@@ -113,13 +113,6 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   val iactDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
   iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
   val iactSPadZeroColumn: Bool = Wire(Bool()) // true, it is a zero column, then need read again
-  when (iactAddrIndexWire === 0.U) { // then it is the beginning of this read
-    iactSPadZeroColumn := false.B
-    iactAddrSPad.io.commonIO.readEn := true.B
-  }.otherwise{
-    iactSPadZeroColumn := iactAddrDataWire === iactAddrDataNextWire
-    iactAddrSPad.io.commonIO.readEn := iactAddrDataNextWire === iactDataIndexWire
-  }
 
   val pSumResultWire: UInt = Wire(UInt(psDataWidth.W))
   val iactAddr_r: UInt = Wire(UInt(iactAddrWidth.W)) // read wire for input activation address
@@ -156,6 +149,13 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
       io.padCtrl.ready := false.B
     }
     is (padIactAddr) {
+      when (iactAddrIndexWire === 0.U) { // then it is the beginning of this read
+        iactSPadZeroColumn := false.B
+        iactAddrSPad.io.commonIO.readEn := true.B
+      }.otherwise{
+        iactSPadZeroColumn := iactAddrDataWire === iactAddrDataNextWire
+        iactAddrSPad.io.commonIO.readEn := iactAddrDataNextWire === iactDataIndexWire
+      }
       when (iactSPadZeroColumn) {
         sPad := padIactAddr
       }.otherwise {
@@ -194,10 +194,10 @@ class IactSPadAddrModule(val topDataLenWidth: Int, val topPadSize: Int, val topD
   when (decoupledDataIO.valid) {
     iactAddrSPad(padWriteIndexReg) := decoupledDataIO.bits.data
   }
-  // dataWire: read logic, for CSC format so this might seem strange
-  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
   val dataWireReadLastElem: Bool = Wire(Bool())
   dataWireReadLastElem := padReadIndexReg === dataLenReg - 1.U
+  // dataWire: read logic, for CSC format so this might seem strange
+  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
   dataWire := Mux(dataWireReadLastElem, 0.U, iactAddrSPad(padReadIndexReg + 1.U))
   io.addrIO.nextReadOutData := dataWire
   io.commonIO.readOutData := dataWireReg
@@ -225,10 +225,10 @@ class WeightSPadAddrModule(val topDataLenWidth: Int, val topPadSize: Int, val to
   when (decoupledDataIO.valid) {
     weightAddrSPad(padWriteIndexReg) := decoupledDataIO.bits.data
   }
-  // dataWire: read logic, for CSC format so this might seem strange
-  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
   val dataWireReadLastElem: Bool = Wire(Bool())
   dataWireReadLastElem := padReadIndexReg === dataLenReg - 1.U
+  // dataWire: read logic, for CSC format so this might seem strange
+  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
   dataWire := Mux(dataWireReadLastElem, 0.U, weightAddrSPad(padReadIndexReg + 1.U))
   io.addrIO.nextReadOutData := dataWire
   io.commonIO.readOutData := dataWireReg
@@ -312,8 +312,8 @@ class DataStreamIO extends Bundle with PESizeConfig {
 }
 
 class DataAddrStreanIO(val dataWidth: Int, addr_width: Int, dataLenWidth: Int, addrLen_width: Int) extends Bundle {
-  val dataIOs = new StreamDataLenFinIO(dataWidth, dataLenWidth)
-  val addrIOs = new StreamDataLenFinIO(addr_width, addrLen_width)
+  val dataIOs = new StreamDataLenFinIO(dataWidth, dataLenWidth) // dataSPad inputs and output writeFin
+  val addrIOs = new StreamDataLenFinIO(addr_width, addrLen_width) // addrSPad inputs and output writeFin
 }
 
 class StreamDataLenFinIO(val streamWidth: Int, streamLenWidth: Int) extends Bundle {
@@ -327,7 +327,7 @@ class StreamBitsIO(val dataWidth: Int) extends Bundle {
 }
 
 class PECtrlToPadIO extends Bundle {
-  val rst: Bool = Bool()
+  //val rst: Bool = Bool()
   //val mcrenf: Vec[UInt] = Vec(6, UInt(5.W))
   val ps_enq_or_product: Bool = Bool() // true, then read from FIFO; false, then use product
   // TODO: set them to input or outpt with ready valid.
