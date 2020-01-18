@@ -95,25 +95,31 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   private def pSumIdx(m: Vec[UInt]): UInt = m(0) + MCRENF.head.U*(m(3) + MCRENF(3).U*(m(4) + MCRENF(4).U*m(5)))
   // pSumIdx = m0 + e0*M0 + n0*E0*M0 + f0*N0*E0*M0
   val psDataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W)))) // reg, partial sum scratch pad
-  val iactAddrSPad: IactSPadAddrModule = Module(new IactSPadAddrModule(commonLenWidth, iactAddrSPadSize, iactAddrWidth))
-  val iactDataSPad: IactSPadDataModule = Module(new IactSPadDataModule(commonLenWidth, iactDataSPadSize, iactDataWidth))
-  val weightAddrSPad: WeightSPadAddrModule = Module(new WeightSPadAddrModule(commonLenWidth, weightAddrSPadSize, weightAddrWidth))
-  val weightDataSPad: WeightSPadDataModule = Module(new WeightSPadDataModule(weightDataLenWidth, weightDataSPadSize, weightDataWidth))
+  val iactAddrSPad: SPadAddrModule = Module(new SPadAddrModule(commonLenWidth, iactAddrSPadSize, iactAddrWidth))
+  val iactDataSPad: SPadDataModule = Module(new SPadDataModule(commonLenWidth, iactDataSPadSize, iactDataWidth, false))
+  val weightAddrSPad: SPadAddrModule = Module(new SPadAddrModule(commonLenWidth, weightAddrSPadSize, weightAddrWidth))
+  val weightDataSPad: SPadDataModule = Module(new SPadDataModule(weightDataLenWidth, weightDataSPadSize, weightDataWidth, true))
   iactAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.addrIOs
   iactDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.dataIOs
   weightAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.addrIOs
   weightDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.dataIOs
+  // close the unused IO
+  iactAddrSPad.io.dataIO.readInIdx := DontCare
+  iactAddrSPad.io.addrIO.readInIdx := DontCare
+  iactDataSPad.io.addrIO.readInIdx := DontCare
+  iactDataSPad.io.dataIO.readInIdx := DontCare
+  weightDataSPad.io.addrIO.readInIdx := DontCare
+  weightAddrSPad.io.dataIO.readInIdx := DontCare
 
   val iactAddrIndexWire: UInt = Wire(UInt(commonLenWidth.W))
   iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
   val iactAddrDataWire: UInt = Wire(UInt(iactAddrWidth.W))
   iactAddrDataWire := iactAddrSPad.io.commonIO.readOutData
-  val iactAddrDataNextWire: UInt = Wire(UInt(iactAddrWidth.W))
-  iactAddrDataNextWire := iactDataSPad.io.addrIO.nextReadOutData
   val iactDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
   iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
   val iactSPadZeroColumn: Bool = Wire(Bool()) // true, it is a zero column, then need read again
-
+  val iactAddrSPadIdxInc: Bool = Wire(Bool()) // true, then increase the read index of address SPad
+  //iactAddrSPadIdxInc :=
   val pSumResultWire: UInt = Wire(UInt(psDataWidth.W))
   val iactAddr_r: UInt = Wire(UInt(iactAddrWidth.W)) // read wire for input activation address
   val weightAddr_r: UInt = Wire(UInt(weightAddrWidth.W)) // read wire for weight address
@@ -153,8 +159,8 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
         iactSPadZeroColumn := false.B
         iactAddrSPad.io.commonIO.readEn := true.B
       }.otherwise{
-        iactSPadZeroColumn := iactAddrDataWire === iactAddrDataNextWire
-        iactAddrSPad.io.commonIO.readEn := iactAddrDataNextWire === iactDataIndexWire
+        iactSPadZeroColumn := iactAddrDataWire === zeroColumnCode.U // then it is a zero column
+        iactAddrSPad.io.commonIO.readEn := iactAddrDataWire === iactDataIndexWire
       }
       when (iactSPadZeroColumn) {
         sPad := padIactAddr
@@ -185,66 +191,39 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   }
 }
 
-class IactSPadAddrModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int)
+class SPadAddrModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int)
   extends SPadCommonModule(topDataLenWidth, topPadSize, topDataWidth) with SPadSizeConfig {
-  val iactAddrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(topPadSize)(0.U(topDataWidth.W))))
-  // dataWireReg: reg the data of one cycle ago, with enable signal to keep the data until it needs to be updated
-  val dataWireReg: UInt = RegEnable(dataWire, 0.U, io.commonIO.readEn)
+  val addrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(topPadSize)(0.U(topDataWidth.W))))
   // write logic 2
   when (decoupledDataIO.valid) {
-    iactAddrSPad(padWriteIndexReg) := decoupledDataIO.bits.data
+    addrSPad(padWriteIndexReg) := decoupledDataIO.bits.data
   }
-  val dataWireReadLastElem: Bool = Wire(Bool())
-  dataWireReadLastElem := padReadIndexReg === dataLenReg - 1.U
-  // dataWire: read logic, for CSC format so this might seem strange
-  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
-  dataWire := Mux(dataWireReadLastElem, 0.U, iactAddrSPad(padReadIndexReg + 1.U))
-  io.addrIO.nextReadOutData := dataWire
-  io.commonIO.readOutData := dataWireReg
-}
-
-class IactSPadDataModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int)
-  extends SPadCommonModule(topDataLenWidth, topPadSize, topDataWidth) with SPadSizeConfig {
-  val iactDataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(topPadSize)(0.U(topDataWidth.W))))
-  // write logic 2
-  when (decoupledDataIO.valid) {
-    iactDataSPad(padWriteIndexReg) := decoupledDataIO.bits.data
-  }
-  // read logic
-  dataWire := iactDataSPad(padReadIndexReg)
-  io.commonIO.readOutData := dataWire // TODO: take care, it is the combination of data and count vector
-  io.addrIO.nextReadOutData := DontCare // disable the unused IO
-}
-
-class WeightSPadAddrModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int)
-  extends SPadCommonModule(topDataLenWidth, topPadSize, topDataWidth) with SPadSizeConfig {
-  val weightAddrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(topPadSize)(0.U(topDataWidth.W))))
-  // dataWireReg: reg the data of one cycle ago, with enable signal to keep the data until it needs to be updated
-  val dataWireReg: UInt = RegEnable(dataWire, 0.U, io.commonIO.readEn)
-  // write logic 2
-  when (decoupledDataIO.valid) {
-    weightAddrSPad(padWriteIndexReg) := decoupledDataIO.bits.data
-  }
-  val dataWireReadLastElem: Bool = Wire(Bool())
-  dataWireReadLastElem := padReadIndexReg === dataLenReg - 1.U
-  // dataWire: read logic, for CSC format so this might seem strange
-  // if dataWire has read the last element(equals to Length - 1), then assign it to 0.U, or it will exceed the index
-  dataWire := Mux(dataWireReadLastElem, 0.U, weightAddrSPad(padReadIndexReg + 1.U))
-  io.addrIO.nextReadOutData := dataWire
-  io.commonIO.readOutData := dataWireReg
-}
-
-class WeightSPadDataModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int)
-  extends SPadCommonModule(topDataLenWidth, topPadSize, topDataWidth) with SPadSizeConfig {
-  val weightDataSPad: SyncReadMem[UInt] = SyncReadMem(topPadSize,UInt(topDataWidth.W))
-  // write logic 2
-  when (decoupledDataIO.valid) {
-    weightDataSPad.write(padWriteIndexReg, decoupledDataIO.bits.data)
-  }
-  // read logic
-  dataWire := weightDataSPad.read(padReadIndexReg, io.commonIO.readEn)
+  // read logic 2
+  dataWire := addrSPad(padReadIndexReg)
   io.commonIO.readOutData := dataWire
-  io.addrIO.nextReadOutData := DontCare // disable the unused IO
+  readIndexInc := io.addrIO.indexInc
+}
+
+class SPadDataModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataWidth: Int, val sramOrReg: Boolean)
+  extends SPadCommonModule(topDataLenWidth, topPadSize, topDataWidth) with SPadSizeConfig {
+  if (sramOrReg) {
+    val dataSPad: SyncReadMem[UInt] = SyncReadMem(topPadSize,UInt(topDataWidth.W))
+    // write logic 2
+    when (decoupledDataIO.valid) {
+      dataSPad.write(padWriteIndexReg, decoupledDataIO.bits.data)
+    }
+    // read logic 2
+    dataWire := dataSPad.read(padReadIndexReg, io.commonIO.readEn)
+  }else{
+    val dataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(topPadSize)(0.U(topDataWidth.W))))
+    when (decoupledDataIO.valid) {
+      dataSPad(padWriteIndexReg) := decoupledDataIO.bits.data
+    }
+    // read logic 2
+    dataWire := dataSPad(padReadIndexReg)
+  }
+  readIndexInc := io.commonIO.readEn
+  io.commonIO.readOutData := dataWire // TODO: take care, it is the combination of data and count vector
 }
 
 class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) extends Module {
@@ -258,10 +237,13 @@ class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) 
   val dataWire: UInt = Wire(UInt(dataWidth.W))
   dataLenReg := io.commonIO.dataLenFinIO.streamLen
   val padWriteIndexReg: UInt = RegInit(0.U(log2Ceil(padSize).W))
+  //val padWriteIndexReg: UInt = RegEnable(0.U(log2Ceil(padSize).W), decoupledDataIO.valid)
   val padReadIndexReg: UInt = RegInit(0.U(log2Ceil(padSize).W))
+  //val padReadIndexReg: UInt = RegEnable(0.U(log2Ceil(padSize).W), io.commonIO.readEn)
 
   val writeWrapWire: Bool = Wire(Bool())
   val readWrapWire: Bool = Wire(Bool())
+  val readIndexInc: Bool = Wire(Bool()) // true, then read index increase
   writeWrapWire := padWriteIndexReg === (dataLenReg - 1.U)
   readWrapWire := padReadIndexReg === (dataLenReg - 1.U)
   // write logic 1
@@ -274,9 +256,9 @@ class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) 
   }.otherwise {
     decoupledDataIO.ready := false.B
   }
-  // counter increase
-  when (io.commonIO.readEn) {
-    padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next cycle, increase
+  // read logic 1
+  when (readIndexInc) {
+    padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next clock cycle, increase
     when (readWrapWire) {
       padReadIndexReg := 0.U
     }
@@ -289,7 +271,7 @@ class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) 
 
 class SPadAddrIO(val dataWidth: Int, val padSize: Int) extends Bundle {
   val readInIdx: UInt = Input(UInt(log2Ceil(padSize).W))
-  val nextReadOutData: UInt = Output(UInt(dataWidth.W)) // the data read last cycle
+  val indexInc: Bool = Input(Bool())
 }
 
 class SPadDataIO(val dataWidth: Int, val padSize: Int) extends Bundle {
@@ -367,4 +349,5 @@ trait PESizeConfig { // TODO: move this config to a higher level package
   val fifoSize: Int = 4
   val commonLenWidth: Int = 4
   val weightDataLenWidth: Int = 8
+  val zeroColumnCode: Int = 15 // when one address vector's element equals to zeroColumnCode, then it is a zero column
 }
