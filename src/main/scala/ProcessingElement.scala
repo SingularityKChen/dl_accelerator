@@ -222,7 +222,7 @@ class SPadDataModule(val topDataLenWidth: Int, val topPadSize: Int, val topDataW
     // read logic 2
     dataWire := dataSPad(padReadIndexReg)
   }
-  readIndexInc := io.commonIO.readEn
+  readIndexInc := io.dataIO.indexInc
   io.commonIO.readOutData := dataWire // TODO: take care, it is the combination of data and count vector
 }
 
@@ -276,6 +276,7 @@ class SPadAddrIO(val dataWidth: Int, val padSize: Int) extends Bundle {
 
 class SPadDataIO(val dataWidth: Int, val padSize: Int) extends Bundle {
   val readInIdx: UInt = Input(UInt(log2Ceil(padSize).W))
+  val indexInc: Bool = Input(Bool())
 }
 
 class SPadCommonIO(val dataLenWidth: Int, val dataWidth: Int, val padSize: Int) extends Bundle {
