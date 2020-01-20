@@ -14,6 +14,7 @@ circuit SPadDataModule :
     input io_addrIO_readInIdx : UInt<4>
     input io_addrIO_indexInc : UInt<1>
     input io_dataIO_readInIdx : UInt<4>
+    input io_dataIO_indexInc : UInt<1>
   
     reg dataLenReg : UInt<4>, clock with :
       reset => (UInt<1>("h0"), dataLenReg) @[ProcessingElement.scala 236:33]
@@ -37,7 +38,7 @@ circuit SPadDataModule :
     node _T_9 = tail(_T_8, 1) @[ProcessingElement.scala 261:40]
     node readWrapWire = _T_5 @[ProcessingElement.scala 245:32 ProcessingElement.scala 248:16]
     node _GEN_3 = mux(readWrapWire, UInt<1>("h0"), _T_9) @[ProcessingElement.scala 262:25]
-    node readIndexInc = io_commonIO_readEn @[ProcessingElement.scala 246:32 ProcessingElement.scala 225:16]
+    node readIndexInc = io_dataIO_indexInc @[ProcessingElement.scala 246:32 ProcessingElement.scala 225:16]
     node _GEN_4 = mux(readIndexInc, _GEN_3, padReadIndexReg) @[ProcessingElement.scala 260:23]
     node _T_10 = and(io_commonIO_dataLenFinIO_streamDecoupledDataIO_valid, writeWrapWire) @[ProcessingElement.scala 268:62]
     reg _T_12_0 : UInt<12>, clock with :

@@ -14,6 +14,7 @@ circuit SPadAddrModule :
     input io_addrIO_readInIdx : UInt<4>
     input io_addrIO_indexInc : UInt<1>
     input io_dataIO_readInIdx : UInt<4>
+    input io_dataIO_indexInc : UInt<1>
   
     reg dataLenReg : UInt<4>, clock with :
       reset => (UInt<1>("h0"), dataLenReg) @[ProcessingElement.scala 236:33]

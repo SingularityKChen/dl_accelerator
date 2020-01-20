@@ -3,7 +3,7 @@ circuit SPadDataModule :
   module SPadDataModule : 
     input clock : Clock
     input reset : UInt<1>
-    output io : {commonIO : {columnNum : UInt<4>, readOutData : UInt<12>, flip readEn : UInt<1>, writeIdx : UInt<4>, dataLenFinIO : {flip streamDecoupledDataIO : {flip ready : UInt<1>, valid : UInt<1>, bits : {data : UInt<12>}}, flip streamLen : UInt<4>, writeFin : UInt<1>}}, addrIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}, dataIO : {flip readInIdx : UInt<4>}}
+    output io : {commonIO : {columnNum : UInt<4>, readOutData : UInt<12>, flip readEn : UInt<1>, writeIdx : UInt<4>, dataLenFinIO : {flip streamDecoupledDataIO : {flip ready : UInt<1>, valid : UInt<1>, bits : {data : UInt<12>}}, flip streamLen : UInt<4>, writeFin : UInt<1>}}, addrIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}, dataIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}}
     
     reg dataLenReg : UInt<4>, clock with : (reset => (reset, UInt<4>("h09"))) @[ProcessingElement.scala 236:33]
     wire dataWire : UInt<12> @[ProcessingElement.scala 237:28]
@@ -67,6 +67,6 @@ circuit SPadDataModule :
       _T_12[padWriteIndexReg] <= io.commonIO.dataLenFinIO.streamDecoupledDataIO.bits.data @[ProcessingElement.scala 220:34]
       skip @[ProcessingElement.scala 219:34]
     dataWire <= _T_12[padReadIndexReg] @[ProcessingElement.scala 223:14]
-    readIndexInc <= io.commonIO.readEn @[ProcessingElement.scala 225:16]
+    readIndexInc <= io.dataIO.indexInc @[ProcessingElement.scala 225:16]
     io.commonIO.readOutData <= dataWire @[ProcessingElement.scala 226:27]
     

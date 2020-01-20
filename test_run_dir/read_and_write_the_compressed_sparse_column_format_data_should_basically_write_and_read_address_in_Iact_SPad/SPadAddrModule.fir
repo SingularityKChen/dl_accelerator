@@ -3,7 +3,7 @@ circuit SPadAddrModule :
   module SPadAddrModule : 
     input clock : Clock
     input reset : UInt<1>
-    output io : {commonIO : {columnNum : UInt<4>, readOutData : UInt<4>, flip readEn : UInt<1>, writeIdx : UInt<4>, dataLenFinIO : {flip streamDecoupledDataIO : {flip ready : UInt<1>, valid : UInt<1>, bits : {data : UInt<4>}}, flip streamLen : UInt<4>, writeFin : UInt<1>}}, addrIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}, dataIO : {flip readInIdx : UInt<4>}}
+    output io : {commonIO : {columnNum : UInt<4>, readOutData : UInt<4>, flip readEn : UInt<1>, writeIdx : UInt<4>, dataLenFinIO : {flip streamDecoupledDataIO : {flip ready : UInt<1>, valid : UInt<1>, bits : {data : UInt<4>}}, flip streamLen : UInt<4>, writeFin : UInt<1>}}, addrIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}, dataIO : {flip readInIdx : UInt<4>, flip indexInc : UInt<1>}}
     
     reg dataLenReg : UInt<4>, clock with : (reset => (reset, UInt<4>("h09"))) @[ProcessingElement.scala 236:33]
     wire dataWire : UInt<4> @[ProcessingElement.scala 237:28]

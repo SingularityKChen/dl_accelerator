@@ -8,28 +8,29 @@ import org.scalatest._
 class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester with Matchers {
   // def some common parameters and functions
   val inAddr = Seq(2, 5, 15, 6, 7, 15, 9, 12) // 15 means it is a zero column, don't record the first number
+  val inAddr2 = Seq(2, 15, 15, 15, 5, 15, 15, 7, 8, 15, 15, 15, 15, 9)
   val inData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33) // zero column between 15 & 18, 24 & 27
   val inCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2)
-  val zeroColumn = Seq(false, false, false, false, false, false, true, false, true, false, false, false)
   val outColumn = Seq(0, 0, 1, 1, 1, 2, 3, 4, 5, 5, 6, 7, 7, 7) // 3, 6 are zero column
-  val outAddrReadData = Seq(2, 2, 5, 5, 5, 15, 6, 7, 15, 9, 9, 12, 12)
   val outDataReadIndex = Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+  val outCycleType = Seq(2, 1, 2, 1, 1, 0, 2, 0, 1, 2, 1, 1) // 0 for zero column, 1 for data read only read cycle,
+                                       // 2 for read cycle which contains both address and data read
   /*
-  * The input matrix is
-  * | data | row | col |
-  * | ---- | --- | --- |
-  * |   1  |  1  |  0  |
-  * |   3  |  2  |  0  |
-  * |   6  |  0  |  1  |
-  * |   9  |  1  |  1  |
-  * |  12  |  3  |  1  |
-  * |  15  |  2  |  2  |
-  * |  18  |  3  |  4  |
-  * |  21  |  1  |  5  |
-  * |  24  |  3  |  5  |
-  * |  27  |  0  |  7  |
-  * |  30  |  1  |  7  |
-  * |  33  |  2  |  7  |
+  * The input matrix is           The second matrix is
+  * | data | row | col |          | data | row | col |
+  * | ---- | --- | --- |          | ---- | --- | --- |
+  * |   1  |  1  |  0  |          |   1  |  1  |  0  | // 0 is a zero column
+  * |   3  |  2  |  0  |          |   3  |  2  |  0  |
+  * |   6  |  0  |  1  |          |   6  |  0  |  1  |
+  * |   9  |  1  |  1  |          |   9  |  1  |  1  |
+  * |  12  |  3  |  1  |          |  12  |  3  |  1  |
+  * |  15  |  2  |  2  |          |  15  |  2  |  5  |
+  * |  18  |  3  |  4  |          |  18  |  3  |  5  |
+  * |  21  |  1  |  5  |          |  21  |  1  |  8  |
+  * |  24  |  3  |  5  |          |  24  |  3  |  9  |
+  * |  27  |  0  |  7  |          |  27  |  0  |  14 |
+  * |  30  |  1  |  7  |          |  30  |  1  |  14 |
+  * |  33  |  2  |  7  |          |  33  |  2  |  14 |
   */
   val inDataWithIndex: Seq[(Int, Int)] = inData zip inCount
   def toBinary(i: Int, digits: Int = 8): String =
@@ -63,25 +64,26 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
     val iactAddrIndexWire: UInt = Wire(UInt(commonLenWidth.W))
     val iactAddrDataWire: UInt = Wire(UInt(iactAddrWidth.W))
     val iactDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
-    val iactSPadZeroColumnWire: Bool = Wire(Bool()) // true, it is a zero column, then need read again
+    val iactSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
     val iactAddrSPadReadEnReg: Bool = RegEnable(false.B, iactASPRERegEnable)
     val iactDataSPadReadEnReg: Bool = RegInit(false.B)
     val iactAddrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of address SPad
     val iactDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of data SPad
-    val iactDataSPadFirstRead: Bool = RegInit(true.B) // true, then the first time to read
+    val iactMatrixColumnReg: UInt = RegInit(0.U(commonLenWidth.W))
+    val iactZeroColumnNumber: UInt = RegInit(0.U(commonLenWidth.W)) // use for get the right column number
+    val iactDataSPadFirstRead: Bool = RegInit(true.B)
     iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
     iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
-    iactAddrSPadIdxIncWire := ((sPad === padIdle) && (iactAddrDataWire === iactDataIndexWire)) || ((sPad === padIactAddr) && iactSPadZeroColumnWire)
-    iactDataSPadIdxIncWire := ((sPad === padIactAddr) && !iactSPadZeroColumnWire && !iactDataSPadFirstRead) // if first read, then keep the read index of zero
-    iactASPRERegEnable := (sPad === padIdle) || ((sPad === padIactAddr) && iactSPadZeroColumnWire)
-    iactSPadZeroColumnWire := (iactAddrDataWire === zeroColumnCode.U) && (sPad === padIactAddr)
+    iactAddrSPadIdxIncWire := ((sPad === padIactData) && (iactAddrDataWire === (iactDataIndexWire + 1.U))) || ((sPad === padIactAddr) && (iactAddrDataWire === zeroColumnCode.U))
+    iactDataSPadIdxIncWire := ((sPad === padIactAddr) && !iactSPadZeroColumnReg && !iactDataSPadFirstRead) || ((sPad === padIactData) && !iactAddrSPadIdxIncWire)// if first read, then keep the read index of zero
+    iactASPRERegEnable := (sPad === padIdle) || ((sPad === padIactAddr) && iactSPadZeroColumnReg)
     iactAddrSPad.io.commonIO.dataLenFinIO <> io.iactIOs.addrIOs // this is different from the real module
     iactDataSPad.io.commonIO.dataLenFinIO <> io.iactIOs.dataIOs
     io.iactAddrWriteIdx := iactAddrSPad.io.commonIO.writeIdx
     io.iactDataWriteIdx := iactDataSPad.io.commonIO.writeIdx
     // AddrSPad
     iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
-    io.iactMatrixColumn := iactAddrIndexWire // for debug
+    io.iactMatrixColumn := iactMatrixColumnReg // for debug
     iactAddrDataWire := iactAddrSPad.io.commonIO.readOutData
     io.iactAddrReadData := iactAddrDataWire // for debug
     iactAddrSPad.io.commonIO.readEn := iactAddrSPadReadEnReg
@@ -107,18 +109,16 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       is(padIdle) {
         when(io.iactDataReq) {
           sPad := padIactAddr
-          when (iactDataIndexWire === 0.U && iactDataSPadFirstRead) {
-            iactDataSPadFirstRead := true.B
-          }
-          when (iactAddrIndexWire === 0.U) { // then it is the beginning of this read
-            iactAddrSPadReadEnReg := true.B
-          }
+          iactAddrSPadReadEnReg := true.B
+          iactDataSPadReadEnReg := false.B
+          iactDataSPadFirstRead := true.B
         }
       }
       is(padIactAddr) {
         // state transform
-        when(iactSPadZeroColumnWire) { // this is a zero column
+        when (iactAddrDataWire === zeroColumnCode.U) {
           sPad := padIactAddr
+          iactSPadZeroColumnReg := true.B
           iactAddrSPadReadEnReg := true.B
           iactDataSPadReadEnReg := false.B
         }.otherwise {
@@ -128,9 +128,25 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
         }
       }
       is(padIactData) {
-        sPad := padIdle
-        iactDataSPadReadEnReg := false.B
         iactDataSPadFirstRead := false.B
+        sPad := padIdle
+        when (iactAddrSPadIdxIncWire) {
+          sPad := padIactAddr
+          iactSPadZeroColumnReg := false.B // only after the last data read and then
+                                           // the reg can be set to false (like the column is 5, 5, 7)
+          iactAddrSPadReadEnReg := true.B
+          iactDataSPadReadEnReg := false.B
+          when (iactSPadZeroColumnReg) {
+            iactMatrixColumnReg := iactMatrixColumnReg + 2.U // if zero, then add two
+            // FIXME: will be wrong if there are continued zero columns
+          } .otherwise {
+            iactMatrixColumnReg := iactMatrixColumnReg + 1.U // if normal column, add one
+          }
+        } .otherwise {
+          sPad := padIactData
+          iactAddrSPadReadEnReg := false.B
+          iactDataSPadReadEnReg := true.B
+        }
         iactAddrSPadReadEnReg := iactAddrDataWire === iactDataIndexWire
       }
     }
@@ -140,6 +156,33 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
     test(new SimplyCombineAddrDataSPad) { iactSPad =>
       val theTopIO = iactSPad.io
       val theClock = iactSPad.clock
+
+      def checkSignal(cycle: Int): Any = outCycleType(cycle) match {
+        case 0 => {
+          println(s"------ read cycle $cycle ---------")
+          println(s"--- meets a zero column at $cycle read cycle ---")
+          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
+          theClock.step(1) // from address SPad to next address SPad read
+          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
+          theClock.step(1) // from address SPad read to data SPad read
+          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
+          theClock.step(1) // goto next one
+        }
+        case 1 => {
+          println(s"------ read cycle $cycle ---------")
+          println(s"--- meets a data read only cycle at $cycle read cycle ---")
+          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
+          theClock.step(1) // goto next one
+        }
+        case 2 => {
+          println(s"------ read cycle $cycle ---------")
+          println(s"--- meets a common read cycle at $cycle read cycle ---")
+          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
+          theClock.step(1) // from address SPad read to data SPad read
+          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
+          theClock.step(1) // goto next one
+        }
+      }
       println("------ begin to test the read ------")
       println("------ and write address in Iact SPad ------")
       println("----------- begin to write -----------")
@@ -170,46 +213,9 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       }.join()
       println("----------- begin to read -----------")
       theTopIO.iactDataReq.poke(true.B) // start the state machine
-      var j:Int = 0 // for address cycle
+      theClock.step(1) // from idle to address SPad read
       for (i <- 0 until 12) {
-        println(s"------ read cycle $i ---------")
-        if (!zeroColumn(i)) {
-          theClock.step(1) // from idle to address SPad read
-          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
-          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
-          //theTopIO.iactAddrReadData.expect(outAddrReadData(j).U)
-          //theTopIO.iactMatrixColumn.expect(outColumn(j).U, s"the column number should be ${outColumn(j)} at $i-th read cycle")
-          theClock.step(1) // from address SPad read to data SPad read
-          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
-          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
-          theTopIO.iactMatrixRow.expect(inCount(i).U, s"the row number should be ${inCount(i)} at $i-th read cycle")
-          theTopIO.iactMatrixData.expect(inData(i).U, s"the data value should be ${inData(i)} at $i-th read cycle")
-          theTopIO.iactDataReadIndex.expect(outDataReadIndex(i).U, s"the data read index should be ${outDataReadIndex(i)} at $i-th read cycle")
-          println(s"data = ${inData(i)}, row = ${inCount(i)}, column = ${outColumn(j)}")
-          println(s"addrReadData = ${outAddrReadData(i)}, dataReadIndex = ${outDataReadIndex(i)}")
-          j = j + 1
-        }else{
-          theClock.step(1) // from idle to address SPad read
-          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
-          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
-          //theTopIO.iactMatrixColumn.expect(outColumn(j).U, s"the column number should be ${outColumn(j)} at $i-th read cycle")
-          //theTopIO.iactAddrReadData.expect(outAddrReadData(j).U)
-          println(s"--- meets a zero column at $i read cycle ---")
-          j = j + 1
-          theClock.step(1) // from address SPad to next address SPad read
-          //theTopIO.iactMatrixColumn.expect(outColumn(j).U, s"the column number should be ${outColumn(j)} at $i-th read cycle")
-          //theTopIO.iactAddrReadData.expect(outAddrReadData(j).U)
-          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
-          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
-          theClock.step(1) // from address SPad read to data SPad read
-          println(s"data = ${theTopIO.iactMatrixData.peek()}, row = ${theTopIO.iactMatrixRow.peek()}, column = ${theTopIO.iactMatrixColumn.peek()}")
-          println(s"addrReadEn = ${theTopIO.iactAddrReadEn.peek()}, addrReadData = ${theTopIO.iactAddrReadData.peek()}, dataReadIndex = ${theTopIO.iactDataReadIndex.peek()}")
-          theTopIO.iactMatrixRow.expect(inCount(i).U, s"the row number should be ${inCount(i)}")
-          theTopIO.iactMatrixData.expect(inData(i).U, s"the data value should be ${inData(i)}")
-          println(s"data = ${inData(i)}, row = ${inCount(i)}, column = ${outColumn(j)}, ")
-          j = j + 1
-        }
-        theClock.step(1) // from data SPad read to idle
+        checkSignal(i)
       }
     }
   }
