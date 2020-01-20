@@ -1,16 +1,16 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeFin",
+    "sink":"~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeInDataIO_ready",
     "sources":[
-      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_streamDecoupledDataIO_valid"
+      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeInDataIO_valid"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_streamDecoupledDataIO_ready",
+    "sink":"~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeFin",
     "sources":[
-      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_streamDecoupledDataIO_valid"
+      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeInDataIO_valid"
     ]
   },
   {

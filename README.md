@@ -40,8 +40,5 @@ This is the control module of PE.
 
 #### ProcessingElementPad
 
-This is the Scratch Pad of input feature map, filter weight and partial sum.
+This is the Scratch Pad of input feature map, filter weight and partial sum. It contains seven stages.
 
-#### ProcessingElementMAC
-
-This is the MAC module of PE.
