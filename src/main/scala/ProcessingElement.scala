@@ -85,7 +85,7 @@ class ProcessingElementControl extends Module with MCRENFConfig {
 
 class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig {
   val io = IO(new Bundle{
-    val padCtrl = Flipped(new PECtrlToPadIO)
+    val padCtrl: PECtrlToPadIO = Flipped(new PECtrlToPadIO)
     val dataStream = new DataStreamIO
   })
   private def iactIdx(m: Vec[UInt]): UInt = m(1) + MCRENF(1).U*(m(2) + MCRENF(2).U*(m(3) + MCRENF(3).U*(m(4) + MCRENF(4).U*m(5))))
@@ -94,6 +94,34 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   // weightIdx = m0 + c0*M0 + r0*C0*M0
   private def pSumIdx(m: Vec[UInt]): UInt = m(0) + MCRENF.head.U*(m(3) + MCRENF(3).U*(m(4) + MCRENF(4).U*m(5)))
   // pSumIdx = m0 + e0*M0 + n0*E0*M0 + f0*N0*E0*M0
+  private def nextSPadIactAddr(): Unit = {
+    sPad := padIactAddr
+    iactAddrSPadReadEnReg := true.B
+    iactDataSPadReadEnReg := false.B
+    weightAddrSPadReadEnReg := false.B
+    weightDataSPadReadEnReg := false.B
+  }
+  private def nextSPadIactData(): Unit = {
+    sPad := padIactData
+    iactAddrSPadReadEnReg := false.B
+    iactDataSPadReadEnReg := true.B
+    weightAddrSPadReadEnReg := false.B
+    weightDataSPadReadEnReg := false.B
+  }
+  private def nextSPadWeightAddr(): Unit = {
+    sPad := padWeightAddr
+    iactAddrSPadReadEnReg := false.B
+    iactDataSPadReadEnReg := false.B
+    weightAddrSPadReadEnReg := true.B
+    weightDataSPadReadEnReg := false.B
+  }
+  private def nextSPadWeightData(): Unit = {
+    sPad := padWeightData1
+    iactAddrSPadReadEnReg := false.B
+    iactDataSPadReadEnReg := false.B
+    weightAddrSPadReadEnReg := false.B
+    weightDataSPadReadEnReg := true.B
+  }
   val psDataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W)))) // reg, partial sum scratch pad
   val iactAddrSPad: SPadAddrModule = Module(new SPadAddrModule(commonLenWidth, iactAddrSPadSize, iactAddrWidth))
   val iactDataSPad: SPadDataModule = Module(new SPadDataModule(commonLenWidth, iactDataSPadSize, iactDataWidth, false))
@@ -136,6 +164,8 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   val weightMatrixRowReg: UInt = RegInit(0.U(cscCountWidth.W))
   val weightMatrixDataReg: UInt = RegInit(0.U(cscDataWidth.W))
   val productReg: UInt = RegInit(0.U(psDataWidth.W))
+  val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
+  val pSumResultWire: UInt = Wire(UInt(psDataWidth.W))
   iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
   weightAddrSPad.io.addrIO.indexInc := weightAddrSPadIdxIncWire
   iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
@@ -191,45 +221,53 @@ class ProcessingElementPad extends Module with MCRENFConfig with SPadSizeConfig 
   switch (sPad) {
     is (padIdle) {
       when(io.padCtrl.doMACEn) {
-        sPad := padIactAddr
-        io.padCtrl.pSumEnqOrProduct.ready := true.B // tell the controller the pad has received data
-        pSumResultIdxReg := pSumIdx(mcrenfReg) // reg the index
+        nextSPadIactAddr()
+        iactDataSPadFirstRead := true.B
       }
-      io.padCtrl.pSumEnqOrProduct.ready := false.B
     }
     is (padIactAddr) {
-      when (iactAddrIndexWire === 0.U) { // then it is the beginning of this read
-        iactSPadZeroColumnReg := false.B
-        iactAddrSPad.io.commonIO.readEn := true.B
-      }.otherwise{
-        iactSPadZeroColumnReg := iactAddrDataWire === zeroColumnCode.U // then it is a zero column
-        iactAddrSPad.io.commonIO.readEn := iactAddrDataWire === iactDataIndexWire
+      when (iactAddrDataWire === zeroColumnCode.U) { // then it is a zero column
+        nextSPadIactAddr()
+        iactSPadZeroColumnReg := true.B
+      } .otherwise {
+        nextSPadIactData()
       }
-      when (iactSPadZeroColumnReg) {
-        sPad := padIactAddr
-      }.otherwise {
-        sPad := padIactData
-      }
-      io.padCtrl.pSumEnqOrProduct.ready := false.B
     }
     is (padIactData) {
-      sPad := padWeightAddr
+    }
+    is (padWeightAddr) {
+      when (weightAddrDataWire === zeroColumnCode.U) { // need to get next iact
+        weightSPadZeroColumnReg := true.B
+        when (iactAddrSPadIdxIncWire) {
+          nextSPadIactAddr()
+        } .otherwise {
+          nextSPadIactData()
+        }
+      }
     }
     is (padWeightData1) {
       sPad := padWeightData2
+      //weightDataSPadReadEnReg := false.B
     }
     is (padWeightData2) {
+      weightDataSPadReadEnReg := false.B
       sPad := pad_mpy
     }
     is (pad_mpy) {
       sPad := pad_wb
-      productReg := weightMatrixDataReg * iactMatrixDataReg
+      pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
+      productReg := Mux(io.padCtrl.pSumEnqOrProduct.bits, io.dataStream.ipsIO.bits, weightMatrixDataReg * iactMatrixDataReg)
     }
     is (pad_wb) {
-      sPad := padIdle
-      //pSumResultWire := Mux(io.padCtrl.pSumEnqOrProduct.bits, io.dataStream.ipsIO.bits, productReg) + pSum_loadReg
+      pSumResultWire := pSumSPadLoadReg + productReg
       // FIXME: add ready valid signal for ips FIFO
-      //psDataSPad(pSumResultIdxReg) := pSumResultWire //update the partial sum
+      psDataSPad(weightMatrixRowReg) := pSumResultWire //update the partial sum
+      when ((iactDataIndexWire === io.dataStream.iactIOs.dataIOs.streamLen - 1.U) && (weightDataIndexWire === io.dataStream.weightIOs.dataIOs.streamLen - 1.U)) {
+        sPad := padIdle
+      }
+      when (iactAddrSPadIdxIncWire) {
+        nextSPadIactAddr()
+      }
     }
   }
 }
@@ -322,7 +360,11 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
     }
     is(padIactData) {
       iactDataSPadFirstRead := false.B
-      sPad := padIdle
+      when (iactDataIndexWire === io.iactIOs.dataIOs.streamLen - 1.U) {
+        sPad := padIdle
+        iactDataSPadReadEnReg := false.B
+        iactSPadZeroColumnReg := false.B
+      }
       when (iactAddrSPadIdxIncWire) {
         sPad := padIactAddr
         iactSPadZeroColumnReg := false.B // only after the last data read and then
@@ -341,7 +383,6 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
         iactAddrSPadReadEnReg := false.B
         iactDataSPadReadEnReg := true.B
       }
-      iactAddrSPadReadEnReg := iactAddrDataWire === iactDataIndexWire
     }
   }
 }
