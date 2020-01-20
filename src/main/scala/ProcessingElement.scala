@@ -331,7 +331,8 @@ trait MCRENFConfig extends PESizeConfig { // contains some scala values
 trait SPadSizeConfig extends PESizeConfig {
   val pSumDataSPadSize: Int = 32
   val iactDataSPadSize: Int = 16
-  val iactAddrSPadSize: Int = 9
+  val iactAddrSPadSize: Int = 15
+  //val iactAddrSPadSize: Int = 9
   val weightDataSPadSize: Int = 192 // 96 if SIMD
   val weightAddrSPadSize: Int = 16
 }
