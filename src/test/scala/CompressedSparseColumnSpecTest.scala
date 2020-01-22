@@ -6,19 +6,20 @@ import dla.pe.{SPadAddrModule, SPadDataModule, SPadSizeConfig, SimplyCombineAddr
 import org.scalatest._
 class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig {
   // def some common parameters and functions
-  val inAddr = Seq(2, 5, iactZeroColumnCode, 6, 7, iactZeroColumnCode, 9, 12) // 15 means it is a zero column, don't record the first number
-  val inAddr2 = Seq(2, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, 5, iactZeroColumnCode, iactZeroColumnCode, 7, 8, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, 9) // FIXME: this will exceed the recommend Address SPad size
-  val inData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33) // zero column between 15 & 18, 24 & 27
-  val inCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2)
-  val inWeightAddr = Seq(5, 9, weightZeroColumnCode, 11, 14)
-  val inWeightData = Seq(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32)
-  val inWeightCount = Seq(1, 3, 4, 6, 7, 2, 5, 6, 7, 0, 5, 0, 1, 3, 5, 7)
-  val outColumn = Seq(0, 0, 1, 1, 1, 2, 4, 5, 5, 7, 7, 7) // 3, 6 are zero column
-  val outColumn2 = Seq(0, 0, 1, 1, 1, 5, 5, 8, 9, 14, 14, 14)
-  val outDataReadIndex = Seq(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-  val outCycleType = Seq(2, 1, 2, 1, 1, 0, 2, 2, 0, 2, 1, 2, 1, 1) // 0 for zero column, 1 for data read only read cycle,
+  val inIactTestAddr = Seq(2, 5, iactZeroColumnCode, 6, 7, iactZeroColumnCode, 9, 12) // 15 means it is a zero column, don't record the first number
+  val inIactTestAddr2 = Seq(2, 5, 7, 8, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, 9)
+  val inWeightAddr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12) // 15 means it is a zero column, don't record the first number
+  val inWeightData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33) // zero column between 15 & 18, 24 & 27
+  val inWeightCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2)
+  val inIactAddr = Seq(5, 9, iactZeroColumnCode, 11, 14)
+  val inIactData = Seq(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32)
+  val inIactCount = Seq(1, 3, 4, 6, 7, 2, 5, 6, 7, 0, 5, 0, 1, 3, 5, 7)
+  val outWeightColumn = Seq(0, 0, 1, 1, 1, 2, 4, 5, 5, 7, 7, 7) // 3, 6 are zero column
+  val outWeightColumn2 = Seq(0, 0, 1, 1, 1, 2, 2, 3, 4, 9, 9, 9)
+  val outIactColumn = Seq(0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5)
+  val outWeightCycleType = Seq(2, 1, 2, 1, 1, 0, 2, 2, 0, 2, 1, 2, 1, 1) // 0 for zero column, 1 for data read only read cycle,
                     // 2 for read cycle which contains both address and data read
-  val outCycleType2 = Seq(2, 1, 0, 0, 0, 2, 1, 1, 0, 0, 2, 1, 2, 0, 0, 0, 0, 2, 2, 1, 1) // read the zero numbers after the column then read data
+  val outWeightCycleType2 = Seq(2, 1, 2, 1, 1, 2, 1, 2, 0, 0, 0, 0, 2, 2, 1, 1) // read the zero numbers after the column then read data
   /*
   * The first matrix is           The second matrix is
   * | data | row | col |          | data | row | col |
@@ -28,13 +29,13 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
   * |   6  |  0  |  1  |          |   6  |  0  |  1  |
   * |   9  |  1  |  1  |          |   9  |  1  |  1  |
   * |  12  |  3  |  1  |          |  12  |  3  |  1  |
-  * |  15  |  2  |  2  |          |  15  |  2  |  5  |
-  * |  18  |  3  |  4  |          |  18  |  3  |  5  |
-  * |  21  |  1  |  5  |          |  21  |  1  |  8  |
-  * |  24  |  3  |  5  |          |  24  |  3  |  9  |
-  * |  27  |  0  |  7  |          |  27  |  0  |  14 |
-  * |  30  |  1  |  7  |          |  30  |  1  |  14 |
-  * |  33  |  2  |  7  |          |  33  |  2  |  14 |
+  * |  15  |  2  |  2  |          |  15  |  2  |  2  |
+  * |  18  |  3  |  4  |          |  18  |  3  |  2  |
+  * |  21  |  1  |  5  |          |  21  |  1  |  3  |
+  * |  24  |  3  |  5  |          |  24  |  3  |  4  |
+  * |  27  |  0  |  7  |          |  27  |  0  |  9  |
+  * |  30  |  1  |  7  |          |  30  |  1  |  9  |
+  * |  33  |  2  |  7  |          |  33  |  2  |  9  |
   */
   def toBinary(i: Int, digits: Int = 8): String =
     String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
@@ -44,40 +45,89 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
     val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
     theDataCountDec
   }
-  val inDataCountDec: Seq[Int] = combineDataAndCount(inData, inCount)
-  def simplyWriteInDataAndAddr(inAddr: Seq[Int], inData: Seq[Int], topModule: SimplyCombineAddrDataSPad): Any = {
+  val inWeightDataCountDec: Seq[Int] = combineDataAndCount(inWeightData, inWeightCount)
+  val inIactDataCountDec: Seq[Int] = combineDataAndCount(inIactData,inIactCount)
+  def PEScratchPadWriteIn(inIactAddr: Seq[Int], inIactData: Seq[Int], inIactTestAddr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
+    val theTopSPadIO = topModule.io.dataStream
+    val theClock = topModule.clock
+    theTopSPadIO.iactIOs.addrIOs.streamLen.poke(inIactAddr.length.U)
+    theTopSPadIO.iactIOs.dataIOs.streamLen.poke(inIactData.length.U)
+    theTopSPadIO.weightIOs.addrIOs.streamLen.poke(inIactTestAddr.length.U)
+    theTopSPadIO.weightIOs.dataIOs.streamLen.poke(inWeightData.length.U)
+    topModule.io.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
+    topModule.io.padCtrl.doMACEn.poke(false.B)
+    fork {
+      theTopSPadIO.iactIOs.addrIOs.writeInDataIO.valid.poke(true.B)
+      for (i <- inIactAddr.indices) {
+        theTopSPadIO.iactIOs.addrIOs.writeInDataIO.bits.data.poke(inIactAddr(i).U)
+        theTopSPadIO.iactIOs.addrIOs.writeFin.expect((i == inIactAddr.length - 1).B, s"[write cycle $i @ iactAddrSPad] should it finish writing?")
+        theTopSPadIO.iactIOs.addrIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ iactAddrSPad] write valid, after receive the data, it should be ready")
+        theClock.step(1)
+      }
+      theTopSPadIO.iactIOs.addrIOs.writeInDataIO.valid.poke(false.B)
+    } .fork {
+      theTopSPadIO.iactIOs.dataIOs.writeInDataIO.valid.poke(true.B)
+      for (i <- inIactData.indices) {
+        theTopSPadIO.iactIOs.dataIOs.writeInDataIO.bits.data.poke(inIactData(i).U)
+        theTopSPadIO.iactIOs.dataIOs.writeFin.expect((i == inIactData.length - 1).B, s"[write cycle $i @ iactDataSPad] should it finish writing?")
+        theTopSPadIO.iactIOs.dataIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ iactDataSPad] write valid, after receive the data, it should be ready")
+        theClock.step(1)
+      }
+      theTopSPadIO.iactIOs.dataIOs.writeInDataIO.valid.poke(false.B)
+    } .fork {
+      theTopSPadIO.weightIOs.addrIOs.writeInDataIO.valid.poke(true.B)
+      for (i <- inIactTestAddr.indices) {
+        theTopSPadIO.weightIOs.addrIOs.writeInDataIO.bits.data.poke(inIactTestAddr(i).U)
+        theTopSPadIO.weightIOs.addrIOs.writeFin.expect((i == inIactTestAddr.length - 1).B, s"[write cycle $i @ weightAddrSPad] should it finish writing?")
+        theTopSPadIO.weightIOs.addrIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ weightAddrSPad] write valid, after receive the data, it should be ready")
+        theClock.step(1)
+      }
+      theTopSPadIO.weightIOs.addrIOs.writeInDataIO.valid.poke(false.B)
+    } .fork {
+      theTopSPadIO.weightIOs.dataIOs.writeInDataIO.valid.poke(true.B)
+      for (i <- inWeightData.indices) {
+        theTopSPadIO.weightIOs.dataIOs.writeInDataIO.bits.data.poke(inWeightData(i).U)
+        theTopSPadIO.weightIOs.dataIOs.writeFin.expect((i == inWeightData.length - 1).B, s"[write cycle $i @ weightDataSPad] should it finish writing?")
+        theTopSPadIO.weightIOs.dataIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ weightDataSPad] write valid, after receive the data, it should be ready")
+        theClock.step(1)
+      }
+      theTopSPadIO.weightIOs.dataIOs.writeInDataIO.valid.poke(false.B)
+    } .join()
+  }
+
+  def simplyWriteInDataAndAddr(inIactTestAddr: Seq[Int], inWeightData: Seq[Int], topModule: SimplyCombineAddrDataSPad): Any = {
     val theTopIO = topModule.io.iactIOs
     val theDataWriteIdx = topModule.io.iactDataWriteIdx
     val theAddrWriteIdx = topModule.io.iactAddrWriteIdx
     val theDataReq = topModule.io.iactDataReq
     val theClock = topModule.clock
-    theTopIO.addrIOs.streamLen.poke(inAddr.length.U)
-    theTopIO.dataIOs.streamLen.poke(inDataCountDec.length.U)
+    theTopIO.addrIOs.streamLen.poke(inIactTestAddr.length.U)
+    theTopIO.dataIOs.streamLen.poke(inWeightData.length.U)
     theDataReq.poke(false.B)
     fork { // run them in parallel
       theTopIO.addrIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inAddr.indices) {
-        theTopIO.addrIOs.writeInDataIO.bits.data.poke(inAddr(i).U)
+      for (i <- inIactTestAddr.indices) {
+        theTopIO.addrIOs.writeInDataIO.bits.data.poke(inIactTestAddr(i).U)
         theAddrWriteIdx.expect(i.U, s"i = $i")
-        theTopIO.addrIOs.writeFin.expect((i == inAddr.length - 1).B, s"i = $i")
+        theTopIO.addrIOs.writeFin.expect((i == inIactTestAddr.length - 1).B, s"i = $i")
         theTopIO.addrIOs.writeInDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
         theClock.step(1)
       }
       theTopIO.addrIOs.writeInDataIO.valid.poke(false.B)
     } .fork {
       theTopIO.dataIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inDataCountDec.indices) {
-        theTopIO.dataIOs.writeInDataIO.bits.data.poke(inDataCountDec(i).U)
+      for (i <- inWeightData.indices) {
+        theTopIO.dataIOs.writeInDataIO.bits.data.poke(inWeightData(i).U)
         theDataWriteIdx.expect(i.U, s"i = $i")
-        theTopIO.dataIOs.writeFin.expect((i == inDataCountDec.length - 1).B, s"i = $i")
+        theTopIO.dataIOs.writeFin.expect((i == inWeightData.length - 1).B, s"i = $i")
         theTopIO.dataIOs.writeInDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
         theClock.step(1)
       }
       theTopIO.dataIOs.writeInDataIO.valid.poke(false.B)
-    }.join()
+    } .join()
   }
 
-  def simplyCheckSignal(cycle: Int, topModule: SimplyCombineAddrDataSPad, outCycleType: Seq[Int], readDataTimes: Int, readInData: Seq[Int], readInRow: Seq[Int], readInColumn: Seq[Int]): Any = outCycleType(cycle) match {
+  def simplyCheckSignal(cycle: Int, topModule: SimplyCombineAddrDataSPad, outWeightCycleType: Seq[Int], readDataTimes: Int, readInData: Seq[Int], readInRow: Seq[Int], readInColumn: Seq[Int]): Any = outWeightCycleType(cycle) match {
     case 0 =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a zero column at $cycle read cycle ---")
@@ -106,11 +156,29 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
   behavior of "read and write the compressed sparse column format data"
 
   it should "try to run PE SPad with CSC compressed data" in {
-    test(new ProcessingElementPad) { thePESPad =>
+    test(new ProcessingElementPad(true)) { thePESPad =>
       val theTopIO = thePESPad.io
       val theClock = thePESPad.clock
-      println("begin to test the PE Scratch Pad Module")
-      println("begin to write")
+      println("----------------- test begin -----------------")
+      println("----------- PE Scratch Pad Module ------------")
+      println("--------------- begin to write ---------------")
+      PEScratchPadWriteIn(inIactAddr,inIactDataCountDec, inWeightAddr, inWeightDataCountDec, thePESPad)
+      println("--------------- begin to read ----------------")
+      theTopIO.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
+      theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
+      theClock.step(1) // from idle to address SPad read
+      for (i<- 0 until 100) {
+        println(s"--------------- $i-th read cycle -----------")
+        println(s"----- SPad State   =  ${theTopIO.debugIO.sPadState.peek()}")
+        println(s"----- iactMatrix   = (${theTopIO.debugIO.iactMatrixData.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixColumn.peek()})")
+        println(s"----- weightMatrix = (${theTopIO.debugIO.weightMatrixData.peek()}, ${theTopIO.debugIO.weightMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()})")
+        println(s"----- WAddrData    =  ${theTopIO.debugIO.weightAddrSPadReadOut.peek()}")
+        println(s"----- product      =  ${theTopIO.debugIO.productResult.peek()}")
+        println(s"----- pSumResult   =  ${theTopIO.debugIO.pSumResult.peek()}")
+        println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
+        println(s"----- WAInIndex    =  ${theTopIO.debugIO.weightAddrInIdx.peek()}")
+        theClock.step(1)
+      }
     }
   }
 
@@ -120,15 +188,15 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       val theClock = iactSPad.clock
       println("---------- begin to test the read ----------")
       println("------ and write address in Iact SPad ------")
-      println("--------------- begin to write -------------")
-      simplyWriteInDataAndAddr(inAddr, inData, iactSPad)
-      println("------------- begin to read ----------------")
+      println("-------------- begin to write --------------")
+      simplyWriteInDataAndAddr(inIactTestAddr, inWeightDataCountDec, iactSPad)
+      println("-------------- begin to read ---------------")
       theTopIO.iactDataReq.poke(true.B) // start the state machine
       theClock.step(1) // from idle to address SPad read
       var j: Int = 0
-      for (i <- outCycleType.indices) {
-        simplyCheckSignal(i, iactSPad, outCycleType, j, inData, inCount, outColumn)
-        if (outCycleType(i) != 0) {
+      for (i <- outWeightCycleType.indices) {
+        simplyCheckSignal(i, iactSPad, outWeightCycleType, j, inWeightData, inWeightCount, outWeightColumn)
+        if (outWeightCycleType(i) != 0) {
           j = j + 1
         }
       }
@@ -143,14 +211,14 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       println("------ and write address in Iact SPad ------")
       println("-------- with continued zero columns -------")
       println("------------- begin to write ---------------")
-      simplyWriteInDataAndAddr(inAddr2, inData, iactSPad)
+      simplyWriteInDataAndAddr(inIactTestAddr2, inWeightDataCountDec, iactSPad)
       println("------------- begin to read ----------------")
       theTopIO.iactDataReq.poke(true.B) // start the state machine
       theClock.step(1) // from idle to address SPad read
       var j: Int = 0
-      for (i <- outCycleType2.indices) {
-        simplyCheckSignal(i, iactSPad, outCycleType2, j, inData, inCount, outColumn2)
-        if (outCycleType2(i) != 0) {
+      for (i <- outWeightCycleType2.indices) {
+        simplyCheckSignal(i, iactSPad, outWeightCycleType2, j, inWeightData, inWeightCount, outWeightColumn2)
+        if (outWeightCycleType2(i) != 0) {
           j = j + 1
         }
       }
@@ -164,13 +232,13 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       val theClock = addrSPad.clock
       println("--- begin to test the read and write address in Iact SPad ---")
       println("----------- begin to write -----------")
-      theCommonIO.dataLenFinIO.streamLen.poke(inAddr.length.U)
+      theCommonIO.dataLenFinIO.streamLen.poke(inIactTestAddr.length.U)
       theDataIO.valid.poke(true.B)
       theCommonIO.readEn.poke(false.B)
-      for (i <- inAddr.indices) {
-        theDataIO.bits.data.poke(inAddr(i).U)
+      for (i <- inIactTestAddr.indices) {
+        theDataIO.bits.data.poke(inIactTestAddr(i).U)
         theCommonIO.writeIdx.expect(i.U, s"i = $i")
-        theCommonIO.dataLenFinIO.writeFin.expect((i == inAddr.length - 1).B, s"i = $i")
+        theCommonIO.dataLenFinIO.writeFin.expect((i == inIactTestAddr.length - 1).B, s"i = $i")
         theDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
         theClock.step(1)
       }
@@ -178,15 +246,15 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       theDataIO.valid.poke(false.B)
       theCommonIO.readEn.poke(true.B)
       addrSPad.io.addrIO.indexInc.poke(true.B) // INCREASE ALL THE TIME
-      for (i <- 0 until (inAddr.length - 1)) {
+      for (i <- 0 until (inIactTestAddr.length - 1)) {
         println(s"----------- read clock $i -----------")
         theCommonIO.columnNum.expect(i.U, s"columnNum = $i")
-        theCommonIO.readOutData.expect(inAddr(i).U, s"readOutData = inData($i) = ${inAddr(i)}")
+        theCommonIO.readOutData.expect(inIactTestAddr(i).U, s"readOutData = inWeightData($i) = ${inIactTestAddr(i)}")
         println(s"theCommonIO.columnNum = $i")
-        println(s"theCommonIO.readOutData = ${inAddr(i)}")
+        println(s"theCommonIO.readOutData = ${inIactTestAddr(i)}")
         theClock.step(1)
       }
-      theCommonIO.readOutData.expect(inAddr.last.U, s"readOutData = inData(${inAddr.length - 1}) = ${inAddr.last}")
+      theCommonIO.readOutData.expect(inIactTestAddr.last.U, s"readOutData = inWeightData(${inIactTestAddr.length - 1}) = ${inIactTestAddr.last}")
     }
   }
   it should "basically write and read data in Iact SPad" in {
@@ -196,13 +264,13 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       val theClock = dataSPad.clock
       println("--- begin to test the read and write data in Iact SPad ---")
       println("----------- begin to write -----------")
-      theCommonIO.dataLenFinIO.streamLen.poke(inDataCountDec.length.U)
+      theCommonIO.dataLenFinIO.streamLen.poke(inWeightDataCountDec.length.U)
       theDataIO.valid.poke(true.B)
       theCommonIO.readEn.poke(false.B)
-      for (i <- inDataCountDec.indices) {
-        theDataIO.bits.data.poke(inDataCountDec(i).U)
+      for (i <- inWeightDataCountDec.indices) {
+        theDataIO.bits.data.poke(inWeightDataCountDec(i).U)
         theDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
-        theCommonIO.dataLenFinIO.writeFin.expect((i == inDataCountDec.length - 1).B, s"i = $i")
+        theCommonIO.dataLenFinIO.writeFin.expect((i == inWeightDataCountDec.length - 1).B, s"i = $i")
         theCommonIO.writeIdx.expect(i.U, s"i = $i")
         theClock.step(1)
       }
@@ -210,16 +278,16 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
       theDataIO.valid.poke(false.B)
       theCommonIO.readEn.poke(true.B)
       dataSPad.io.dataIO.indexInc.poke(true.B) // INCREASE ALL THE TIME
-      for (i <- inDataCountDec.indices) {
+      for (i <- inWeightDataCountDec.indices) {
         println(s"----------- read clock $i -----------")
         theCommonIO.columnNum.expect(i.U, s"columnNum = $i in read clock $i")
-        theCommonIO.readOutData.expect(inDataCountDec(i).U, s"readOutData = inDataCountDec($i) = ${inDataCountDec(i)}")
+        theCommonIO.readOutData.expect(inWeightDataCountDec(i).U, s"readOutData = inWeightDataCountDec($i) = ${inWeightDataCountDec(i)}")
         println(s"theCommonIO.columnNum = $i")
-        println(s"theCommonIO.readOutData = ${inDataCountDec(i)}")
+        println(s"theCommonIO.readOutData = ${inWeightDataCountDec(i)}")
         theClock.step(1)
       }
       theCommonIO.columnNum.expect(0.U, s"new read turn begins, columnNum = 0")
-      theCommonIO.readOutData.expect(inDataCountDec.head.U, s"new read turn begins, readOutData = ${inDataCountDec.head}")
+      theCommonIO.readOutData.expect(inWeightDataCountDec.head.U, s"new read turn begins, readOutData = ${inWeightDataCountDec.head}")
     }
   }
 }
