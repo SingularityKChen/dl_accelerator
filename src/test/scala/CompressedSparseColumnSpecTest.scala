@@ -171,12 +171,14 @@ class CompressedSparseColumnSpecTest extends FlatSpec with ChiselScalatestTester
         println(s"--------------- $i-th read cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.sPadState.peek()}")
         println(s"----- iactMatrix   = (${theTopIO.debugIO.iactMatrixData.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixColumn.peek()})")
+        println(s"----- IAddrIndex   =  ${theTopIO.debugIO.iactAddrIdx.peek()}, ${theTopIO.debugIO.iactAddrInc.peek()}")
+        println(s"----- IDataInc     =  ${theTopIO.debugIO.iactDataInc.peek()}")
         println(s"----- weightMatrix = (${theTopIO.debugIO.weightMatrixData.peek()}, ${theTopIO.debugIO.weightMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()})")
         println(s"----- WAddrData    =  ${theTopIO.debugIO.weightAddrSPadReadOut.peek()}")
+        println(s"----- WAInIndex    =  ${theTopIO.debugIO.weightAddrInIdx.peek()}")
         println(s"----- product      =  ${theTopIO.debugIO.productResult.peek()}")
         println(s"----- pSumResult   =  ${theTopIO.debugIO.pSumResult.peek()}")
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
-        println(s"----- WAInIndex    =  ${theTopIO.debugIO.weightAddrInIdx.peek()}")
         theClock.step(1)
       }
     }

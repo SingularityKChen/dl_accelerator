@@ -101,6 +101,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     iactDataSPadReadEnReg := false.B
     weightAddrSPadReadEnReg := false.B
     weightDataSPadReadEnReg := false.B
+    weightDataSPadFirstRead := true.B // if need read a new column of input activation matrix, then true
   }
   private def nextSPadIactData(): Unit = {
     sPad := padIactData
@@ -108,6 +109,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     iactDataSPadReadEnReg := true.B
     weightAddrSPadReadEnReg := false.B
     weightDataSPadReadEnReg := false.B
+    weightDataSPadFirstRead := true.B // if need to read a new data, also a new weight matrix column
   }
   private def nextSPadWeightAddr(): Unit = {
     sPad := padWeightAddr
@@ -138,7 +140,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val iactAddrIndexWire: UInt = Wire(UInt(commonLenWidth.W))
   val iactAddrDataWire: UInt = Wire(UInt(iactAddrWidth.W))
   val iactDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
-  val iactSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
   val iactAddrSPadReadEnReg: Bool = RegInit(false.B)
   val iactDataSPadReadEnReg: Bool = RegInit(false.B)
   val iactAddrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of iact address SPad
@@ -146,15 +147,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val iactMatrixColumnReg: UInt = RegInit(0.U(commonLenWidth.W))
   val iactZeroColumnNumber: UInt = RegInit(0.U(commonLenWidth.W)) // use for get the right column number
   val iactDataSPadFirstReadReg: Bool = RegInit(true.B)
-  val iactMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
-  //val iactMatrixRowReg: UInt = RegInit(0.U(cscCountWidth.W))
-  val iactMatrixDataReg: UInt = Wire(UInt(cscDataWidth.W))
-  //val iactMatrixDataReg: UInt = RegInit(0.U(cscDataWidth.W))
+  val iactMatrixRowWire: UInt = Wire(UInt(cscCountWidth.W))
+  val iactMatrixDataWire: UInt = Wire(UInt(cscDataWidth.W))
   // WeightSPad
   val weightAddrIndexWire: UInt = Wire(UInt(commonLenWidth.W))
   val weightAddrDataWire: UInt = Wire(UInt(weightAddrWidth.W))
   val weightDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
-  val weightSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then read the next column of iact
   val weightAddrSPadReadEnReg: Bool = RegInit(false.B)
   val weightDataSPadReadEnReg: Bool = RegInit(false.B)
   val weightAddrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight address SPad
@@ -165,6 +163,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val weightDataIdxMuxWire: Bool = Wire(Bool()) // false, then means need to read the first column of weight Matrix
   val weightAddrSPadReadIdxWire: UInt = Wire(UInt(cscCountWidth.W))
   val weightDataIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
+  val weightAddrIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
   // pSumSPad
   val productReg: UInt = RegInit(0.U(psDataWidth.W))
   val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
@@ -198,16 +197,17 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   iactAddrSPad.io.commonIO.readEn := iactAddrSPadReadEnReg
   iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
   iactAddrSPad.io.addrIO.readInIdx := DontCare
+  iactAddrSPad.io.addrIO.readInIdxEn := DontCare
   iactAddrSPad.io.dataIO := DontCare
   // Input activation Data Scratch Pad
   iactDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.dataIOs
   iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
   val iactDataCountVec: Seq[Bool] = iactDataSPad.io.commonIO.readOutData.asBools
-  iactMatrixDataReg := Cat(iactDataCountVec.reverse.take(cscDataWidth)).asUInt // TODO: figure out why it need reverse
-  iactMatrixRowReg := Cat(iactDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
+  iactMatrixDataWire := Cat(iactDataCountVec.reverse.take(cscDataWidth)).asUInt // TODO: figure out why it need reverse
+  iactMatrixRowWire := Cat(iactDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
   iactDataSPad.io.commonIO.readEn := iactDataSPadReadEnReg
   iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
-  iactDataSPad.io.dataIO.readInIdx := DontCare
+  iactDataSPad.io.dataIO.readInIdx := iactAddrDataWire
   iactDataSPad.io.dataIO.readInIdxEn := DontCare
   iactDataSPad.io.addrIO := DontCare
   // Weight Address Scratch Pad
@@ -219,6 +219,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
                                                           // the iact address SPad's rows, and it takes one clock cycle
                                                           // for the reg inside SPad to change the index it need
   weightAddrSPad.io.addrIO.indexInc := weightAddrSPadIdxIncWire
+  weightAddrSPad.io.addrIO.readInIdxEn := weightAddrIdxEnWire
   weightAddrSPad.io.dataIO := DontCare
   // Weight Data Scratch Pad
   weightDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.dataIOs
@@ -246,6 +247,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val pSumResultIdxReg: UInt = RegInit(0.U(calDataWidth.W)) // store the index for write back
   // several signals which can help to indicate the process
   val mightIactZeroColumnWire: Bool = Wire(Bool())
+  val iactSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
   val mightIactIdxIncWire: Bool = Wire(Bool())
   val mightWeightZeroColumnWire: Bool = Wire(Bool())
   val mightWeightIdxIncWire: Bool = Wire(Bool())
@@ -258,11 +260,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   mightIactReadFinish := (iactDataIndexWire + 1.U) === io.dataStream.iactIOs.dataIOs.streamLen
   mightWeightReadFinish := (weightDataIndexWire + 1.U) === io.dataStream.weightIOs.dataIOs.streamLen
   iactAddrSPadIdxIncWire := (padEqIA && mightIactZeroColumnWire) || (((padEqWA && mightWeightZeroColumnWire) || (padEqWB && mightWeightIdxIncWire)) && mightIactIdxIncWire)
-  weightAddrSPadIdxIncWire := false.B // never increase the index because we will use weightAddrSPadReadIdxWire
-  iactDataSPadIdxIncWire := (padEqIA && !iactSPadZeroColumnReg && !iactDataSPadFirstReadReg) || (((padEqWA && mightWeightZeroColumnWire) || (padEqWB && mightWeightIdxIncWire)) && !mightIactIdxIncWire)// if first read, then keep the read index of zero
+  weightAddrSPadIdxIncWire := (padEqMpy || sPad === padWeightData1) && mightWeightZeroColumnWire // FIXME: should add a state
+  iactDataSPadIdxIncWire := (padEqIA && !mightIactZeroColumnWire && !iactDataSPadFirstReadReg) || (((padEqWA && mightWeightZeroColumnWire) || (padEqWB && mightWeightIdxIncWire)) && !mightIactIdxIncWire)// if first read, then keep the read index of zero
   weightDataSPadIdxIncWire := (padEqWA && !mightWeightZeroColumnWire && !weightDataSPadFirstRead) || (padEqWB && !mightWeightIdxIncWire) // when first read, ask Weight Address Scratch Pad for data index
-  weightDataIdxMuxWire := (sPad === padIactData) && !(iactMatrixRowReg === 0.U) && weightDataSPadFirstRead // then it can read the start index in weightDataSPad, the end index of that will be read otherwise
-  weightAddrSPadReadIdxWire := Mux(weightDataIdxMuxWire, iactMatrixRowReg - 1.U, iactMatrixRowReg)
+  weightAddrIdxEnWire := (sPad === padIactData) && weightDataSPadFirstRead || padEqWA
+  weightDataIdxMuxWire := (sPad === padIactData) && weightDataSPadFirstRead && !(iactMatrixRowWire === 0.U) // then it can read the start index in weightDataSPad, the end index of that will be read otherwise
+  weightAddrSPadReadIdxWire := Mux(weightDataIdxMuxWire, iactMatrixRowWire - 1.U, iactMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
   switch (sPad) {
     is (padIdle) {
@@ -275,29 +278,35 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       when (mightIactZeroColumnWire) { // then it is a zero column
         nextSPadIactAddr()
         iactSPadZeroColumnReg := true.B
+        iactZeroColumnNumber := iactZeroColumnNumber + 1.U
       } .otherwise {
         nextSPadIactData()
       }
     }
     is (padIactData) {
       nextSPadWeightAddr()
+      iactDataSPadFirstReadReg := false.B
     }
     is (padWeightAddr) {
       when (mightWeightZeroColumnWire) { // need to get next iact
-        weightSPadZeroColumnReg := true.B
         when (mightIactIdxIncWire) { // if have read all elements in current iact Matrix column
           nextSPadIactAddr()
+          when (iactSPadZeroColumnReg) {
+            iactSPadZeroColumnReg := false.B
+            iactMatrixColumnReg := iactMatrixColumnReg + 1.U + iactZeroColumnNumber
+            iactZeroColumnNumber := 0.U
+          } .otherwise {
+            iactMatrixColumnReg := iactMatrixColumnReg + 1.U
+          }
         } .otherwise { // still some elements in current iact Matrix column
           nextSPadIactData()
         }
       } .otherwise { // then it isn't a zero column, can do MAC
         nextSPadWeightData()
-        weightDataSPadFirstRead := true.B // then it's the first time to read a weight Matrix column
       }
     }
     is (padWeightData1) {
       sPad := padWeightData2
-      //readOff()
     }
     is (padWeightData2) {
       sPad := padMpy
@@ -306,31 +315,43 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     is (padMpy) {
       sPad := padWriteBack
       pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
-      productReg := Mux(io.padCtrl.pSumEnqOrProduct.bits, io.dataStream.ipsIO.bits, weightMatrixDataReg * iactMatrixDataReg)
+      productReg := Mux(io.padCtrl.pSumEnqOrProduct.bits, io.dataStream.ipsIO.bits, weightMatrixDataReg * iactMatrixDataWire)
     }
     is (padWriteBack) {
       // FIXME: add ready valid signal for ips FIFO
       psDataSPad(weightMatrixRowReg) := pSumResultWire //update the partial sum
       when (mightIactReadFinish && mightWeightReadFinish) {
         sPad := padIdle
+        iactMatrixColumnReg := 0.U
         // TODO: tell the control module that we finished
       } .otherwise { // then haven't done all the MAC operations
         when (mightWeightIdxIncWire) { // finished read current weight data Matrix column
           when (mightIactIdxIncWire) { // finished read current iact data Matrix column
             nextSPadIactAddr()
+            when (iactSPadZeroColumnReg) {
+              iactSPadZeroColumnReg := false.B
+              iactMatrixColumnReg := iactMatrixColumnReg + 1.U + iactZeroColumnNumber
+              iactZeroColumnNumber := 0.U
+            } .otherwise {
+              iactMatrixColumnReg := iactMatrixColumnReg + 1.U
+            }
           } .otherwise {
             nextSPadIactData()
           }
         } .otherwise {
           nextSPadWeightData()
+          weightDataSPadFirstRead := false.B // as it has been read current weight matrix column
         }
       }
     }
   }
   if (debug) {
     io.debugIO.iactMatrixColumn := iactMatrixColumnReg
-    io.debugIO.iactMatrixData := iactMatrixDataReg
-    io.debugIO.iactMatrixRow := iactMatrixRowReg
+    io.debugIO.iactMatrixData := iactMatrixDataWire
+    io.debugIO.iactMatrixRow := iactMatrixRowWire
+    io.debugIO.iactAddrIdx := iactAddrIndexWire
+    io.debugIO.iactAddrInc := iactAddrSPadIdxIncWire
+    io.debugIO.iactDataInc := iactDataSPadIdxIncWire
     io.debugIO.weightMatrixData := weightMatrixDataReg
     io.debugIO.weightMatrixRow := weightMatrixRowReg
     io.debugIO.weightAddrSPadReadOut := weightAddrDataWire
@@ -393,6 +414,7 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   io.iactAddrReadEn := iactAddrSPadReadEnReg
   iactAddrSPad.io.dataIO := DontCare
   iactAddrSPad.io.addrIO.readInIdx := DontCare
+  iactAddrSPad.io.addrIO.readInIdxEn := DontCare
   // DataSPad
   iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
   io.iactDataReadIndex := iactDataIndexWire // for debug
@@ -461,7 +483,9 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
 }
 
 class WeightSPadAddrModule(DataLenWidth: Int, PadSize: Int, DataWidth: Int) extends SPadAddrModule(DataLenWidth, PadSize, DataWidth) {
-  padReadIndexReg := io.addrIO.readInIdx
+  when (io.addrIO.readInIdxEn) {
+    padReadIndexReg := io.addrIO.readInIdx
+  }
 }
 
 class SPadAddrModule(DataLenWidth: Int, PadSize: Int, val DataWidth: Int)
@@ -562,6 +586,9 @@ class PESPadDebugIO extends Bundle with PESizeConfig {
   val iactMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val iactMatrixRow: UInt = Output(UInt(cscCountWidth.W))
   val iactMatrixColumn: UInt = Output(UInt(commonLenWidth.W))
+  val iactAddrInc: Bool = Output(Bool())
+  val iactDataInc: Bool = Output(Bool())
+  val iactAddrIdx: UInt = Output(UInt(iactAddrWidth.W))
   val weightAddrSPadReadOut: UInt = Output(UInt(weightAddrWidth.W))
   val weightMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val weightMatrixRow: UInt = Output(UInt(cscCountWidth.W))
@@ -575,6 +602,7 @@ class PESPadDebugIO extends Bundle with PESizeConfig {
 class SPadAddrIO(val dataWidth: Int, val padSize: Int) extends Bundle {
   val readInIdx: UInt = Input(UInt(log2Ceil(padSize).W))
   val indexInc: Bool = Input(Bool())
+  val readInIdxEn: Bool = Input(Bool()) // for weight SPad only, true then padReadIndexReg = readInIdx
 }
 
 class SPadDataIO(val dataWidth: Int, val padSize: Int) extends Bundle {
