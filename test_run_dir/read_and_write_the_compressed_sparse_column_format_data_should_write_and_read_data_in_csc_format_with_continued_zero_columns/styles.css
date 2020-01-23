@@ -1,0 +1,8 @@
+
+.edge:hover * {
+  stroke: #ff0000;
+}
+.edge:hover polygon {
+  fill: #ff0000;
+}
+      

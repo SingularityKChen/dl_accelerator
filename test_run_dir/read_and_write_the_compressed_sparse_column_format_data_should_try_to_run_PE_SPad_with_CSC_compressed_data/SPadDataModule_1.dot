@@ -1,0 +1,418 @@
+digraph SPadDataModule_1 {
+stylesheet = "styles.css"
+rankdir="LR" 
+
+subgraph cluster_SPadDataModule_1 {
+  label="SPadDataModule_1"
+  URL=""
+  bgcolor="#FFF8DC"
+  cluster_SPadDataModule_1_clock [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="clock" rank="0"]
+     
+cluster_SPadDataModule_1_reset [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="reset" rank="0"]
+     
+cluster_SPadDataModule_1_io_commonIO_readEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_readEn" rank="0"]
+     
+cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_valid [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_valid" rank="0"]
+     
+cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_bits_data [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_bits_data" rank="0"]
+     
+cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_streamLen [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_streamLen" rank="0"]
+     
+cluster_SPadDataModule_1_io_dataIO_readInIdx [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_dataIO_readInIdx" rank="0"]
+     
+cluster_SPadDataModule_1_io_dataIO_indexInc [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_dataIO_indexInc" rank="0"]
+     
+cluster_SPadDataModule_1_io_dataIO_readInIdxEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_dataIO_readInIdxEn" rank="0"]
+     
+cluster_SPadDataModule_1_io_commonIO_columnNum [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_commonIO_columnNum" rank="1000"]
+     
+cluster_SPadDataModule_1_io_commonIO_readOutData [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_commonIO_readOutData" rank="1000"]
+     
+cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_ready [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_commonIO_dataLenFinIO_writeInDataIO_ready" rank="1000"]
+     
+cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeFin [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_commonIO_dataLenFinIO_writeFin" rank="1000"]
+     
+
+struct_cluster_SPadDataModule_1__T_9 [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#DA70D6">
+  <TR>
+    <TD>Mem _T_9 </TD>
+  </TR>
+    
+<TR><TD>read port _T_16</TD></TR>
+            
+<TR><TD PORT="_T_16_en">en</TD></TR>
+          
+<TR><TD PORT="_T_16_addr">addr</TD></TR>
+          
+<TR><TD PORT="_T_16_data">data</TD></TR>
+          
+<TR><TD PORT="_T_16_clk">clk</TD></TR>
+    
+<TR><TD>write port _T_10</TD></TR>
+            
+<TR><TD PORT="_T_10_en">en</TD></TR>
+          
+<TR><TD PORT="_T_10_addr">addr</TD></TR>
+          
+<TR><TD PORT="_T_10_data">data</TD></TR>
+          
+<TR><TD PORT="_T_10_mask">mask</TD></TR>
+          
+<TR><TD PORT="_T_10_clk">clk</TD></TR>
+    
+</TABLE>>];
+    
+struct_cluster_SPadDataModule_1__T_9__T_16_en_pipe_0 [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#FFE4B5">
+  <TR>
+    <TD PORT="in">&#x25cf;</TD>
+    <TD>_T_9__T_16_en_pipe_0</TD>
+    <TD PORT="out">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+struct_cluster_SPadDataModule_1__T_9__T_16_addr_pipe_0 [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#FFE4B5">
+  <TR>
+    <TD PORT="in">&#x25cf;</TD>
+    <TD>_T_9__T_16_addr_pipe_0</TD>
+    <TD PORT="out">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+struct_cluster_SPadDataModule_1_dataLenReg [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#FFE4B5">
+  <TR>
+    <TD PORT="in">&#x25cf;</TD>
+    <TD>dataLenReg</TD>
+    <TD PORT="out">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+struct_cluster_SPadDataModule_1_padWriteIndexReg [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#FFE4B5">
+  <TR>
+    <TD PORT="in">&#x25cf;</TD>
+    <TD>padWriteIndexReg</TD>
+    <TD PORT="out">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+struct_cluster_SPadDataModule_1_padReadIndexReg [shape="plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#FFE4B5">
+  <TR>
+    <TD PORT="in">&#x25cf;</TD>
+    <TD>padReadIndexReg</TD>
+    <TD PORT="out">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+cluster_SPadDataModule_1__T [label = "_T" shape="rectangle"]; 
+
+op_sub_640 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > sub </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">1</TD>
+  </TR>
+</TABLE>>];
+       
+cluster_SPadDataModule_1_writeWrapWire [label = "writeWrapWire" shape="rectangle"]; 
+
+op_eq_641 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > eq </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_tail_642 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > tail </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD>1</TD>
+  </TR>
+</TABLE>>];
+       
+cluster_SPadDataModule_1_readWrapWire [label = "readWrapWire" shape="rectangle"]; 
+
+op_eq_643 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > eq </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_tail_644 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > tail </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD>1</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_645 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_352098832 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">9</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_569554338 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">0</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_847629871 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_1855880938 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">0</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_tail_646 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > tail </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD>1</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_add_647 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > add </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">1</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_1040973989 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">0</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_1219211274 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_445861300 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_674491324 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">0</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_tail_648 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > tail </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD>1</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_add_649 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > add </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">1</TD>
+  </TR>
+</TABLE>>];
+       
+
+mux_1498061143 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+cluster_SPadDataModule_1_lit650 [shape="circle" style="filled" BGCOLOR="#C0C0C0" label="1"]
+     
+
+  struct_cluster_SPadDataModule_1_padReadIndexReg:out -> cluster_SPadDataModule_1_io_commonIO_columnNum
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_valid -> cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_ready
+  mux_352098832:out -> struct_cluster_SPadDataModule_1_dataLenReg:in
+  cluster_SPadDataModule_1_io_commonIO_readEn -> mux_1498061143:select
+  cluster_SPadDataModule_1_readWrapWire -> mux_674491324:select
+  cluster_SPadDataModule_1_clock -> struct_cluster_SPadDataModule_1__T_9:_T_16_clk
+  struct_cluster_SPadDataModule_1_dataLenReg:out -> op_sub_640:in1
+  struct_cluster_SPadDataModule_1_padReadIndexReg:out -> mux_1498061143:in1
+  struct_cluster_SPadDataModule_1_padWriteIndexReg:out -> struct_cluster_SPadDataModule_1__T_9:_T_10_addr
+  cluster_SPadDataModule_1_reset -> mux_352098832:select
+  struct_cluster_SPadDataModule_1_padReadIndexReg:out -> op_add_649:in1
+  cluster_SPadDataModule_1_writeWrapWire -> op_and_645:in2
+  cluster_SPadDataModule_1_io_commonIO_readEn -> struct_cluster_SPadDataModule_1__T_9__T_16_en_pipe_0:in
+  op_eq_641:out -> cluster_SPadDataModule_1_writeWrapWire
+  op_tail_644:out -> op_eq_643:in2
+  struct_cluster_SPadDataModule_1__T_9__T_16_addr_pipe_0:out -> struct_cluster_SPadDataModule_1__T_9:_T_16_addr
+  cluster_SPadDataModule_1_reset -> mux_569554338:select
+  cluster_SPadDataModule_1_io_dataIO_readInIdxEn -> mux_1219211274:select
+  op_tail_646:out -> mux_1855880938:in2
+  struct_cluster_SPadDataModule_1_padReadIndexReg:out -> mux_445861300:in2
+  cluster_SPadDataModule_1__T -> op_tail_644:in1
+  cluster_SPadDataModule_1_reset -> mux_1040973989:select
+  mux_1855880938:out -> mux_847629871:in1
+  op_and_645:out -> cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeFin
+  cluster_SPadDataModule_1_clock -> struct_cluster_SPadDataModule_1__T_9:_T_10_clk
+  mux_445861300:out -> mux_1219211274:in2
+  op_add_649:out -> op_tail_648:in1
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_valid -> struct_cluster_SPadDataModule_1__T_9:_T_10_en
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> struct_cluster_SPadDataModule_1__T_9:_T_10_data
+  mux_1219211274:out -> mux_1040973989:in2
+  struct_cluster_SPadDataModule_1__T_9__T_16_en_pipe_0:out -> struct_cluster_SPadDataModule_1__T_9:_T_16_en
+  mux_674491324:out -> mux_445861300:in1
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_645:in1
+  mux_569554338:out -> struct_cluster_SPadDataModule_1_padWriteIndexReg:in
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_streamLen -> mux_352098832:in2
+  cluster_SPadDataModule_1_io_dataIO_readInIdx -> mux_1219211274:in1
+  struct_cluster_SPadDataModule_1_padReadIndexReg:out -> op_eq_643:in1
+  op_tail_642:out -> op_eq_641:in2
+  op_tail_648:out -> mux_674491324:in2
+  mux_1498061143:out -> struct_cluster_SPadDataModule_1__T_9__T_16_addr_pipe_0:in
+  cluster_SPadDataModule_1__T -> op_tail_642:in1
+  cluster_SPadDataModule_1_io_dataIO_indexInc -> mux_445861300:select
+  struct_cluster_SPadDataModule_1_padWriteIndexReg:out -> op_add_647:in1
+  op_add_647:out -> op_tail_646:in1
+  struct_cluster_SPadDataModule_1__T_9__T_16_addr_pipe_0:out -> mux_1498061143:in2
+  cluster_SPadDataModule_1_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_847629871:select
+  op_eq_643:out -> cluster_SPadDataModule_1_readWrapWire
+  cluster_SPadDataModule_1_lit650 -> struct_cluster_SPadDataModule_1__T_9:_T_10_mask
+  cluster_SPadDataModule_1_writeWrapWire -> mux_1855880938:select
+  mux_847629871:out -> mux_569554338:in2
+  struct_cluster_SPadDataModule_1__T_9:_T_16_data -> cluster_SPadDataModule_1_io_commonIO_readOutData
+  mux_1040973989:out -> struct_cluster_SPadDataModule_1_padReadIndexReg:in
+  struct_cluster_SPadDataModule_1_padWriteIndexReg:out -> op_eq_641:in1
+  op_sub_640:out -> cluster_SPadDataModule_1__T
+  struct_cluster_SPadDataModule_1_padWriteIndexReg:out -> mux_847629871:in2
+  
+  
+}
+     
+}

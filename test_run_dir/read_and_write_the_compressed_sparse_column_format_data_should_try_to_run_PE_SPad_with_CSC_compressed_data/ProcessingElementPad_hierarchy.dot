@@ -1,0 +1,75 @@
+digraph ProcessingElementPad_hierarchy { rankdir="TB" 
+ node [shape="rectangle"]; 
+rankdir="LR" 
+stylesheet = "styles.css"
+module_1 [shape= "plaintext" href="ProcessingElementPad.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > ProcessingElementPad </TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_3" BGCOLOR="#FFF8DC" >iactAddrSPad</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_2" BGCOLOR="#FFF8DC" >iactDataSPad</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_5" BGCOLOR="#FFF8DC" >weightDataSPad</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_4" BGCOLOR="#FFF8DC" >weightAddrSPad</TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_2 [shape= "plaintext" href="SPadDataModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_3 [shape= "plaintext" href="SPadAddrModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadAddrModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_4 [shape= "plaintext" href="WeightSPadAddrModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > WeightSPadAddrModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_5 [shape= "plaintext" href="SPadDataModule_1.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule_1 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_1:module_2 -> module_2
+module_1:module_3 -> module_3
+module_1:module_4 -> module_4
+module_1:module_5 -> module_5
+}
