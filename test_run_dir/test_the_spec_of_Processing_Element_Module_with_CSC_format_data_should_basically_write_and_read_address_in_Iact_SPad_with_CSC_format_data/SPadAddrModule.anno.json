@@ -1,0 +1,32 @@
+[
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_ready",
+    "sources":[
+      "~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_valid"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeFin",
+    "sources":[
+      "~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_valid"
+    ]
+  },
+  {
+    "class":"firrtl.EmitCircuitAnnotation",
+    "emitter":"firrtl.LowFirrtlEmitter"
+  },
+  {
+    "class":"firrtl.options.TargetDirAnnotation",
+    "directory":"test_run_dir/test_the_spec_of_Processing_Element_Module_with_CSC_format_data_should_basically_write_and_read_address_in_Iact_SPad_with_CSC_format_data"
+  },
+  {
+    "class":"firrtl.options.OutputAnnotationFileAnnotation",
+    "file":"SPadAddrModule"
+  },
+  {
+    "class":"firrtl.transforms.BlackBoxTargetDirAnno",
+    "targetDir":"test_run_dir/test_the_spec_of_Processing_Element_Module_with_CSC_format_data_should_basically_write_and_read_address_in_Iact_SPad_with_CSC_format_data"
+  }
+]

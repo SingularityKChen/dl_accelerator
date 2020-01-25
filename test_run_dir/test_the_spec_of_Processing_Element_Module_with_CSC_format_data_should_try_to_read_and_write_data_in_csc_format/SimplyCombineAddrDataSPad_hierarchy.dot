@@ -1,0 +1,45 @@
+digraph SimplyCombineAddrDataSPad_hierarchy { rankdir="TB" 
+ node [shape="rectangle"]; 
+rankdir="LR" 
+stylesheet = "styles.css"
+module_1 [shape= "plaintext" href="SimplyCombineAddrDataSPad.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SimplyCombineAddrDataSPad </TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_2" BGCOLOR="#FFF8DC" >iactAddrSPad</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_3" BGCOLOR="#FFF8DC" >iactDataSPad</TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_2 [shape= "plaintext" href="SPadAddrModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadAddrModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_3 [shape= "plaintext" href="SPadDataModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_1:module_2 -> module_2
+module_1:module_3 -> module_3
+}
