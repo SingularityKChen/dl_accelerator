@@ -3,12 +3,12 @@ package dla.pe
 import scala.math.pow
 
 trait MCRENFConfig extends PESizeConfig { // contains some scala values
-  val M0: Int = 6 // weights reuse M0 times
-  val C0: Int = 3 // different input feature maps and their weights reuse
+  val M0: Int = 4 // weights reuse M0 times
+  val C0: Int = 2 // different input feature maps and their weights reuse
   val R: Int = weightHeight //
   val E: Int = ofmapHeight // same row of weights in a PE
-  val N0: Int = 2 // the number of partial sum
-  val F0: Int = 2 // one row of partial sum
+  val N0: Int = 3 // the number of partial sum
+  val F0: Int = 1 // one row of partial sum
   val MCRENF: List[Int] = List(M0, C0, R, E, N0, F0)
   // C0*R0 < iacAddrSize = 9
   // C0*R0*E0*N0*F0 <
@@ -23,7 +23,7 @@ trait SPadSizeConfig extends PESizeConfig {
 }
 
 trait PESizeConfig {
-  val weightHeight: Int = 2
+  val weightHeight: Int = 4
   val ofmapHeight: Int = 2
   val iactDataWidth: Int = 12 // 8-bit data and 4-bit count
   val iactAddrWidth: Int = 4

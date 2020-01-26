@@ -2,10 +2,10 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.tester._
-import dla.pe.{SPadAddrModule, SPadDataModule, SPadSizeConfig, ProcessingElementPad}
+import dla.pe.{ProcessingElement, ProcessingElementPad, SPadAddrModule, SPadDataModule, MCRENFConfig}
 import org.scalatest._
 
-class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig {
+class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with MCRENFConfig {
   // def some common parameters and functions
   val inIactTestAddr = Seq(2, 5, iactZeroColumnCode, 6, 7, iactZeroColumnCode, 9, 12) // 15 means it is a zero column, don't record the first number
   val inIactTestAddr2 = Seq(2, 5, 7, 8, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, iactZeroColumnCode, 9)
@@ -15,6 +15,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   val inIactAddr = Seq(5, 9, iactZeroColumnCode, 11, 14)
   val inIactData = Seq(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32)
   val inIactCount = Seq(1, 3, 4, 6, 7, 2, 5, 6, 7, 0, 5, 0, 1, 3, 5, 7)
+  val outpSum = Seq(282, 318, 330, 132, 486, 834, 774, 336, 0, 482, 60, 528, 0, 0, 0, 0, 156, 258, 72, 312, 864, 1590, 1056, 720)
   val outWeightColumn = Seq(0, 0, 1, 1, 1, 2, 4, 5, 5, 7, 7, 7) // 3, 6 are zero column
   val outWeightColumn2 = Seq(0, 0, 1, 1, 1, 2, 2, 3, 4, 9, 9, 9)
   val outIactColumn = Seq(0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5)
@@ -156,8 +157,35 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println(s"data = ${topModule.io.iactMatrixData.peek()}, row = ${topModule.io.iactMatrixRow.peek()}, column = ${topModule.io.iactMatrixColumn.peek()}")
       topModule.clock.step(1) // goto next one
   }
-  behavior of "test the spec of Processing Element Module with CSC format data"
 
+  def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outIactCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outIactCycleType(cycle)) match {
+    case (0, _) =>
+      println(s"---------------- read cycle $cycle --------------")
+      println(s"--- meets a zero weight column at $cycle read cycle ---")
+      topModule.io.debugIO.sPadState.expect(2.U, s"the SPad state should be 2, iact data read at $cycle")
+      topModule.clock.step(1)
+      topModule.io.debugIO.sPadState.expect(3.U, s"the SPad state should be 3 after one clock, weight address read at $cycle")
+      topModule.io.debugIO.weightAddrSPadReadOut.expect(weightZeroColumnCode.U, s"the weight address read out should be $weightZeroColumnCode, weight data read at $cycle")
+      topModule.clock.step(1)
+    case (1, _) =>
+      println(s"---------------- read cycle $cycle --------------")
+      println(s"--- meets a weight data read only cycle at $cycle read cycle ---")
+
+  }
+
+  behavior of "test the spec of Processing Element Module with CSC format data"
+/*
+  it should "try to run PE with control and CSC SPad module" in {
+    test(new ProcessingElement) { thePE =>
+      val theTopIO = thePE.io
+      val theClock = thePE.clock
+      println("----------------- test begin -----------------")
+      println("----------- Processing Element Module ------------")
+      println("--------------- begin to write ---------------")
+      theTopIO.topCtrl.doLoadEn.poke(true.B)
+    }
+  }
+*/
   it should "try to run PE SPad with CSC compressed data" in {
     test(new ProcessingElementPad(true)) { thePESPad =>
       val theTopIO = thePESPad.io
@@ -172,7 +200,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theTopIO.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
       theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
       theClock.step(1) // from idle to address SPad read
-      for (i<- 0 until 147) {
+      for (i<- 0 until 146) {
         println(s"--------------- $i-th read cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.sPadState.peek()}")
         println(s"----- iactMatrix   = (${theTopIO.debugIO.iactMatrixData.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixColumn.peek()})")
@@ -184,6 +212,18 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- product      =  ${theTopIO.debugIO.productResult.peek()}")
         println(s"----- pSumResult   =  ${theTopIO.debugIO.pSumResult.peek()}")
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
+        theClock.step(1)
+      }
+      theTopIO.padCtrl.doMACEn.poke(false.B) // start the state machine
+      theClock.step(2)
+      theTopIO.padCtrl.doLoadEn.poke(true.B) // begin to read out partial sum
+      theTopIO.dataStream.opsIO.ready.poke(true.B)
+      theTopIO.debugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
+      for (i <- 0 until M0*E*N0*F0 - 1) {
+        println(s"--------- $i-th pSumSPad read cycle --------")
+        println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+        theTopIO.dataStream.opsIO.bits.expect(outpSum(i).U, s"the out partial sum should be ${outpSum(i)} at $i-th index")
+        //assertResult(outpSum(i).asUInt(psDataWidth.W))(theTopIO.dataStream.opsIO.bits.peek())
         theClock.step(1)
       }
     }

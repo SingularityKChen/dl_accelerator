@@ -219,17 +219,24 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.io.addrIO := DontCare
   // Partial Sum Scratch Pad
   io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.pSumEnqOrProduct.bits
-  io.dataStream.opsIO.bits := pSumResultWire
-  io.dataStream.opsIO.valid := padEqWB // FIXME:
+  val psPadReadIdxCounter: Counter = Counter(M0*E*N0*F0 + 1)
+  when (io.padCtrl.doLoadEn && io.dataStream.opsIO.ready) {
+    io.dataStream.opsIO.bits := psDataSPad(psPadReadIdxCounter.value)
+    io.dataStream.opsIO.valid := true.B
+    psPadReadIdxCounter.inc()
+  } .otherwise {
+    io.dataStream.opsIO.valid := false.B
+    io.dataStream.opsIO.bits := DontCare
+  }
   // SPadToCtrl
   io.padCtrl.pSumEnqOrProduct.ready := padEqMpy
   io.padCtrl.writeFinish := Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad).map(_.io.commonIO.dataLenFinIO.writeFin).reduce(_ && _) // when all Scratch Pad write finished
   pSumResultWire := Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
-
+  /*
   val mcrenfReg: Vec[UInt] = RegInit(VecInit(Seq.fill(6)(0.U(log2Ceil(MCRENF.max).W))))
   val when_carry: IndexedSeq[Bool] = mcrenfReg.zip(MCRENF.map(x=> x - 1)).map{ case (x,y) => x === y.U}
   // when_carry stores the information of whether m0 === M0.U, et al.
-
+  */
   val pSumResultIdxReg: UInt = RegInit(0.U(calDataWidth.W)) // store the index for write back
   // several signals which can help to indicate the process
   val mightIactZeroColumnWire: Bool = Wire(Bool())
@@ -239,6 +246,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val mightWeightIdxIncWire: Bool = Wire(Bool())
   val mightIactReadFinish: Bool = Wire(Bool())
   val mightWeightReadFinish: Bool = Wire(Bool())
+  val psDataSpadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
   mightIactZeroColumnWire := iactAddrDataWire === iactZeroColumnCode.U
   mightWeightZeroColumnWire := weightAddrDataWire === weightZeroColumnCode.U
   mightIactIdxIncWire := iactAddrDataWire === (iactDataIndexWire + 1.U)
@@ -254,6 +262,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightAddrSPadReadIdxWire := Mux(weightDataIdxMuxWire, iactMatrixRowWire - 1.U, iactMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
   io.padCtrl.calFinish := padEqWB && mightIactReadFinish && mightWeightReadFinish
+  psDataSpadIdxWire := weightMatrixRowReg + iactMatrixColumnReg*(M0.U)
   switch (sPad) {
     is (padIdle) {
       when(io.padCtrl.doMACEn) {
@@ -297,6 +306,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     }
     is (padWeightData2) {
       sPad := padMpy
+      psPadReadIdxCounter.value := psDataSpadIdxWire
       readOff()
     }
     is (padMpy) {
@@ -305,19 +315,20 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
           sPad := padWriteBack
           productReg := io.dataStream.ipsIO.bits
           io.dataStream.ipsIO.ready := true.B
-          pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
+          pSumSPadLoadReg := psDataSPad(psPadReadIdxCounter.value)
         }
       } .otherwise {
         sPad := padWriteBack
         productReg :=  weightMatrixDataReg * iactMatrixDataWire
-        pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
+        pSumSPadLoadReg := psDataSPad(psPadReadIdxCounter.value)
       }
     }
     is (padWriteBack) {
-      psDataSPad(weightMatrixRowReg) := pSumResultWire //update the partial sum
+      psDataSPad(psDataSpadIdxWire) := pSumResultWire //update the partial sum
       when (mightIactReadFinish && mightWeightReadFinish) {
         sPad := padIdle
         iactMatrixColumnReg := 0.U
+        psPadReadIdxCounter.value := 0.U
       } .otherwise { // then haven't done all the MAC operations
         when (mightWeightIdxIncWire) { // finished read current weight data Matrix column
           when (mightIactIdxIncWire) { // finished read current iact data Matrix column
