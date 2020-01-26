@@ -34,6 +34,7 @@ trait PESizeConfig {
   val calDataWidth: Int = 20
   val psDataWidth: Int = 20
   val fifoSize: Int = 4
+  val fifoEn: Boolean = true
   val commonLenWidth: Int = 4
   val weightDataLenWidth: Int = 8
   val iactZeroColumnCode: Int = pow(2, iactAddrWidth).toInt - 1 // when one address vector's element equals to iactZeroColumnCode, then it is a zero column

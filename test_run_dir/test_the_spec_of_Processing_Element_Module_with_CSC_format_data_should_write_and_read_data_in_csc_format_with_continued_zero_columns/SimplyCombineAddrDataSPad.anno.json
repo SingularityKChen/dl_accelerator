@@ -1,13 +1,6 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_ready",
-    "sources":[
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_valid"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeFin",
     "sources":[
       "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_valid"
@@ -17,7 +10,8 @@
     "class":"firrtl.transforms.CombinationalPath",
     "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_ready",
     "sources":[
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_valid"
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_valid",
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn"
     ]
   },
   {
@@ -25,6 +19,14 @@
     "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeFin",
     "sources":[
       "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_valid"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_ready",
+    "sources":[
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_valid",
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn"
     ]
   },
   {

@@ -6,77 +6,58 @@ import chisel3.util._
 class ProcessingElement extends Module with PESizeConfig {
   val io = IO(new Bundle{
     val dataStream = new DataStreamIO
+    val topCtrl = new PETopToCtrlIO
   })
-  //val iactDataFIFO = Module(new Queue(io.dataStream.iactDataIO, fifoSize, flow = true)) //FIFO for input feature map
-  //
-  //val iactAddrFIFO = Module(new Queue(io.dataStream.iactAddrIO, fifoSize, flow = true)) //FIFO for input feature map
-  //val weightDataFIFO = Module(new Queue(io.dataStream.weightDataIO, fifoSize, flow = true)) //FIFO for weight
-  // c0 === C0.U, weightFIFO.deq.valid := true.B
-  //val weightAddrFIFO = Module(new Queue(io.dataStream.weightAddrIO, fifoSize, flow = true)) //FIFO for weight
-  val ipsFIFO: Queue[DecoupledIO[UInt]] = Module(new Queue(io.dataStream.ipsIO, fifoSize, flow = true)) //FIFO for input partial sum
-  // r0 === R.U, ipsFIFO.deq.valid := true.B
   val peCtrl = new ProcessingElementControl
   val pePad = new ProcessingElementPad(false)
+  if (fifoEn) {
+    pePad.io.dataStream.iactIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
+    pePad.io.dataStream.iactIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
+    pePad.io.dataStream.weightIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
+    pePad.io.dataStream.weightIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
+  } else {
+    pePad.io.dataStream.iactIOs <> io.dataStream.iactIOs
+    pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
+ }
   peCtrl.io.ctrlPad <> pePad.io.padCtrl
-  pePad.io.dataStream.iactIOs <> io.dataStream.iactIOs
-  pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
-  pePad.io.dataStream.ipsIO <> ipsFIFO.io.deq
-  val opsFIFO: Queue[DecoupledIO[UInt]] = Module(new Queue(pePad.io.dataStream.opsIO, fifoSize, flow = true)) //FIFO for output partial sum
-  //
-  io.dataStream.opsIO <> ipsFIFO.io.deq
+  peCtrl.io.ctrlTop <> io.topCtrl
+  pePad.io.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true)
+  io.dataStream.opsIO <> Queue(pePad.io.dataStream.opsIO, fifoSize, flow = true)
 }
 
 class ProcessingElementControl extends Module with MCRENFConfig {
   val io = IO(new Bundle{
     val ctrlPad = new PECtrlToPadIO
+    val ctrlTop: PETopToCtrlIO = Flipped(new PETopToCtrlIO)
   })
+  io.ctrlTop.writeFinish := io.ctrlPad.writeFinish
+  io.ctrlTop.calFinish := io.ctrlPad.calFinish
   // some config of RS+
-
   // logic of PE MAC
-  // state machine, the for-loop of m0
-  // psIdle: if not all the MAC operations are done, then load
-  // ps_load: load input activations, weights, partial sums, then do the MAC
-  // ps_done: finish one mac, then jump to idle or load state
-  val psIdle :: ps_load :: ps_done :: Nil = Enum(3)
-  val s_per_mac: UInt = RegInit(psIdle) // the state of the mac process
-  val all_mac_is_done: Bool = RegInit(false.B) //true when all the mac has been done, then pe will keep in psIdle
-  // TODO: check the MCRENF.map
-  switch (s_per_mac) {
+  // state machine, control the process of MAC
+  // psIdle: wait for signal
+  // psLoad: load input activations, weights, partial sums outside and read out output partial sum
+  // psCal: do MAC computations
+  val psIdle :: psLoad :: psCal :: Nil = Enum(3)
+  val stateMac: UInt = RegInit(psIdle) // the state of the mac process
+  io.ctrlTop.pSumEnqOrProduct.ready := Mux(stateMac === psCal, io.ctrlPad.pSumEnqOrProduct.ready, false.B)
+  io.ctrlPad.pSumEnqOrProduct.valid := Mux(stateMac === psCal, io.ctrlTop.pSumEnqOrProduct.valid, false.B)
+  io.ctrlPad.doLoadEn := stateMac === psLoad
+  io.ctrlPad.doMACEn := stateMac === psCal
+  switch (stateMac) {
     is (psIdle) {
-      when (!all_mac_is_done) { // when there is any mac leaving
-        s_per_mac := ps_load
-      }
-      io.ctrlPad.pSumEnqOrProduct.valid := false.B
-    }
-    is (ps_load) {
-      io.ctrlPad.pSumEnqOrProduct.valid := true.B
-      when (io.ctrlPad.pSumEnqOrProduct.ready) { //after the pad receives the data
-        s_per_mac := ps_done
-        io.ctrlPad.pSumEnqOrProduct.valid := false.B
+      when (io.ctrlTop.doLoadEn) { // when there is any mac leaving
+        stateMac := psLoad
       }
     }
-    is (ps_done) {/*
-      mcrenfReg(0) := mcrenfReg(0) + 1.U // no matter whether m0 equals to (M0 - 1).U, we add one, then check it
-      // then check whether mcrenf need carry one TODO: check it
-      for (i <- 1 until 6) { // from m0 to n0
-        when(when_carry.take(i).reduce(_ && _)) {
-          if (!isPow2(MCRENF(i-1))) { // if equals to pow2, then don't need reset just let it carries.
-            mcrenfReg(i - 1) := 0.U
-          }
-          mcrenfReg(i) := mcrenfReg(i) + 1.U
-        }
+    is (psLoad) {
+      when (io.ctrlPad.writeFinish) { //after the pad receives the data
+        stateMac := psCal
       }
-      when(when_carry.reduce(_ && _)) { // f0
-        if (!isPow2(MCRENF(5))) {
-          mcrenfReg(5) := 0.U
-        }
-        all_mac_is_done := true.B // then all the macs have been done
-      }*/
-
-      when (all_mac_is_done) {
-        s_per_mac := psIdle
-      }.otherwise{
-        s_per_mac := ps_load
+    }
+    is (psCal) {
+      when (io.ctrlPad.calFinish) {
+        stateMac := psIdle
       }
     }
   }
@@ -193,6 +174,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
   //val weightMatrixRowReg: UInt = RegEnable(0.U(cscCountWidth.W), padEqWA)
   // Connections
+  Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad).map(_.io.commonIO.writeEn := io.padCtrl.doLoadEn)
   // Input activation Address Scratch Pad
   iactAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.addrIOs
   iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
@@ -238,9 +220,10 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // Partial Sum Scratch Pad
   io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.pSumEnqOrProduct.bits
   io.dataStream.opsIO.bits := pSumResultWire
-  io.dataStream.opsIO.valid := padEqWB // FIXME: it should be read out with one special signal
+  io.dataStream.opsIO.valid := padEqWB // FIXME:
   // SPadToCtrl
   io.padCtrl.pSumEnqOrProduct.ready := padEqMpy
+  io.padCtrl.writeFinish := Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad).map(_.io.commonIO.dataLenFinIO.writeFin).reduce(_ && _) // when all Scratch Pad write finished
   pSumResultWire := Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
 
   val mcrenfReg: Vec[UInt] = RegInit(VecInit(Seq.fill(6)(0.U(log2Ceil(MCRENF.max).W))))
@@ -270,6 +253,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataIdxMuxWire := padEqID && weightDataSPadFirstRead && !weightMatrixReadFirstColumn // then it can read the start index in weightDataSPad, the end index of that will be read otherwise
   weightAddrSPadReadIdxWire := Mux(weightDataIdxMuxWire, iactMatrixRowWire - 1.U, iactMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
+  io.padCtrl.calFinish := padEqWB && mightIactReadFinish && mightWeightReadFinish
   switch (sPad) {
     is (padIdle) {
       when(io.padCtrl.doMACEn) {
@@ -316,17 +300,24 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       readOff()
     }
     is (padMpy) {
-      sPad := padWriteBack
-      pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
-      productReg := Mux(io.padCtrl.pSumEnqOrProduct.bits, io.dataStream.ipsIO.bits, weightMatrixDataReg * iactMatrixDataWire)
+      when (io.padCtrl.pSumEnqOrProduct.bits) {
+        when (io.dataStream.ipsIO.valid) {
+          sPad := padWriteBack
+          productReg := io.dataStream.ipsIO.bits
+          io.dataStream.ipsIO.ready := true.B
+          pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
+        }
+      } .otherwise {
+        sPad := padWriteBack
+        productReg :=  weightMatrixDataReg * iactMatrixDataWire
+        pSumSPadLoadReg := psDataSPad(weightMatrixRowReg)
+      }
     }
     is (padWriteBack) {
-      // FIXME: add ready valid signal for ips FIFO
       psDataSPad(weightMatrixRowReg) := pSumResultWire //update the partial sum
       when (mightIactReadFinish && mightWeightReadFinish) {
         sPad := padIdle
         iactMatrixColumnReg := 0.U
-        // TODO: tell the control module that we finished
       } .otherwise { // then haven't done all the MAC operations
         when (mightWeightIdxIncWire) { // finished read current weight data Matrix column
           when (mightIactIdxIncWire) { // finished read current iact data Matrix column

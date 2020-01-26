@@ -36,6 +36,7 @@ class SPadCommonIO(val dataLenWidth: Int, val dataWidth: Int, val padSize: Int) 
   val columnNum: UInt = Output(UInt(dataLenWidth.W)) // the column number, address only
   val readOutData: UInt = Output(UInt(dataWidth.W)) // the data read from SPad
   val readEn: Bool = Input(Bool())
+  val writeEn: Bool = Input(Bool())
   val writeIdx: UInt = Output(UInt(log2Ceil(padSize).W))
   val dataLenFinIO = new StreamDataLenFinIO(dataWidth, dataLenWidth)
 }
@@ -62,8 +63,13 @@ class StreamBitsIO(val dataWidth: Int) extends Bundle {
   val data: UInt = UInt(dataWidth.W)
 }
 
-class PECtrlToPadIO extends Bundle {
-  //val mcrenf: Vec[UInt] = Vec(6, UInt(5.W))
+class PECtrlToPadIO extends PETopToCtrlIO {
+  val doMACEn: Bool = Output(Bool()) // true, then begin MAC computations
+}
+
+class PETopToCtrlIO extends Bundle {
   val pSumEnqOrProduct: DecoupledIO[Bool] = Decoupled(Bool()) // true, then read from FIFO; false, then use product
-  val doMACEn: Bool = Output(Bool())
+  val doLoadEn: Bool = Output(Bool()) // true, then write data into iact and weight SPad and read data out from psData SPad
+  val writeFinish: Bool = Input(Bool()) // true then write data into the Scratch Pad finished
+  val calFinish: Bool = Input(Bool()) // true then MAC computations finished
 }

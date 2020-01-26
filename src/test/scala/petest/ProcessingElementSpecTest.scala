@@ -2,7 +2,7 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.tester._
-import dla.pe.{SPadAddrModule, SPadDataModule, SPadSizeConfig, SimplyCombineAddrDataSPad, ProcessingElementPad}
+import dla.pe.{SPadAddrModule, SPadDataModule, SPadSizeConfig, ProcessingElementPad}
 import org.scalatest._
 
 class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig {
@@ -105,6 +105,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     theTopIO.addrIOs.streamLen.poke(inIactTestAddr.length.U)
     theTopIO.dataIOs.streamLen.poke(inWeightData.length.U)
     theDataReq.poke(false.B)
+    topModule.io.writeEn.poke(true.B)
     fork { // run them in parallel
       theTopIO.addrIOs.writeInDataIO.valid.poke(true.B)
       for (i <- inIactTestAddr.indices) {
@@ -126,6 +127,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       }
       theTopIO.dataIOs.writeInDataIO.valid.poke(false.B)
     } .join()
+    topModule.io.writeEn.poke(false.B)
   }
 
   def simplyCheckSignal(cycle: Int, topModule: SimplyCombineAddrDataSPad, outWeightCycleType: Seq[Int], readDataTimes: Int, readInData: Seq[Int], readInRow: Seq[Int], readInColumn: Seq[Int]): Any = outWeightCycleType(cycle) match {
@@ -163,7 +165,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("----------------- test begin -----------------")
       println("----------- PE Scratch Pad Module ------------")
       println("--------------- begin to write ---------------")
+      theTopIO.padCtrl.doLoadEn.poke(true.B)
       PEScratchPadWriteIn(inIactAddr,inIactDataCountDec, inWeightAddr, inWeightDataCountDec, thePESPad)
+      theTopIO.padCtrl.doLoadEn.poke(false.B)
       println("--------------- begin to read ----------------")
       theTopIO.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
       theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
@@ -237,6 +241,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("----------- begin to write -----------")
       theCommonIO.dataLenFinIO.streamLen.poke(inIactTestAddr.length.U)
       theDataIO.valid.poke(true.B)
+      theCommonIO.writeEn.poke(true.B)
       theCommonIO.readEn.poke(false.B)
       for (i <- inIactTestAddr.indices) {
         theDataIO.bits.data.poke(inIactTestAddr(i).U)
@@ -247,6 +252,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       }
       println("----------- begin to read -----------")
       theDataIO.valid.poke(false.B)
+      theCommonIO.writeEn.poke(false.B)
       theCommonIO.readEn.poke(true.B)
       addrSPad.io.addrIO.indexInc.poke(true.B) // INCREASE ALL THE TIME
       for (i <- 0 until (inIactTestAddr.length - 1)) {
@@ -270,6 +276,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("----------- begin to write -----------")
       theCommonIO.dataLenFinIO.streamLen.poke(inWeightDataCountDec.length.U)
       theDataIO.valid.poke(true.B)
+      theCommonIO.writeEn.poke(true.B)
       theCommonIO.readEn.poke(false.B)
       for (i <- inWeightDataCountDec.indices) {
         theDataIO.bits.data.poke(inWeightDataCountDec(i).U)
@@ -280,6 +287,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       }
       println("----------- begin to read -----------")
       theDataIO.valid.poke(false.B)
+      theCommonIO.writeEn.poke(false.B)
       theCommonIO.readEn.poke(true.B)
       dataSPad.io.dataIO.indexInc.poke(true.B) // INCREASE ALL THE TIME
       for (i <- inWeightDataCountDec.indices) {
