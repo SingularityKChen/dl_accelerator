@@ -3,6 +3,15 @@ package dla.pe
 import chisel3._
 import chisel3.util._
 
+class PETopDebugIO extends Bundle {
+  val peControlDebugIO = new PEControlDebugIO
+  val peSPadDebugIO = new PESPadDebugIO
+}
+
+class PEControlDebugIO extends Bundle {
+  val peState: UInt = Output(UInt(2.W))
+}
+
 class PESPadDebugIO extends Bundle with PESizeConfig {
   val iactMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val iactMatrixRow: UInt = Output(UInt(cscCountWidth.W))
@@ -63,13 +72,14 @@ class StreamBitsIO(val dataWidth: Int) extends Bundle {
   val data: UInt = UInt(dataWidth.W)
 }
 
-class PECtrlToPadIO extends PETopToCtrlIO {
+class PECtrlToPadIO extends Bundle {
   val doMACEn: Bool = Output(Bool()) // true, then begin MAC computations
+  val fromTopIO: PETopToHigherIO = Flipped(new PETopToHigherIO)
 }
 
-class PETopToCtrlIO extends Bundle {
-  val pSumEnqOrProduct: DecoupledIO[Bool] = Decoupled(Bool()) // true, then read from FIFO; false, then use product
-  val doLoadEn: Bool = Output(Bool()) // true, then write data into iact and weight SPad and read data out from psData SPad
-  val writeFinish: Bool = Input(Bool()) // true then write data into the Scratch Pad finished
-  val calFinish: Bool = Input(Bool()) // true then MAC computations finished
+class PETopToHigherIO extends Bundle {
+  val pSumEnqOrProduct: DecoupledIO[Bool] = Flipped(Decoupled(Bool())) // true, then read from FIFO; false, then use product
+  val doLoadEn: Bool = Input(Bool()) // true, then write data into iact and weight SPad and read data out from psData SPad
+  val writeFinish: Bool = Output(Bool()) // true then write data into the Scratch Pad finished
+  val calFinish: Bool = Output(Bool()) // true then MAC computations finished
 }

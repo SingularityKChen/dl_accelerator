@@ -1,4 +1,46 @@
-circuit ProcessingElementPad :
+circuit ProcessingElement :
+  module ProcessingElementControl :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_ctrlPad_doMACEn : UInt<1>
+    input io_ctrlPad_fromTopIO_pSumEnqOrProduct_ready : UInt<1>
+    output io_ctrlPad_fromTopIO_pSumEnqOrProduct_valid : UInt<1>
+    output io_ctrlPad_fromTopIO_pSumEnqOrProduct_bits : UInt<1>
+    output io_ctrlPad_fromTopIO_doLoadEn : UInt<1>
+    input io_ctrlPad_fromTopIO_writeFinish : UInt<1>
+    input io_ctrlPad_fromTopIO_calFinish : UInt<1>
+    output io_ctrlTop_pSumEnqOrProduct_ready : UInt<1>
+    input io_ctrlTop_pSumEnqOrProduct_valid : UInt<1>
+    input io_ctrlTop_pSumEnqOrProduct_bits : UInt<1>
+    input io_ctrlTop_doLoadEn : UInt<1>
+    output io_ctrlTop_writeFinish : UInt<1>
+    output io_ctrlTop_calFinish : UInt<1>
+  
+    reg stateMac : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), stateMac) @[ProcessingElement.scala 49:31]
+    node _T = eq(stateMac, UInt<2>("h2")) @[ProcessingElement.scala 50:53]
+    node _T_1 = mux(_T, io_ctrlPad_fromTopIO_pSumEnqOrProduct_ready, UInt<1>("h0")) @[ProcessingElement.scala 50:43]
+    node _T_2 = eq(stateMac, UInt<2>("h2")) @[ProcessingElement.scala 51:63]
+    node _T_3 = mux(_T_2, io_ctrlTop_pSumEnqOrProduct_valid, UInt<1>("h0")) @[ProcessingElement.scala 51:53]
+    node _T_4 = eq(stateMac, UInt<2>("h2")) @[ProcessingElement.scala 54:34]
+    node _T_5 = eq(UInt<2>("h0"), stateMac) @[Conditional.scala 37:30]
+    node _GEN_0 = mux(io_ctrlTop_doLoadEn, UInt<2>("h1"), stateMac) @[ProcessingElement.scala 57:34]
+    node _T_6 = eq(UInt<2>("h1"), stateMac) @[Conditional.scala 37:30]
+    node _GEN_1 = mux(io_ctrlPad_fromTopIO_writeFinish, UInt<2>("h2"), stateMac) @[ProcessingElement.scala 62:47]
+    node _T_7 = eq(UInt<2>("h2"), stateMac) @[Conditional.scala 37:30]
+    node _GEN_2 = mux(io_ctrlPad_fromTopIO_calFinish, UInt<2>("h0"), stateMac) @[ProcessingElement.scala 67:45]
+    node _GEN_3 = mux(_T_7, _GEN_2, stateMac) @[Conditional.scala 39:67]
+    node _GEN_4 = mux(_T_6, _GEN_1, _GEN_3) @[Conditional.scala 39:67]
+    node _GEN_5 = mux(_T_5, _GEN_0, _GEN_4) @[Conditional.scala 40:58]
+    io_ctrlPad_doMACEn <= _T_4 @[ProcessingElement.scala 54:22]
+    io_ctrlPad_fromTopIO_pSumEnqOrProduct_valid <= _T_3 @[ProcessingElement.scala 51:47]
+    io_ctrlPad_fromTopIO_pSumEnqOrProduct_bits <= io_ctrlTop_pSumEnqOrProduct_bits @[ProcessingElement.scala 52:46]
+    io_ctrlPad_fromTopIO_doLoadEn <= io_ctrlTop_doLoadEn @[ProcessingElement.scala 53:33]
+    io_ctrlTop_pSumEnqOrProduct_ready <= _T_1 @[ProcessingElement.scala 50:37]
+    io_ctrlTop_writeFinish <= io_ctrlPad_fromTopIO_writeFinish @[ProcessingElement.scala 40:26]
+    io_ctrlTop_calFinish <= io_ctrlPad_fromTopIO_calFinish @[ProcessingElement.scala 41:24]
+    stateMac <= mux(reset, UInt<2>("h0"), _GEN_5) @[ProcessingElement.scala 58:18 ProcessingElement.scala 63:18 ProcessingElement.scala 68:18]
+
   module SPadAddrModule :
     input clock : Clock
     input reset : UInt<1>
@@ -1424,20 +1466,20 @@ circuit ProcessingElementPad :
     io_dataStream_weightIOs_dataIOs_writeFin <= SPadSeq_3.io_commonIO_dataLenFinIO_writeFin @[ProcessingElement.scala 218:43]
     io_dataStream_weightIOs_addrIOs_writeInDataIO_ready <= SPadSeq_2.io_commonIO_dataLenFinIO_writeInDataIO_ready @[ProcessingElement.scala 207:43]
     io_dataStream_weightIOs_addrIOs_writeFin <= SPadSeq_2.io_commonIO_dataLenFinIO_writeFin @[ProcessingElement.scala 207:43]
-    io_debugIO_iactMatrixData <= iactMatrixDataWire @[ProcessingElement.scala 372:31]
-    io_debugIO_iactMatrixRow <= iactMatrixRowWire @[ProcessingElement.scala 373:30]
-    io_debugIO_iactMatrixColumn <= iactMatrixColumnReg @[ProcessingElement.scala 371:33]
-    io_debugIO_iactAddrInc <= iactAddrSPadIdxIncWire @[ProcessingElement.scala 375:28]
-    io_debugIO_iactDataInc <= iactDataSPadIdxIncWire @[ProcessingElement.scala 376:28]
-    io_debugIO_iactAddrIdx <= iactAddrIndexWire @[ProcessingElement.scala 374:28]
-    io_debugIO_weightAddrSPadReadOut <= weightAddrDataWire @[ProcessingElement.scala 379:38]
-    io_debugIO_weightMatrixData <= weightMatrixDataReg @[ProcessingElement.scala 377:33]
-    io_debugIO_weightMatrixRow <= weightMatrixRowReg @[ProcessingElement.scala 378:32]
-    io_debugIO_productResult <= productReg @[ProcessingElement.scala 380:30]
-    io_debugIO_pSumResult <= pSumResultWire @[ProcessingElement.scala 381:27]
-    io_debugIO_pSumLoad <= pSumSPadLoadReg @[ProcessingElement.scala 382:25]
-    io_debugIO_weightAddrInIdx <= weightAddrSPadReadIdxWire @[ProcessingElement.scala 383:32]
-    io_debugIO_sPadState <= sPad @[ProcessingElement.scala 384:26]
+    io_debugIO_iactMatrixData is invalid
+    io_debugIO_iactMatrixRow is invalid
+    io_debugIO_iactMatrixColumn is invalid
+    io_debugIO_iactAddrInc is invalid
+    io_debugIO_iactDataInc is invalid
+    io_debugIO_iactAddrIdx is invalid
+    io_debugIO_weightAddrSPadReadOut is invalid
+    io_debugIO_weightMatrixData is invalid
+    io_debugIO_weightMatrixRow is invalid
+    io_debugIO_productResult is invalid
+    io_debugIO_pSumResult is invalid
+    io_debugIO_pSumLoad is invalid
+    io_debugIO_weightAddrInIdx is invalid
+    io_debugIO_sPadState is invalid
     psDataSPad_0 <= mux(reset, _T__0, _GEN_467) @[ProcessingElement.scala 344:37]
     psDataSPad_1 <= mux(reset, _T__1, _GEN_468) @[ProcessingElement.scala 344:37]
     psDataSPad_2 <= mux(reset, _T__2, _GEN_469) @[ProcessingElement.scala 344:37]
@@ -1536,3 +1578,425 @@ circuit ProcessingElementPad :
     value <= mux(reset, UInt<5>("h0"), _GEN_463) @[Counter.scala 38:13 Counter.scala 40:29 ProcessingElement.scala 326:33 ProcessingElement.scala 348:35]
     pSumResultIdxReg <= mux(reset, UInt<20>("h0"), pSumResultIdxReg)
     iactSPadZeroColumnReg <= mux(reset, UInt<1>("h0"), _GEN_460) @[ProcessingElement.scala 293:31 ProcessingElement.scala 308:35 ProcessingElement.scala 354:37]
+
+  module Queue :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_enq_ready : UInt<1>
+    input io_enq_valid : UInt<1>
+    input io_enq_bits_data : UInt<4>
+    input io_deq_ready : UInt<1>
+    output io_deq_valid : UInt<1>
+    output io_deq_bits_data : UInt<4>
+    output io_count : UInt<3>
+  
+    mem _T_data : @[Decoupled.scala 209:24]
+      data-type => UInt<4>
+      depth => 4
+      read-latency => 0
+      write-latency => 1
+      reader => _T_22
+      writer => _T_12
+      read-under-write => undefined
+    reg _T_1 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_1) @[Counter.scala 29:33]
+    reg _T_2 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_2) @[Counter.scala 29:33]
+    reg _T_3 : UInt<1>, clock with :
+      reset => (UInt<1>("h0"), _T_3) @[Decoupled.scala 212:35]
+    node _T_4 = eq(_T_1, _T_2) @[Decoupled.scala 214:41]
+    node _T_5 = eq(_T_3, UInt<1>("h0")) @[Decoupled.scala 215:36]
+    node _T_6 = and(_T_4, _T_5) @[Decoupled.scala 215:33]
+    node _T_7 = and(_T_4, _T_3) @[Decoupled.scala 216:32]
+    node _T_8 = and(io_enq_ready, io_enq_valid) @[Decoupled.scala 40:37]
+    node _T_10 = and(io_deq_ready, io_deq_valid) @[Decoupled.scala 40:37]
+    node _T_13 = eq(_T_1, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_14 = add(_T_1, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_15 = tail(_T_14, 1) @[Counter.scala 38:22]
+    node _GEN_9 = mux(io_deq_ready, UInt<1>("h0"), _T_8) @[Decoupled.scala 240:27]
+    node _GEN_12 = mux(_T_6, _GEN_9, _T_8) @[Decoupled.scala 237:18]
+    node _T_9 = _GEN_12 @[Decoupled.scala 240:36]
+    node _GEN_0 = validif(_T_9, _T_1) @[Decoupled.scala 220:17]
+    node _GEN_1 = validif(_T_9, clock) @[Decoupled.scala 220:17]
+    node _GEN_2 = mux(_T_9, UInt<1>("h1"), UInt<1>("h0")) @[Decoupled.scala 220:17]
+    node _GEN_3 = validif(_T_9, UInt<1>("h1")) @[Decoupled.scala 220:17]
+    node _GEN_4 = validif(_T_9, io_enq_bits_data) @[Decoupled.scala 220:17]
+    node _GEN_5 = mux(_T_9, _T_15, _T_1) @[Decoupled.scala 220:17]
+    node _T_16 = eq(_T_2, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_17 = add(_T_2, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_18 = tail(_T_17, 1) @[Counter.scala 38:22]
+    node _GEN_11 = mux(_T_6, UInt<1>("h0"), _T_10) @[Decoupled.scala 237:18]
+    node _T_11 = _GEN_11 @[Decoupled.scala 239:14]
+    node _GEN_6 = mux(_T_11, _T_18, _T_2) @[Decoupled.scala 224:17]
+    node _T_19 = neq(_T_9, _T_11) @[Decoupled.scala 227:16]
+    node _GEN_7 = mux(_T_19, _T_9, _T_3) @[Decoupled.scala 227:28]
+    node _T_20 = eq(_T_6, UInt<1>("h0")) @[Decoupled.scala 231:19]
+    node _T_21 = eq(_T_7, UInt<1>("h0")) @[Decoupled.scala 232:19]
+    node _GEN_8 = mux(io_enq_valid, UInt<1>("h1"), _T_20) @[Decoupled.scala 236:25]
+    node _GEN_10 = mux(_T_6, io_enq_bits_data, _T_data._T_22.data) @[Decoupled.scala 237:18]
+    node _T_23 = sub(_T_1, _T_2) @[Decoupled.scala 248:40]
+    node _T_24 = tail(_T_23, 1) @[Decoupled.scala 248:40]
+    node _T_25 = and(_T_3, _T_4) @[Decoupled.scala 250:32]
+    node _T_26 = mux(_T_25, UInt<3>("h4"), UInt<1>("h0")) @[Decoupled.scala 250:20]
+    node _T_27 = or(_T_26, _T_24) @[Decoupled.scala 250:62]
+    io_enq_ready <= _T_21 @[Decoupled.scala 232:16]
+    io_deq_valid <= _GEN_8 @[Decoupled.scala 231:16 Decoupled.scala 236:40]
+    io_deq_bits_data <= _GEN_10 @[Decoupled.scala 233:15 Decoupled.scala 238:19]
+    io_count <= _T_27 @[Decoupled.scala 250:14]
+    _T_data._T_22.addr <= _T_2 @[Decoupled.scala 233:21]
+    _T_data._T_22.en <= UInt<1>("h1") @[Decoupled.scala 209:24 Decoupled.scala 233:21]
+    _T_data._T_22.clk <= clock @[Decoupled.scala 233:21]
+    _T_data._T_12.addr <= _GEN_0 @[Decoupled.scala 221:8]
+    _T_data._T_12.en <= _GEN_2 @[Decoupled.scala 209:24 Decoupled.scala 221:8]
+    _T_data._T_12.clk <= _GEN_1 @[Decoupled.scala 221:8]
+    _T_data._T_12.data <= _GEN_4 @[Decoupled.scala 221:24]
+    _T_data._T_12.mask <= _GEN_3 @[Decoupled.scala 221:8 Decoupled.scala 221:24]
+    _T_1 <= mux(reset, UInt<2>("h0"), _GEN_5) @[Counter.scala 38:13]
+    _T_2 <= mux(reset, UInt<2>("h0"), _GEN_6) @[Counter.scala 38:13]
+    _T_3 <= mux(reset, UInt<1>("h0"), _GEN_7) @[Decoupled.scala 228:16]
+
+  module Queue_1 :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_enq_ready : UInt<1>
+    input io_enq_valid : UInt<1>
+    input io_enq_bits_data : UInt<12>
+    input io_deq_ready : UInt<1>
+    output io_deq_valid : UInt<1>
+    output io_deq_bits_data : UInt<12>
+    output io_count : UInt<3>
+  
+    mem _T_data : @[Decoupled.scala 209:24]
+      data-type => UInt<12>
+      depth => 4
+      read-latency => 0
+      write-latency => 1
+      reader => _T_22
+      writer => _T_12
+      read-under-write => undefined
+    reg _T_1 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_1) @[Counter.scala 29:33]
+    reg _T_2 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_2) @[Counter.scala 29:33]
+    reg _T_3 : UInt<1>, clock with :
+      reset => (UInt<1>("h0"), _T_3) @[Decoupled.scala 212:35]
+    node _T_4 = eq(_T_1, _T_2) @[Decoupled.scala 214:41]
+    node _T_5 = eq(_T_3, UInt<1>("h0")) @[Decoupled.scala 215:36]
+    node _T_6 = and(_T_4, _T_5) @[Decoupled.scala 215:33]
+    node _T_7 = and(_T_4, _T_3) @[Decoupled.scala 216:32]
+    node _T_8 = and(io_enq_ready, io_enq_valid) @[Decoupled.scala 40:37]
+    node _T_10 = and(io_deq_ready, io_deq_valid) @[Decoupled.scala 40:37]
+    node _T_13 = eq(_T_1, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_14 = add(_T_1, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_15 = tail(_T_14, 1) @[Counter.scala 38:22]
+    node _GEN_9 = mux(io_deq_ready, UInt<1>("h0"), _T_8) @[Decoupled.scala 240:27]
+    node _GEN_12 = mux(_T_6, _GEN_9, _T_8) @[Decoupled.scala 237:18]
+    node _T_9 = _GEN_12 @[Decoupled.scala 240:36]
+    node _GEN_0 = validif(_T_9, _T_1) @[Decoupled.scala 220:17]
+    node _GEN_1 = validif(_T_9, clock) @[Decoupled.scala 220:17]
+    node _GEN_2 = mux(_T_9, UInt<1>("h1"), UInt<1>("h0")) @[Decoupled.scala 220:17]
+    node _GEN_3 = validif(_T_9, UInt<1>("h1")) @[Decoupled.scala 220:17]
+    node _GEN_4 = validif(_T_9, io_enq_bits_data) @[Decoupled.scala 220:17]
+    node _GEN_5 = mux(_T_9, _T_15, _T_1) @[Decoupled.scala 220:17]
+    node _T_16 = eq(_T_2, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_17 = add(_T_2, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_18 = tail(_T_17, 1) @[Counter.scala 38:22]
+    node _GEN_11 = mux(_T_6, UInt<1>("h0"), _T_10) @[Decoupled.scala 237:18]
+    node _T_11 = _GEN_11 @[Decoupled.scala 239:14]
+    node _GEN_6 = mux(_T_11, _T_18, _T_2) @[Decoupled.scala 224:17]
+    node _T_19 = neq(_T_9, _T_11) @[Decoupled.scala 227:16]
+    node _GEN_7 = mux(_T_19, _T_9, _T_3) @[Decoupled.scala 227:28]
+    node _T_20 = eq(_T_6, UInt<1>("h0")) @[Decoupled.scala 231:19]
+    node _T_21 = eq(_T_7, UInt<1>("h0")) @[Decoupled.scala 232:19]
+    node _GEN_8 = mux(io_enq_valid, UInt<1>("h1"), _T_20) @[Decoupled.scala 236:25]
+    node _GEN_10 = mux(_T_6, io_enq_bits_data, _T_data._T_22.data) @[Decoupled.scala 237:18]
+    node _T_23 = sub(_T_1, _T_2) @[Decoupled.scala 248:40]
+    node _T_24 = tail(_T_23, 1) @[Decoupled.scala 248:40]
+    node _T_25 = and(_T_3, _T_4) @[Decoupled.scala 250:32]
+    node _T_26 = mux(_T_25, UInt<3>("h4"), UInt<1>("h0")) @[Decoupled.scala 250:20]
+    node _T_27 = or(_T_26, _T_24) @[Decoupled.scala 250:62]
+    io_enq_ready <= _T_21 @[Decoupled.scala 232:16]
+    io_deq_valid <= _GEN_8 @[Decoupled.scala 231:16 Decoupled.scala 236:40]
+    io_deq_bits_data <= _GEN_10 @[Decoupled.scala 233:15 Decoupled.scala 238:19]
+    io_count <= _T_27 @[Decoupled.scala 250:14]
+    _T_data._T_22.addr <= _T_2 @[Decoupled.scala 233:21]
+    _T_data._T_22.en <= UInt<1>("h1") @[Decoupled.scala 209:24 Decoupled.scala 233:21]
+    _T_data._T_22.clk <= clock @[Decoupled.scala 233:21]
+    _T_data._T_12.addr <= _GEN_0 @[Decoupled.scala 221:8]
+    _T_data._T_12.en <= _GEN_2 @[Decoupled.scala 209:24 Decoupled.scala 221:8]
+    _T_data._T_12.clk <= _GEN_1 @[Decoupled.scala 221:8]
+    _T_data._T_12.data <= _GEN_4 @[Decoupled.scala 221:24]
+    _T_data._T_12.mask <= _GEN_3 @[Decoupled.scala 221:8 Decoupled.scala 221:24]
+    _T_1 <= mux(reset, UInt<2>("h0"), _GEN_5) @[Counter.scala 38:13]
+    _T_2 <= mux(reset, UInt<2>("h0"), _GEN_6) @[Counter.scala 38:13]
+    _T_3 <= mux(reset, UInt<1>("h0"), _GEN_7) @[Decoupled.scala 228:16]
+
+  module Queue_2 :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_enq_ready : UInt<1>
+    input io_enq_valid : UInt<1>
+    input io_enq_bits_data : UInt<7>
+    input io_deq_ready : UInt<1>
+    output io_deq_valid : UInt<1>
+    output io_deq_bits_data : UInt<7>
+    output io_count : UInt<3>
+  
+    mem _T_data : @[Decoupled.scala 209:24]
+      data-type => UInt<7>
+      depth => 4
+      read-latency => 0
+      write-latency => 1
+      reader => _T_22
+      writer => _T_12
+      read-under-write => undefined
+    reg _T_1 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_1) @[Counter.scala 29:33]
+    reg _T_2 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_2) @[Counter.scala 29:33]
+    reg _T_3 : UInt<1>, clock with :
+      reset => (UInt<1>("h0"), _T_3) @[Decoupled.scala 212:35]
+    node _T_4 = eq(_T_1, _T_2) @[Decoupled.scala 214:41]
+    node _T_5 = eq(_T_3, UInt<1>("h0")) @[Decoupled.scala 215:36]
+    node _T_6 = and(_T_4, _T_5) @[Decoupled.scala 215:33]
+    node _T_7 = and(_T_4, _T_3) @[Decoupled.scala 216:32]
+    node _T_8 = and(io_enq_ready, io_enq_valid) @[Decoupled.scala 40:37]
+    node _T_10 = and(io_deq_ready, io_deq_valid) @[Decoupled.scala 40:37]
+    node _T_13 = eq(_T_1, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_14 = add(_T_1, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_15 = tail(_T_14, 1) @[Counter.scala 38:22]
+    node _GEN_9 = mux(io_deq_ready, UInt<1>("h0"), _T_8) @[Decoupled.scala 240:27]
+    node _GEN_12 = mux(_T_6, _GEN_9, _T_8) @[Decoupled.scala 237:18]
+    node _T_9 = _GEN_12 @[Decoupled.scala 240:36]
+    node _GEN_0 = validif(_T_9, _T_1) @[Decoupled.scala 220:17]
+    node _GEN_1 = validif(_T_9, clock) @[Decoupled.scala 220:17]
+    node _GEN_2 = mux(_T_9, UInt<1>("h1"), UInt<1>("h0")) @[Decoupled.scala 220:17]
+    node _GEN_3 = validif(_T_9, UInt<1>("h1")) @[Decoupled.scala 220:17]
+    node _GEN_4 = validif(_T_9, io_enq_bits_data) @[Decoupled.scala 220:17]
+    node _GEN_5 = mux(_T_9, _T_15, _T_1) @[Decoupled.scala 220:17]
+    node _T_16 = eq(_T_2, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_17 = add(_T_2, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_18 = tail(_T_17, 1) @[Counter.scala 38:22]
+    node _GEN_11 = mux(_T_6, UInt<1>("h0"), _T_10) @[Decoupled.scala 237:18]
+    node _T_11 = _GEN_11 @[Decoupled.scala 239:14]
+    node _GEN_6 = mux(_T_11, _T_18, _T_2) @[Decoupled.scala 224:17]
+    node _T_19 = neq(_T_9, _T_11) @[Decoupled.scala 227:16]
+    node _GEN_7 = mux(_T_19, _T_9, _T_3) @[Decoupled.scala 227:28]
+    node _T_20 = eq(_T_6, UInt<1>("h0")) @[Decoupled.scala 231:19]
+    node _T_21 = eq(_T_7, UInt<1>("h0")) @[Decoupled.scala 232:19]
+    node _GEN_8 = mux(io_enq_valid, UInt<1>("h1"), _T_20) @[Decoupled.scala 236:25]
+    node _GEN_10 = mux(_T_6, io_enq_bits_data, _T_data._T_22.data) @[Decoupled.scala 237:18]
+    node _T_23 = sub(_T_1, _T_2) @[Decoupled.scala 248:40]
+    node _T_24 = tail(_T_23, 1) @[Decoupled.scala 248:40]
+    node _T_25 = and(_T_3, _T_4) @[Decoupled.scala 250:32]
+    node _T_26 = mux(_T_25, UInt<3>("h4"), UInt<1>("h0")) @[Decoupled.scala 250:20]
+    node _T_27 = or(_T_26, _T_24) @[Decoupled.scala 250:62]
+    io_enq_ready <= _T_21 @[Decoupled.scala 232:16]
+    io_deq_valid <= _GEN_8 @[Decoupled.scala 231:16 Decoupled.scala 236:40]
+    io_deq_bits_data <= _GEN_10 @[Decoupled.scala 233:15 Decoupled.scala 238:19]
+    io_count <= _T_27 @[Decoupled.scala 250:14]
+    _T_data._T_22.addr <= _T_2 @[Decoupled.scala 233:21]
+    _T_data._T_22.en <= UInt<1>("h1") @[Decoupled.scala 209:24 Decoupled.scala 233:21]
+    _T_data._T_22.clk <= clock @[Decoupled.scala 233:21]
+    _T_data._T_12.addr <= _GEN_0 @[Decoupled.scala 221:8]
+    _T_data._T_12.en <= _GEN_2 @[Decoupled.scala 209:24 Decoupled.scala 221:8]
+    _T_data._T_12.clk <= _GEN_1 @[Decoupled.scala 221:8]
+    _T_data._T_12.data <= _GEN_4 @[Decoupled.scala 221:24]
+    _T_data._T_12.mask <= _GEN_3 @[Decoupled.scala 221:8 Decoupled.scala 221:24]
+    _T_1 <= mux(reset, UInt<2>("h0"), _GEN_5) @[Counter.scala 38:13]
+    _T_2 <= mux(reset, UInt<2>("h0"), _GEN_6) @[Counter.scala 38:13]
+    _T_3 <= mux(reset, UInt<1>("h0"), _GEN_7) @[Decoupled.scala 228:16]
+
+  module Queue_4 :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_enq_ready : UInt<1>
+    input io_enq_valid : UInt<1>
+    input io_enq_bits : UInt<20>
+    input io_deq_ready : UInt<1>
+    output io_deq_valid : UInt<1>
+    output io_deq_bits : UInt<20>
+    output io_count : UInt<3>
+  
+    mem _T : @[Decoupled.scala 209:24]
+      data-type => UInt<20>
+      depth => 4
+      read-latency => 0
+      write-latency => 1
+      reader => _T_22
+      writer => _T_12
+      read-under-write => undefined
+    reg _T_1 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_1) @[Counter.scala 29:33]
+    reg _T_2 : UInt<2>, clock with :
+      reset => (UInt<1>("h0"), _T_2) @[Counter.scala 29:33]
+    reg _T_3 : UInt<1>, clock with :
+      reset => (UInt<1>("h0"), _T_3) @[Decoupled.scala 212:35]
+    node _T_4 = eq(_T_1, _T_2) @[Decoupled.scala 214:41]
+    node _T_5 = eq(_T_3, UInt<1>("h0")) @[Decoupled.scala 215:36]
+    node _T_6 = and(_T_4, _T_5) @[Decoupled.scala 215:33]
+    node _T_7 = and(_T_4, _T_3) @[Decoupled.scala 216:32]
+    node _T_8 = and(io_enq_ready, io_enq_valid) @[Decoupled.scala 40:37]
+    node _T_10 = and(io_deq_ready, io_deq_valid) @[Decoupled.scala 40:37]
+    node _T_13 = eq(_T_1, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_14 = add(_T_1, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_15 = tail(_T_14, 1) @[Counter.scala 38:22]
+    node _GEN_9 = mux(io_deq_ready, UInt<1>("h0"), _T_8) @[Decoupled.scala 240:27]
+    node _GEN_12 = mux(_T_6, _GEN_9, _T_8) @[Decoupled.scala 237:18]
+    node _T_9 = _GEN_12 @[Decoupled.scala 240:36]
+    node _GEN_0 = validif(_T_9, _T_1) @[Decoupled.scala 220:17]
+    node _GEN_1 = validif(_T_9, clock) @[Decoupled.scala 220:17]
+    node _GEN_2 = mux(_T_9, UInt<1>("h1"), UInt<1>("h0")) @[Decoupled.scala 220:17]
+    node _GEN_3 = validif(_T_9, UInt<1>("h1")) @[Decoupled.scala 220:17]
+    node _GEN_4 = validif(_T_9, io_enq_bits) @[Decoupled.scala 220:17]
+    node _GEN_5 = mux(_T_9, _T_15, _T_1) @[Decoupled.scala 220:17]
+    node _T_16 = eq(_T_2, UInt<2>("h3")) @[Counter.scala 37:24]
+    node _T_17 = add(_T_2, UInt<1>("h1")) @[Counter.scala 38:22]
+    node _T_18 = tail(_T_17, 1) @[Counter.scala 38:22]
+    node _GEN_11 = mux(_T_6, UInt<1>("h0"), _T_10) @[Decoupled.scala 237:18]
+    node _T_11 = _GEN_11 @[Decoupled.scala 239:14]
+    node _GEN_6 = mux(_T_11, _T_18, _T_2) @[Decoupled.scala 224:17]
+    node _T_19 = neq(_T_9, _T_11) @[Decoupled.scala 227:16]
+    node _GEN_7 = mux(_T_19, _T_9, _T_3) @[Decoupled.scala 227:28]
+    node _T_20 = eq(_T_6, UInt<1>("h0")) @[Decoupled.scala 231:19]
+    node _T_21 = eq(_T_7, UInt<1>("h0")) @[Decoupled.scala 232:19]
+    node _GEN_8 = mux(io_enq_valid, UInt<1>("h1"), _T_20) @[Decoupled.scala 236:25]
+    node _GEN_10 = mux(_T_6, io_enq_bits, _T._T_22.data) @[Decoupled.scala 237:18]
+    node _T_23 = sub(_T_1, _T_2) @[Decoupled.scala 248:40]
+    node _T_24 = tail(_T_23, 1) @[Decoupled.scala 248:40]
+    node _T_25 = and(_T_3, _T_4) @[Decoupled.scala 250:32]
+    node _T_26 = mux(_T_25, UInt<3>("h4"), UInt<1>("h0")) @[Decoupled.scala 250:20]
+    node _T_27 = or(_T_26, _T_24) @[Decoupled.scala 250:62]
+    io_enq_ready <= _T_21 @[Decoupled.scala 232:16]
+    io_deq_valid <= _GEN_8 @[Decoupled.scala 231:16 Decoupled.scala 236:40]
+    io_deq_bits <= _GEN_10 @[Decoupled.scala 233:15 Decoupled.scala 238:19]
+    io_count <= _T_27 @[Decoupled.scala 250:14]
+    _T._T_22.addr <= _T_2 @[Decoupled.scala 233:21]
+    _T._T_22.en <= UInt<1>("h1") @[Decoupled.scala 209:24 Decoupled.scala 233:21]
+    _T._T_22.clk <= clock @[Decoupled.scala 233:21]
+    _T._T_12.addr <= _GEN_0 @[Decoupled.scala 221:8]
+    _T._T_12.en <= _GEN_2 @[Decoupled.scala 209:24 Decoupled.scala 221:8]
+    _T._T_12.clk <= _GEN_1 @[Decoupled.scala 221:8]
+    _T._T_12.data <= _GEN_4 @[Decoupled.scala 221:24]
+    _T._T_12.mask <= _GEN_3 @[Decoupled.scala 221:8 Decoupled.scala 221:24]
+    _T_1 <= mux(reset, UInt<2>("h0"), _GEN_5) @[Counter.scala 38:13]
+    _T_2 <= mux(reset, UInt<2>("h0"), _GEN_6) @[Counter.scala 38:13]
+    _T_3 <= mux(reset, UInt<1>("h0"), _GEN_7) @[Decoupled.scala 228:16]
+
+  module ProcessingElement :
+    input clock : Clock
+    input reset : UInt<1>
+    output io_dataStream_ipsIO_ready : UInt<1>
+    input io_dataStream_ipsIO_valid : UInt<1>
+    input io_dataStream_ipsIO_bits : UInt<20>
+    input io_dataStream_opsIO_ready : UInt<1>
+    output io_dataStream_opsIO_valid : UInt<1>
+    output io_dataStream_opsIO_bits : UInt<20>
+    output io_dataStream_iactIOs_dataIOs_writeInDataIO_ready : UInt<1>
+    input io_dataStream_iactIOs_dataIOs_writeInDataIO_valid : UInt<1>
+    input io_dataStream_iactIOs_dataIOs_writeInDataIO_bits_data : UInt<12>
+    input io_dataStream_iactIOs_dataIOs_streamLen : UInt<4>
+    output io_dataStream_iactIOs_dataIOs_writeFin : UInt<1>
+    output io_dataStream_iactIOs_addrIOs_writeInDataIO_ready : UInt<1>
+    input io_dataStream_iactIOs_addrIOs_writeInDataIO_valid : UInt<1>
+    input io_dataStream_iactIOs_addrIOs_writeInDataIO_bits_data : UInt<4>
+    input io_dataStream_iactIOs_addrIOs_streamLen : UInt<4>
+    output io_dataStream_iactIOs_addrIOs_writeFin : UInt<1>
+    output io_dataStream_weightIOs_dataIOs_writeInDataIO_ready : UInt<1>
+    input io_dataStream_weightIOs_dataIOs_writeInDataIO_valid : UInt<1>
+    input io_dataStream_weightIOs_dataIOs_writeInDataIO_bits_data : UInt<12>
+    input io_dataStream_weightIOs_dataIOs_streamLen : UInt<8>
+    output io_dataStream_weightIOs_dataIOs_writeFin : UInt<1>
+    output io_dataStream_weightIOs_addrIOs_writeInDataIO_ready : UInt<1>
+    input io_dataStream_weightIOs_addrIOs_writeInDataIO_valid : UInt<1>
+    input io_dataStream_weightIOs_addrIOs_writeInDataIO_bits_data : UInt<7>
+    input io_dataStream_weightIOs_addrIOs_streamLen : UInt<4>
+    output io_dataStream_weightIOs_addrIOs_writeFin : UInt<1>
+    output io_topCtrl_pSumEnqOrProduct_ready : UInt<1>
+    input io_topCtrl_pSumEnqOrProduct_valid : UInt<1>
+    input io_topCtrl_pSumEnqOrProduct_bits : UInt<1>
+    input io_topCtrl_doLoadEn : UInt<1>
+    output io_topCtrl_writeFinish : UInt<1>
+    output io_topCtrl_calFinish : UInt<1>
+  
+    inst peCtrl of ProcessingElementControl @[ProcessingElement.scala 11:48]
+    inst pePad of ProcessingElementPad @[ProcessingElement.scala 12:43]
+    inst Queue of Queue @[Decoupled.scala 287:21]
+    inst Queue_1 of Queue_1 @[Decoupled.scala 287:21]
+    inst Queue_2 of Queue_2 @[Decoupled.scala 287:21]
+    inst Queue_3 of Queue_1 @[Decoupled.scala 287:21]
+    inst Queue_4 of Queue_4 @[Decoupled.scala 287:21]
+    inst Queue_5 of Queue_4 @[Decoupled.scala 287:21]
+    io_dataStream_ipsIO_ready <= Queue_4.io_enq_ready @[Decoupled.scala 290:17]
+    io_dataStream_opsIO_valid <= Queue_5.io_deq_valid @[ProcessingElement.scala 32:23]
+    io_dataStream_opsIO_bits <= Queue_5.io_deq_bits @[ProcessingElement.scala 32:23]
+    io_dataStream_iactIOs_dataIOs_writeInDataIO_ready <= Queue_1.io_enq_ready @[Decoupled.scala 290:17]
+    io_dataStream_iactIOs_dataIOs_writeFin <= pePad.io_dataStream_iactIOs_dataIOs_writeFin @[ProcessingElement.scala 24:55]
+    io_dataStream_iactIOs_addrIOs_writeInDataIO_ready <= Queue.io_enq_ready @[Decoupled.scala 290:17]
+    io_dataStream_iactIOs_addrIOs_writeFin <= pePad.io_dataStream_iactIOs_addrIOs_writeFin @[ProcessingElement.scala 23:55]
+    io_dataStream_weightIOs_dataIOs_writeInDataIO_ready <= Queue_3.io_enq_ready @[Decoupled.scala 290:17]
+    io_dataStream_weightIOs_dataIOs_writeFin <= pePad.io_dataStream_weightIOs_dataIOs_writeFin @[ProcessingElement.scala 24:55]
+    io_dataStream_weightIOs_addrIOs_writeInDataIO_ready <= Queue_2.io_enq_ready @[Decoupled.scala 290:17]
+    io_dataStream_weightIOs_addrIOs_writeFin <= pePad.io_dataStream_weightIOs_addrIOs_writeFin @[ProcessingElement.scala 23:55]
+    io_topCtrl_pSumEnqOrProduct_ready <= peCtrl.io_ctrlTop_pSumEnqOrProduct_ready @[ProcessingElement.scala 30:14]
+    io_topCtrl_writeFinish <= peCtrl.io_ctrlTop_writeFinish @[ProcessingElement.scala 30:14]
+    io_topCtrl_calFinish <= peCtrl.io_ctrlTop_calFinish @[ProcessingElement.scala 30:14]
+    peCtrl.clock <= clock
+    peCtrl.reset <= reset
+    peCtrl.io_ctrlPad_fromTopIO_pSumEnqOrProduct_ready <= pePad.io_padCtrl_fromTopIO_pSumEnqOrProduct_ready @[ProcessingElement.scala 29:21]
+    peCtrl.io_ctrlPad_fromTopIO_writeFinish <= pePad.io_padCtrl_fromTopIO_writeFinish @[ProcessingElement.scala 29:21]
+    peCtrl.io_ctrlPad_fromTopIO_calFinish <= pePad.io_padCtrl_fromTopIO_calFinish @[ProcessingElement.scala 29:21]
+    peCtrl.io_ctrlTop_pSumEnqOrProduct_valid <= io_topCtrl_pSumEnqOrProduct_valid @[ProcessingElement.scala 30:14]
+    peCtrl.io_ctrlTop_pSumEnqOrProduct_bits <= io_topCtrl_pSumEnqOrProduct_bits @[ProcessingElement.scala 30:14]
+    peCtrl.io_ctrlTop_doLoadEn <= io_topCtrl_doLoadEn @[ProcessingElement.scala 30:14]
+    pePad.clock <= clock
+    pePad.reset <= reset
+    pePad.io_padCtrl_doMACEn <= peCtrl.io_ctrlPad_doMACEn @[ProcessingElement.scala 29:21]
+    pePad.io_padCtrl_fromTopIO_pSumEnqOrProduct_valid <= peCtrl.io_ctrlPad_fromTopIO_pSumEnqOrProduct_valid @[ProcessingElement.scala 29:21]
+    pePad.io_padCtrl_fromTopIO_pSumEnqOrProduct_bits <= peCtrl.io_ctrlPad_fromTopIO_pSumEnqOrProduct_bits @[ProcessingElement.scala 29:21]
+    pePad.io_padCtrl_fromTopIO_doLoadEn <= peCtrl.io_ctrlPad_fromTopIO_doLoadEn @[ProcessingElement.scala 29:21]
+    pePad.io_dataStream_ipsIO_valid <= Queue_4.io_deq_valid @[ProcessingElement.scala 31:29]
+    pePad.io_dataStream_ipsIO_bits <= Queue_4.io_deq_bits @[ProcessingElement.scala 31:29]
+    pePad.io_dataStream_opsIO_ready <= Queue_5.io_enq_ready @[Decoupled.scala 290:17]
+    pePad.io_dataStream_iactIOs_dataIOs_writeInDataIO_valid <= Queue_1.io_deq_valid @[ProcessingElement.scala 15:55]
+    pePad.io_dataStream_iactIOs_dataIOs_writeInDataIO_bits_data <= Queue_1.io_deq_bits_data @[ProcessingElement.scala 15:55]
+    pePad.io_dataStream_iactIOs_dataIOs_streamLen <= io_dataStream_iactIOs_dataIOs_streamLen @[ProcessingElement.scala 22:56]
+    pePad.io_dataStream_iactIOs_addrIOs_writeInDataIO_valid <= Queue.io_deq_valid @[ProcessingElement.scala 14:55]
+    pePad.io_dataStream_iactIOs_addrIOs_writeInDataIO_bits_data <= Queue.io_deq_bits_data @[ProcessingElement.scala 14:55]
+    pePad.io_dataStream_iactIOs_addrIOs_streamLen <= io_dataStream_iactIOs_addrIOs_streamLen @[ProcessingElement.scala 21:56]
+    pePad.io_dataStream_weightIOs_dataIOs_writeInDataIO_valid <= Queue_3.io_deq_valid @[ProcessingElement.scala 17:57]
+    pePad.io_dataStream_weightIOs_dataIOs_writeInDataIO_bits_data <= Queue_3.io_deq_bits_data @[ProcessingElement.scala 17:57]
+    pePad.io_dataStream_weightIOs_dataIOs_streamLen <= io_dataStream_weightIOs_dataIOs_streamLen @[ProcessingElement.scala 22:56]
+    pePad.io_dataStream_weightIOs_addrIOs_writeInDataIO_valid <= Queue_2.io_deq_valid @[ProcessingElement.scala 16:57]
+    pePad.io_dataStream_weightIOs_addrIOs_writeInDataIO_bits_data <= Queue_2.io_deq_bits_data @[ProcessingElement.scala 16:57]
+    pePad.io_dataStream_weightIOs_addrIOs_streamLen <= io_dataStream_weightIOs_addrIOs_streamLen @[ProcessingElement.scala 21:56]
+    Queue.clock <= clock
+    Queue.reset <= reset
+    Queue.io_enq_valid <= io_dataStream_iactIOs_addrIOs_writeInDataIO_valid @[Decoupled.scala 288:22]
+    Queue.io_enq_bits_data <= io_dataStream_iactIOs_addrIOs_writeInDataIO_bits_data @[Decoupled.scala 289:21]
+    Queue.io_deq_ready <= pePad.io_dataStream_iactIOs_addrIOs_writeInDataIO_ready @[ProcessingElement.scala 14:55]
+    Queue_1.clock <= clock
+    Queue_1.reset <= reset
+    Queue_1.io_enq_valid <= io_dataStream_iactIOs_dataIOs_writeInDataIO_valid @[Decoupled.scala 288:22]
+    Queue_1.io_enq_bits_data <= io_dataStream_iactIOs_dataIOs_writeInDataIO_bits_data @[Decoupled.scala 289:21]
+    Queue_1.io_deq_ready <= pePad.io_dataStream_iactIOs_dataIOs_writeInDataIO_ready @[ProcessingElement.scala 15:55]
+    Queue_2.clock <= clock
+    Queue_2.reset <= reset
+    Queue_2.io_enq_valid <= io_dataStream_weightIOs_addrIOs_writeInDataIO_valid @[Decoupled.scala 288:22]
+    Queue_2.io_enq_bits_data <= io_dataStream_weightIOs_addrIOs_writeInDataIO_bits_data @[Decoupled.scala 289:21]
+    Queue_2.io_deq_ready <= pePad.io_dataStream_weightIOs_addrIOs_writeInDataIO_ready @[ProcessingElement.scala 16:57]
+    Queue_3.clock <= clock
+    Queue_3.reset <= reset
+    Queue_3.io_enq_valid <= io_dataStream_weightIOs_dataIOs_writeInDataIO_valid @[Decoupled.scala 288:22]
+    Queue_3.io_enq_bits_data <= io_dataStream_weightIOs_dataIOs_writeInDataIO_bits_data @[Decoupled.scala 289:21]
+    Queue_3.io_deq_ready <= pePad.io_dataStream_weightIOs_dataIOs_writeInDataIO_ready @[ProcessingElement.scala 17:57]
+    Queue_4.clock <= clock
+    Queue_4.reset <= reset
+    Queue_4.io_enq_valid <= io_dataStream_ipsIO_valid @[Decoupled.scala 288:22]
+    Queue_4.io_enq_bits <= io_dataStream_ipsIO_bits @[Decoupled.scala 289:21]
+    Queue_4.io_deq_ready <= pePad.io_dataStream_ipsIO_ready @[ProcessingElement.scala 31:29]
+    Queue_5.clock <= clock
+    Queue_5.reset <= reset
+    Queue_5.io_enq_valid <= pePad.io_dataStream_opsIO_valid @[Decoupled.scala 288:22]
+    Queue_5.io_enq_bits <= pePad.io_dataStream_opsIO_bits @[Decoupled.scala 289:21]
+    Queue_5.io_deq_ready <= io_dataStream_opsIO_ready @[ProcessingElement.scala 32:23]

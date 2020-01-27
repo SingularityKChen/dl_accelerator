@@ -2,7 +2,7 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.tester._
-import dla.pe.{ProcessingElement, ProcessingElementPad, SPadAddrModule, SPadDataModule, MCRENFConfig}
+import dla.pe.{DataStreamIO, MCRENFConfig, ProcessingElement, ProcessingElementPad, SPadAddrModule, SPadDataModule, StreamDataLenFinIO}
 import org.scalatest._
 
 class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with MCRENFConfig {
@@ -49,84 +49,54 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
   val inWeightDataCountDec: Seq[Int] = combineDataAndCount(inWeightData, inWeightCount)
   val inIactDataCountDec: Seq[Int] = combineDataAndCount(inIactData,inIactCount)
-  def PEScratchPadWriteIn(inIactAddr: Seq[Int], inIactData: Seq[Int], inIactTestAddr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
+
+  def signalReadInFuc(readInData: Seq[Int], readInIO: StreamDataLenFinIO, theClock: Clock): Any = {
+    readInIO.writeInDataIO.valid.poke(true.B)
+    for (i <- readInData.indices) {
+      readInIO.writeInDataIO.bits.data.poke(readInData(i).U)
+      readInIO.writeFin.expect((i == readInData.length - 1).B, s"[write cycle $i @ $readInIO] should it finish writing?")
+      readInIO.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ $readInIO] write valid, after receive the data, it should be ready")
+      theClock.step(1)
+    }
+    readInIO.writeInDataIO.valid.poke(false.B)
+  }
+
+  def iactAndWeightReadInFuc(IAData: Seq[Int], IDData: Seq[Int], WAData: Seq[Int], WDData: Seq[Int], theSPadIO: DataStreamIO, theClock: Clock): Any = {
+    fork {
+      signalReadInFuc(IAData, theSPadIO.iactIOs.addrIOs, theClock)
+    } .fork {
+      signalReadInFuc(IDData, theSPadIO.iactIOs.dataIOs, theClock)
+    } .fork {
+      signalReadInFuc(WAData, theSPadIO.weightIOs.addrIOs, theClock)
+    } .fork {
+      signalReadInFuc(WDData, theSPadIO.weightIOs.dataIOs, theClock)
+    } .join()
+  }
+
+  def PEScratchPadWriteIn(inIactAddr: Seq[Int], inIactData: Seq[Int], inWeightAddr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
     val theTopSPadIO = topModule.io.dataStream
     val theClock = topModule.clock
     theTopSPadIO.iactIOs.addrIOs.streamLen.poke(inIactAddr.length.U)
     theTopSPadIO.iactIOs.dataIOs.streamLen.poke(inIactData.length.U)
-    theTopSPadIO.weightIOs.addrIOs.streamLen.poke(inIactTestAddr.length.U)
+    theTopSPadIO.weightIOs.addrIOs.streamLen.poke(inWeightAddr.length.U)
     theTopSPadIO.weightIOs.dataIOs.streamLen.poke(inWeightData.length.U)
-    topModule.io.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
+    topModule.io.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
     topModule.io.padCtrl.doMACEn.poke(false.B)
-    fork {
-      theTopSPadIO.iactIOs.addrIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inIactAddr.indices) {
-        theTopSPadIO.iactIOs.addrIOs.writeInDataIO.bits.data.poke(inIactAddr(i).U)
-        theTopSPadIO.iactIOs.addrIOs.writeFin.expect((i == inIactAddr.length - 1).B, s"[write cycle $i @ iactAddrSPad] should it finish writing?")
-        theTopSPadIO.iactIOs.addrIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ iactAddrSPad] write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopSPadIO.iactIOs.addrIOs.writeInDataIO.valid.poke(false.B)
-    } .fork {
-      theTopSPadIO.iactIOs.dataIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inIactData.indices) {
-        theTopSPadIO.iactIOs.dataIOs.writeInDataIO.bits.data.poke(inIactData(i).U)
-        theTopSPadIO.iactIOs.dataIOs.writeFin.expect((i == inIactData.length - 1).B, s"[write cycle $i @ iactDataSPad] should it finish writing?")
-        theTopSPadIO.iactIOs.dataIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ iactDataSPad] write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopSPadIO.iactIOs.dataIOs.writeInDataIO.valid.poke(false.B)
-    } .fork {
-      theTopSPadIO.weightIOs.addrIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inIactTestAddr.indices) {
-        theTopSPadIO.weightIOs.addrIOs.writeInDataIO.bits.data.poke(inIactTestAddr(i).U)
-        theTopSPadIO.weightIOs.addrIOs.writeFin.expect((i == inIactTestAddr.length - 1).B, s"[write cycle $i @ weightAddrSPad] should it finish writing?")
-        theTopSPadIO.weightIOs.addrIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ weightAddrSPad] write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopSPadIO.weightIOs.addrIOs.writeInDataIO.valid.poke(false.B)
-    } .fork {
-      theTopSPadIO.weightIOs.dataIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inWeightData.indices) {
-        theTopSPadIO.weightIOs.dataIOs.writeInDataIO.bits.data.poke(inWeightData(i).U)
-        theTopSPadIO.weightIOs.dataIOs.writeFin.expect((i == inWeightData.length - 1).B, s"[write cycle $i @ weightDataSPad] should it finish writing?")
-        theTopSPadIO.weightIOs.dataIOs.writeInDataIO.ready.expect(true.B, s"[write cycle $i @ weightDataSPad] write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopSPadIO.weightIOs.dataIOs.writeInDataIO.valid.poke(false.B)
-    } .join()
+    iactAndWeightReadInFuc(inIactAddr, inIactData, inWeightAddr, inWeightData, theTopSPadIO, theClock)
   }
 
-  def simplyWriteInDataAndAddr(inIactTestAddr: Seq[Int], inWeightData: Seq[Int], topModule: SimplyCombineAddrDataSPad): Any = {
+  def simplyWriteInDataAndAddr(inAddress: Seq[Int], inData: Seq[Int], topModule: SimplyCombineAddrDataSPad): Any = {
     val theTopIO = topModule.io.iactIOs
-    val theDataWriteIdx = topModule.io.iactDataWriteIdx
-    val theAddrWriteIdx = topModule.io.iactAddrWriteIdx
     val theDataReq = topModule.io.iactDataReq
     val theClock = topModule.clock
-    theTopIO.addrIOs.streamLen.poke(inIactTestAddr.length.U)
-    theTopIO.dataIOs.streamLen.poke(inWeightData.length.U)
+    theTopIO.addrIOs.streamLen.poke(inAddress.length.U)
+    theTopIO.dataIOs.streamLen.poke(inData.length.U)
     theDataReq.poke(false.B)
     topModule.io.writeEn.poke(true.B)
     fork { // run them in parallel
-      theTopIO.addrIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inIactTestAddr.indices) {
-        theTopIO.addrIOs.writeInDataIO.bits.data.poke(inIactTestAddr(i).U)
-        theAddrWriteIdx.expect(i.U, s"i = $i")
-        theTopIO.addrIOs.writeFin.expect((i == inIactTestAddr.length - 1).B, s"i = $i")
-        theTopIO.addrIOs.writeInDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopIO.addrIOs.writeInDataIO.valid.poke(false.B)
+      signalReadInFuc(inAddress, theTopIO.addrIOs, theClock)
     } .fork {
-      theTopIO.dataIOs.writeInDataIO.valid.poke(true.B)
-      for (i <- inWeightData.indices) {
-        theTopIO.dataIOs.writeInDataIO.bits.data.poke(inWeightData(i).U)
-        theDataWriteIdx.expect(i.U, s"i = $i")
-        theTopIO.dataIOs.writeFin.expect((i == inWeightData.length - 1).B, s"i = $i")
-        theTopIO.dataIOs.writeInDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
-        theClock.step(1)
-      }
-      theTopIO.dataIOs.writeInDataIO.valid.poke(false.B)
+      signalReadInFuc(inData, theTopIO.dataIOs, theClock)
     } .join()
     topModule.io.writeEn.poke(false.B)
   }
@@ -174,32 +144,58 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   behavior of "test the spec of Processing Element Module with CSC format data"
-/*
+
   it should "try to run PE with control and CSC SPad module" in {
-    test(new ProcessingElement) { thePE =>
+    test(new ProcessingElement(true)) { thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
       println("----------------- test begin -----------------")
       println("----------- Processing Element Module ------------")
+      thePE.reset.poke(true.B)
+      theClock.step(1)
+      thePE.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.topCtrl.doLoadEn.poke(true.B)
+      theTopIO.dataStream.iactIOs.addrIOs.streamLen.poke(inIactAddr.length.U)
+      theTopIO.dataStream.iactIOs.dataIOs.streamLen.poke(inIactDataCountDec.length.U)
+      theTopIO.dataStream.weightIOs.addrIOs.streamLen.poke(inWeightAddr.length.U)
+      theTopIO.dataStream.weightIOs.dataIOs.streamLen.poke(inWeightDataCountDec.length.U)
+      iactAndWeightReadInFuc(inIactAddr,inIactDataCountDec, inWeightAddr, inWeightDataCountDec, theTopIO.dataStream, theClock)
+      theClock.step(1)
+      theTopIO.topCtrl.writeFinish.expect(true.B, s"after write in all data, write should finish")
+      theTopIO.topCtrl.doLoadEn.poke(false.B)
+      theTopIO.topCtrl.pSumEnqOrProduct.bits.poke(false.B)
+      theClock.step(145)
+      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
+      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+      theClock.step(1)
+      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
+      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+      theClock.step(1)
+      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
+      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+      theClock.step(1)
     }
   }
-*/
+
   it should "try to run PE SPad with CSC compressed data" in {
     test(new ProcessingElementPad(true)) { thePESPad =>
       val theTopIO = thePESPad.io
       val theClock = thePESPad.clock
       println("----------------- test begin -----------------")
       println("----------- PE Scratch Pad Module ------------")
+      thePESPad.reset.poke(true.B)
+      theClock.step(1)
+      thePESPad.reset.poke(false.B)
       println("--------------- begin to write ---------------")
-      theTopIO.padCtrl.doLoadEn.poke(true.B)
-      PEScratchPadWriteIn(inIactAddr,inIactDataCountDec, inWeightAddr, inWeightDataCountDec, thePESPad)
-      theTopIO.padCtrl.doLoadEn.poke(false.B)
+      theTopIO.padCtrl.fromTopIO.doLoadEn.poke(true.B)
+      PEScratchPadWriteIn(inIactAddr, inIactDataCountDec, inWeightAddr, inWeightDataCountDec, thePESPad)
+      theTopIO.padCtrl.fromTopIO.doLoadEn.poke(false.B)
       println("--------------- begin to read ----------------")
-      theTopIO.padCtrl.pSumEnqOrProduct.bits.poke(false.B)
+      theTopIO.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
       theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
       theClock.step(1) // from idle to address SPad read
+      theTopIO.padCtrl.doMACEn.poke(false.B) // end the state machine
       for (i<- 0 until 146) {
         println(s"--------------- $i-th read cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.sPadState.peek()}")
@@ -214,9 +210,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
         theClock.step(1)
       }
-      theTopIO.padCtrl.doMACEn.poke(false.B) // start the state machine
       theClock.step(2)
-      theTopIO.padCtrl.doLoadEn.poke(true.B) // begin to read out partial sum
+      println("-------------- read partial sum ---------------")
+      theTopIO.padCtrl.fromTopIO.doLoadEn.poke(true.B) // begin to read out partial sum
       theTopIO.dataStream.opsIO.ready.poke(true.B)
       theTopIO.debugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
       for (i <- 0 until M0*E*N0*F0 - 1) {
@@ -235,6 +231,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       val theClock = iactSPad.clock
       println("---------- begin to test the read ----------")
       println("------ and write address in Iact SPad ------")
+      iactSPad.reset.poke(true.B)
+      theClock.step(1)
+      iactSPad.reset.poke(false.B)
       println("-------------- begin to write --------------")
       simplyWriteInDataAndAddr(inIactTestAddr, inWeightDataCountDec, iactSPad)
       println("-------------- begin to read ---------------")
@@ -257,6 +256,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("---------- begin to test the read ----------")
       println("------ and write address in Iact SPad ------")
       println("-------- with continued zero columns -------")
+      iactSPad.reset.poke(true.B)
+      theClock.step(1)
+      iactSPad.reset.poke(false.B)
       println("------------- begin to write ---------------")
       simplyWriteInDataAndAddr(inIactTestAddr2, inWeightDataCountDec, iactSPad)
       println("------------- begin to read ----------------")

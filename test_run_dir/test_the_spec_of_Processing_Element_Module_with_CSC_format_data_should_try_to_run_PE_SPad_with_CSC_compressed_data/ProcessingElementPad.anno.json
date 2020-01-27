@@ -1,32 +1,9 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_padCtrl_calFinish",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_writeFinish",
     "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_streamLen",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_streamLen"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_ready",
-    "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_ipsIO_ready",
-    "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_pSumEnqOrProduct_bits",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_ipsIO_valid"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_padCtrl_writeFinish",
-    "sources":[
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doMACEn",
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid",
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_addrIOs_writeInDataIO_valid",
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid",
@@ -49,9 +26,9 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_bits",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_valid",
     "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn",
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn",
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_ready"
     ]
   },
@@ -60,7 +37,23 @@
     "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_addrIOs_writeInDataIO_ready",
     "sources":[
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn"
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_calFinish",
+    "sources":[
+      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_streamLen",
+      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_streamLen"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_ipsIO_ready",
+    "sources":[
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_pSumEnqOrProduct_bits",
+      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_ipsIO_valid"
     ]
   },
   {
@@ -68,23 +61,15 @@
     "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeInDataIO_ready",
     "sources":[
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn"
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_valid",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_bits",
     "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn",
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn",
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_opsIO_ready"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_writeInDataIO_ready",
-    "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doLoadEn"
     ]
   },
   {
@@ -92,6 +77,22 @@
     "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeFin",
     "sources":[
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_ready",
+    "sources":[
+      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid",
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_writeInDataIO_ready",
+    "sources":[
+      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_writeInDataIO_valid",
+      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_doLoadEn"
     ]
   },
   {

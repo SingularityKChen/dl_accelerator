@@ -3,35 +3,50 @@ package dla.pe
 import chisel3._
 import chisel3.util._
 // TODO: add reset signal for every module
-class ProcessingElement extends Module with PESizeConfig {
+class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io = IO(new Bundle{
     val dataStream = new DataStreamIO
-    val topCtrl = new PETopToCtrlIO
+    val topCtrl = new PETopToHigherIO
+    val debugIO = new PETopDebugIO
   })
-  val peCtrl = new ProcessingElementControl
-  val pePad = new ProcessingElementPad(false)
+  val peCtrl: ProcessingElementControl = Module(new ProcessingElementControl(debug = debug))
+  val pePad: ProcessingElementPad = Module(new ProcessingElementPad(debug = debug))
   if (fifoEn) {
     pePad.io.dataStream.iactIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
     pePad.io.dataStream.iactIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
     pePad.io.dataStream.weightIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
     pePad.io.dataStream.weightIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
+    val iactAndWeightIOs = Seq(pePad.io.dataStream.iactIOs, pePad.io.dataStream.weightIOs)
+    val iactAndWeightTopIOs = Seq(io.dataStream.iactIOs, io.dataStream.weightIOs)
+    val zipThem = iactAndWeightIOs zip iactAndWeightTopIOs
+    zipThem.foreach{case (x, y) => x.addrIOs.streamLen := y.addrIOs.streamLen}
+    zipThem.foreach{case (x, y) => x.dataIOs.streamLen := y.dataIOs.streamLen}
+    zipThem.foreach{case (x, y) => y.addrIOs.writeFin := x.addrIOs.writeFin}
+    zipThem.foreach{case (x, y) => y.dataIOs.writeFin := x.dataIOs.writeFin}
   } else {
     pePad.io.dataStream.iactIOs <> io.dataStream.iactIOs
     pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
  }
   peCtrl.io.ctrlPad <> pePad.io.padCtrl
-  peCtrl.io.ctrlTop <> io.topCtrl
+  io.topCtrl <> peCtrl.io.ctrlTop
   pePad.io.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true)
   io.dataStream.opsIO <> Queue(pePad.io.dataStream.opsIO, fifoSize, flow = true)
+  if (debug) {
+    io.debugIO.peControlDebugIO <> peCtrl.io.debugIO
+    io.debugIO.peSPadDebugIO <> pePad.io.debugIO
+  } else {
+    io.debugIO := DontCare
+  }
 }
 
-class ProcessingElementControl extends Module with MCRENFConfig {
+class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig {
   val io = IO(new Bundle{
     val ctrlPad = new PECtrlToPadIO
-    val ctrlTop: PETopToCtrlIO = Flipped(new PETopToCtrlIO)
+    val ctrlTop = new PETopToHigherIO
+    val debugIO = new PEControlDebugIO
   })
-  io.ctrlTop.writeFinish := io.ctrlPad.writeFinish
-  io.ctrlTop.calFinish := io.ctrlPad.calFinish
+  io.ctrlTop.writeFinish := io.ctrlPad.fromTopIO.writeFinish
+  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
   // some config of RS+
   // logic of PE MAC
   // state machine, control the process of MAC
@@ -40,9 +55,10 @@ class ProcessingElementControl extends Module with MCRENFConfig {
   // psCal: do MAC computations
   val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   val stateMac: UInt = RegInit(psIdle) // the state of the mac process
-  io.ctrlTop.pSumEnqOrProduct.ready := Mux(stateMac === psCal, io.ctrlPad.pSumEnqOrProduct.ready, false.B)
-  io.ctrlPad.pSumEnqOrProduct.valid := Mux(stateMac === psCal, io.ctrlTop.pSumEnqOrProduct.valid, false.B)
-  io.ctrlPad.doLoadEn := stateMac === psLoad
+  io.ctrlTop.pSumEnqOrProduct.ready := Mux(stateMac === psCal, io.ctrlPad.fromTopIO.pSumEnqOrProduct.ready, false.B)
+  io.ctrlPad.fromTopIO.pSumEnqOrProduct.valid := Mux(stateMac === psCal, io.ctrlTop.pSumEnqOrProduct.valid, false.B)
+  io.ctrlPad.fromTopIO.pSumEnqOrProduct.bits := io.ctrlTop.pSumEnqOrProduct.bits
+  io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
   io.ctrlPad.doMACEn := stateMac === psCal
   switch (stateMac) {
     is (psIdle) {
@@ -51,15 +67,20 @@ class ProcessingElementControl extends Module with MCRENFConfig {
       }
     }
     is (psLoad) {
-      when (io.ctrlPad.writeFinish) { //after the pad receives the data
+      when (io.ctrlPad.fromTopIO.writeFinish) { //after the pad receives the data
         stateMac := psCal
       }
     }
     is (psCal) {
-      when (io.ctrlPad.calFinish) {
+      when (io.ctrlPad.fromTopIO.calFinish) {
         stateMac := psIdle
       }
     }
+  }
+  if (debug) {
+    io.debugIO.peState := stateMac
+  } else {
+    io.debugIO := DontCare
   }
 }
 
@@ -172,9 +193,9 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   padEqID := sPad === padIactData
   weightMatrixReadFirstColumn := iactMatrixRowWire === 0.U
   val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
-  //val weightMatrixRowReg: UInt = RegEnable(0.U(cscCountWidth.W), padEqWA)
+  val SPadSeq = Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad)
   // Connections
-  Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad).map(_.io.commonIO.writeEn := io.padCtrl.doLoadEn)
+  SPadSeq.map(_.io.commonIO.writeEn := io.padCtrl.fromTopIO.doLoadEn)
   // Input activation Address Scratch Pad
   iactAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.addrIOs
   iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
@@ -218,9 +239,9 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.io.dataIO.readInIdxEn := weightDataIdxEnWire
   weightDataSPad.io.addrIO := DontCare
   // Partial Sum Scratch Pad
-  io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.pSumEnqOrProduct.bits
+  io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.fromTopIO.pSumEnqOrProduct.bits
   val psPadReadIdxCounter: Counter = Counter(M0*E*N0*F0 + 1)
-  when (io.padCtrl.doLoadEn && io.dataStream.opsIO.ready) {
+  when (io.padCtrl.fromTopIO.doLoadEn && io.dataStream.opsIO.ready) {
     io.dataStream.opsIO.bits := psDataSPad(psPadReadIdxCounter.value)
     io.dataStream.opsIO.valid := true.B
     psPadReadIdxCounter.inc()
@@ -229,8 +250,17 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     io.dataStream.opsIO.bits := DontCare
   }
   // SPadToCtrl
-  io.padCtrl.pSumEnqOrProduct.ready := padEqMpy
-  io.padCtrl.writeFinish := Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad).map(_.io.commonIO.dataLenFinIO.writeFin).reduce(_ && _) // when all Scratch Pad write finished
+  io.padCtrl.fromTopIO.pSumEnqOrProduct.ready := padEqMpy
+  val SPadWriteFinReg: Vec[Bool] = VecInit(Seq.fill(4)(false.B))
+  for (i <- 0 until 4) {
+    when (SPadSeq(i).io.commonIO.dataLenFinIO.writeFin) {
+      SPadWriteFinReg(i) := true.B
+    }
+    when (io.padCtrl.doMACEn) {
+      SPadWriteFinReg(i) := false.B
+    }
+  }
+  io.padCtrl.fromTopIO.writeFinish := SPadWriteFinReg.reduce(_ && _) // when all Scratch Pad write finished
   pSumResultWire := Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
   /*
   val mcrenfReg: Vec[UInt] = RegInit(VecInit(Seq.fill(6)(0.U(log2Ceil(MCRENF.max).W))))
@@ -261,7 +291,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataIdxMuxWire := padEqID && weightDataSPadFirstRead && !weightMatrixReadFirstColumn // then it can read the start index in weightDataSPad, the end index of that will be read otherwise
   weightAddrSPadReadIdxWire := Mux(weightDataIdxMuxWire, iactMatrixRowWire - 1.U, iactMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
-  io.padCtrl.calFinish := padEqWB && mightIactReadFinish && mightWeightReadFinish
+  io.padCtrl.fromTopIO.calFinish := padEqWB && mightIactReadFinish && mightWeightReadFinish
   psDataSpadIdxWire := weightMatrixRowReg + iactMatrixColumnReg*(M0.U)
   switch (sPad) {
     is (padIdle) {
@@ -310,7 +340,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       readOff()
     }
     is (padMpy) {
-      when (io.padCtrl.pSumEnqOrProduct.bits) {
+      when (io.padCtrl.fromTopIO.pSumEnqOrProduct.bits) {
         when (io.dataStream.ipsIO.valid) {
           sPad := padWriteBack
           productReg := io.dataStream.ipsIO.bits
