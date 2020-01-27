@@ -1,0 +1,195 @@
+digraph ProcessingElement_hierarchy { rankdir="TB" 
+ node [shape="rectangle"]; 
+rankdir="LR" 
+stylesheet = "styles.css"
+module_1 [shape= "plaintext" href="ProcessingElement.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > ProcessingElement </TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_8" BGCOLOR="#FFF8DC" >peCtrl</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_2" BGCOLOR="#FFF8DC" >pePad</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_9" BGCOLOR="#FFF8DC" >Queue</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_7" BGCOLOR="#FFF8DC" >Queue_1</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_10" BGCOLOR="#FFF8DC" >Queue_3</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_12" BGCOLOR="#FFF8DC" >Queue_2</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_11" BGCOLOR="#FFF8DC" >Queue_4</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_13" BGCOLOR="#FFF8DC" >Queue_5</TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_2 [shape= "plaintext" href="ProcessingElementPad.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > ProcessingElementPad </TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_6" BGCOLOR="#FFF8DC" >SPadSeq_0</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_4" BGCOLOR="#FFF8DC" >SPadSeq_1</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_5" BGCOLOR="#FFF8DC" >SPadSeq_3</TD>
+  </TR>
+        
+  <TR>
+    <TD PORT="module_3" BGCOLOR="#FFF8DC" >SPadSeq_2</TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_3 [shape= "plaintext" href="WeightSPadAddrModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > WeightSPadAddrModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_4 [shape= "plaintext" href="SPadDataModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_5 [shape= "plaintext" href="SPadDataModule_1.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule_1 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_6 [shape= "plaintext" href="SPadAddrModule.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadAddrModule </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_7 [shape= "plaintext" href="Queue_1.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue_1 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_8 [shape= "plaintext" href="ProcessingElementControl.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > ProcessingElementControl </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_9 [shape= "plaintext" href="Queue.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_10 [shape= "plaintext" href="Queue_1.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue_1 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_11 [shape= "plaintext" href="Queue_4.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue_4 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_12 [shape= "plaintext" href="Queue_2.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue_2 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_13 [shape= "plaintext" href="Queue_4.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > Queue_4 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_2:module_3 -> module_3
+module_2:module_4 -> module_4
+module_2:module_5 -> module_5
+module_2:module_6 -> module_6
+module_1:module_2 -> module_2
+module_1:module_7 -> module_7
+module_1:module_8 -> module_8
+module_1:module_9 -> module_9
+module_1:module_10 -> module_10
+module_1:module_11 -> module_11
+module_1:module_12 -> module_12
+module_1:module_13 -> module_13
+}

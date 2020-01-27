@@ -11,29 +11,29 @@ module_1 [shape= "plaintext" href="ProcessingElementPad.dot.svg" label=<
   </TR>
         
   <TR>
-    <TD PORT="module_4" BGCOLOR="#FFF8DC" >iactAddrSPad</TD>
+    <TD PORT="module_5" BGCOLOR="#FFF8DC" >SPadSeq_0</TD>
   </TR>
         
   <TR>
-    <TD PORT="module_3" BGCOLOR="#FFF8DC" >iactDataSPad</TD>
+    <TD PORT="module_3" BGCOLOR="#FFF8DC" >SPadSeq_1</TD>
   </TR>
         
   <TR>
-    <TD PORT="module_2" BGCOLOR="#FFF8DC" >weightDataSPad</TD>
+    <TD PORT="module_4" BGCOLOR="#FFF8DC" >SPadSeq_3</TD>
   </TR>
         
   <TR>
-    <TD PORT="module_5" BGCOLOR="#FFF8DC" >weightAddrSPad</TD>
+    <TD PORT="module_2" BGCOLOR="#FFF8DC" >SPadSeq_2</TD>
   </TR>
         
 </TABLE>>];
 
-      module_2 [shape= "plaintext" href="SPadDataModule_1.dot.svg" label=<
+      module_2 [shape= "plaintext" href="WeightSPadAddrModule.dot.svg" label=<
 
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
       
   <TR >
-    <TD BGCOLOR="#FFDEAD" > SPadDataModule_1 </TD>
+    <TD BGCOLOR="#FFDEAD" > WeightSPadAddrModule </TD>
   </TR>
         
 </TABLE>>];
@@ -48,22 +48,22 @@ module_1 [shape= "plaintext" href="ProcessingElementPad.dot.svg" label=<
         
 </TABLE>>];
 
-      module_4 [shape= "plaintext" href="SPadAddrModule.dot.svg" label=<
+      module_4 [shape= "plaintext" href="SPadDataModule_1.dot.svg" label=<
+
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
+      
+  <TR >
+    <TD BGCOLOR="#FFDEAD" > SPadDataModule_1 </TD>
+  </TR>
+        
+</TABLE>>];
+
+      module_5 [shape= "plaintext" href="SPadAddrModule.dot.svg" label=<
 
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
       
   <TR >
     <TD BGCOLOR="#FFDEAD" > SPadAddrModule </TD>
-  </TR>
-        
-</TABLE>>];
-
-      module_5 [shape= "plaintext" href="WeightSPadAddrModule.dot.svg" label=<
-
-<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" >
-      
-  <TR >
-    <TD BGCOLOR="#FFDEAD" > WeightSPadAddrModule </TD>
   </TR>
         
 </TABLE>>];

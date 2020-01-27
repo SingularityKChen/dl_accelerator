@@ -30,16 +30,6 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_topCtrl_writeFinish",
-    "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid",
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeInDataIO_valid"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid"

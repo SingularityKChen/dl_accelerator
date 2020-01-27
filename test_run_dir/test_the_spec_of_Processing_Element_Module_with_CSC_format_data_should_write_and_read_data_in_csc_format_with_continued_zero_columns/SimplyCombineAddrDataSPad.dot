@@ -24,6 +24,8 @@ cluster_SimplyCombineAddrDataSPad_io_iactIOs_addrIOs_streamLen [shape = "rectang
      
 cluster_SimplyCombineAddrDataSPad_io_iactDataReq [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_iactDataReq" rank="0"]
      
+cluster_SimplyCombineAddrDataSPad_io_writeEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_writeEn" rank="0"]
+     
 cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_writeInDataIO_ready [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_iactIOs_dataIOs_writeInDataIO_ready" rank="1000"]
      
 cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_writeFin [shape = "rectangle" style="filled" fillcolor="#E0FFFF" label="io_iactIOs_dataIOs_writeFin" rank="1000"]
@@ -59,6 +61,8 @@ subgraph cluster_SimplyCombineAddrDataSPad_iactAddrSPad {
      
 cluster_SimplyCombineAddrDataSPad_iactAddrSPad_reset [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="reset" rank="0"]
      
+cluster_SimplyCombineAddrDataSPad_iactAddrSPad_io_commonIO_writeEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_writeEn" rank="0"]
+     
 cluster_SimplyCombineAddrDataSPad_iactAddrSPad_io_commonIO_dataLenFinIO_writeInDataIO_valid [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_valid" rank="0"]
      
 cluster_SimplyCombineAddrDataSPad_iactAddrSPad_io_commonIO_dataLenFinIO_writeInDataIO_bits_data [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_bits_data" rank="0"]
@@ -89,6 +93,8 @@ subgraph cluster_SimplyCombineAddrDataSPad_iactDataSPad {
   cluster_SimplyCombineAddrDataSPad_iactDataSPad_clock [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="clock" rank="0"]
      
 cluster_SimplyCombineAddrDataSPad_iactDataSPad_reset [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="reset" rank="0"]
+     
+cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_writeEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_writeEn" rank="0"]
      
 cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_dataLenFinIO_writeInDataIO_valid [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_valid" rank="0"]
      
@@ -1695,6 +1701,7 @@ op_eq_84 [shape = "plaintext" label=<
   op_eq_66:out -> mux_387445309:select
   mux_153743849:out -> mux_1521503419:in2
   op_or_40:out -> cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_dataIO_indexInc
+  cluster_SimplyCombineAddrDataSPad_io_writeEn -> cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_writeEn
   cluster_SimplyCombineAddrDataSPad_iactDataCountVec_0 -> op_cat_24:in2
   op_bits_20:out -> cluster_SimplyCombineAddrDataSPad_iactDataCountVec_10
   cluster_SimplyCombineAddrDataSPad_iactDataIndexWire -> op_add_36:in1
@@ -1776,6 +1783,7 @@ op_eq_84 [shape = "plaintext" label=<
   op_cat_25:out -> cluster_SimplyCombineAddrDataSPad_io_iactMatrixData
   mux_2010350037:out -> mux_1255936837:in2
   struct_cluster_SimplyCombineAddrDataSPad_sPad:out -> mux_39663549:in2
+  cluster_SimplyCombineAddrDataSPad_io_writeEn -> cluster_SimplyCombineAddrDataSPad_iactAddrSPad_io_commonIO_writeEn
   mux_1473823747:out -> mux_1055083065:in2
   struct_cluster_SimplyCombineAddrDataSPad_sPad:out -> op_eq_74:in2
   mux_193500111:out -> mux_695825629:in2
@@ -1815,8 +1823,8 @@ op_eq_84 [shape = "plaintext" label=<
   struct_cluster_SimplyCombineAddrDataSPad_sPad:out -> op_eq_1:in1
   cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_dataLenFinIO_writeFin -> cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_writeFin
   op_eq_57:out -> mux_153743849:select
-  cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_streamLen -> cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_dataLenFinIO_streamLen
   cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_writeInDataIO_bits_data -> cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_dataLenFinIO_writeInDataIO_bits_data
+  cluster_SimplyCombineAddrDataSPad_io_iactIOs_dataIOs_streamLen -> cluster_SimplyCombineAddrDataSPad_iactDataSPad_io_commonIO_dataLenFinIO_streamLen
   struct_cluster_SimplyCombineAddrDataSPad_sPad:out -> op_eq_62:in2
   cluster_SimplyCombineAddrDataSPad_iactAddrSPad_io_commonIO_dataLenFinIO_writeFin -> cluster_SimplyCombineAddrDataSPad_io_iactIOs_addrIOs_writeFin
   mux_1780521204:out -> struct_cluster_SimplyCombineAddrDataSPad_iactZeroColumnNumber:in
@@ -1847,8 +1855,8 @@ op_eq_84 [shape = "plaintext" label=<
   mux_594192731:out -> mux_572477433:in1
   op_eq_1:out -> cluster_SimplyCombineAddrDataSPad__T
   cluster_SimplyCombineAddrDataSPad_iactDataIndexWire -> op_add_6:in1
-  cluster_SimplyCombineAddrDataSPad_iactAddrDataWire -> op_eq_9:in1
   op_add_73:out -> op_tail_72:in1
+  cluster_SimplyCombineAddrDataSPad_iactAddrDataWire -> op_eq_9:in1
   cluster_SimplyCombineAddrDataSPad_io_iactDataReq -> mux_39663549:select
   op_eq_43:out -> op_and_42:in1
   op_tail_77:out -> mux_594192731:in1

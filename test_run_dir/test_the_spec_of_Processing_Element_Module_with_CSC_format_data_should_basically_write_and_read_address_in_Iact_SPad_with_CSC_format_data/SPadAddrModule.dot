@@ -12,6 +12,8 @@ cluster_SPadAddrModule_reset [shape = "rectangle" style="filled" fillcolor="#CCC
      
 cluster_SPadAddrModule_io_commonIO_readEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_readEn" rank="0"]
      
+cluster_SPadAddrModule_io_commonIO_writeEn [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_writeEn" rank="0"]
+     
 cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_valid" rank="0"]
      
 cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data [shape = "rectangle" style="filled" fillcolor="#CCCCCC" label="io_commonIO_dataLenFinIO_writeInDataIO_bits_data" rank="0"]
@@ -426,6 +428,19 @@ op_and_14 [shape = "plaintext" label=<
 </TABLE>>];
        
 
+op_and_15 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
 mux_1917568076 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
@@ -439,7 +454,7 @@ mux_1917568076 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1655311714 [shape = "plaintext" label=<
+mux_1505323958 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -452,11 +467,24 @@ mux_1655311714 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_2006009045 [shape = "plaintext" label=<
+mux_1145489358 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_16 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -478,7 +506,7 @@ mux_1200765837 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_tail_15 [shape = "plaintext" label=<
+op_tail_17 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
@@ -491,7 +519,7 @@ op_tail_15 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_add_16 [shape = "plaintext" label=<
+op_add_18 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
@@ -543,7 +571,7 @@ mux_1879217376 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_tail_17 [shape = "plaintext" label=<
+op_tail_19 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
@@ -556,7 +584,7 @@ op_tail_17 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_add_18 [shape = "plaintext" label=<
+op_add_20 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
@@ -569,7 +597,7 @@ op_add_18 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1191789408 [shape = "plaintext" label=<
+mux_1236010222 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -582,11 +610,24 @@ mux_1191789408 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_687242275 [shape = "plaintext" label=<
+mux_1129305920 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_21 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -608,7 +649,7 @@ mux_260158353 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_19 [shape = "plaintext" label=<
+op_eq_22 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">0</TD>
@@ -621,7 +662,7 @@ op_eq_19 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_317470931 [shape = "plaintext" label=<
+mux_1332203526 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -634,11 +675,24 @@ mux_317470931 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_128296247 [shape = "plaintext" label=<
+mux_1530946951 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_23 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -660,7 +714,7 @@ mux_1947825395 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_20 [shape = "plaintext" label=<
+op_eq_24 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">1</TD>
@@ -673,7 +727,7 @@ op_eq_20 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_2143785277 [shape = "plaintext" label=<
+mux_1936985877 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -686,11 +740,24 @@ mux_2143785277 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_96244437 [shape = "plaintext" label=<
+mux_1347886748 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_25 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -712,7 +779,7 @@ mux_757808781 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_21 [shape = "plaintext" label=<
+op_eq_26 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">2</TD>
@@ -725,7 +792,7 @@ op_eq_21 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_388634555 [shape = "plaintext" label=<
+mux_169654343 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -738,11 +805,24 @@ mux_388634555 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1032720460 [shape = "plaintext" label=<
+mux_1986404580 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_27 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -764,7 +844,7 @@ mux_139702981 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_22 [shape = "plaintext" label=<
+op_eq_28 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">3</TD>
@@ -777,7 +857,7 @@ op_eq_22 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1455507309 [shape = "plaintext" label=<
+mux_372857080 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -790,11 +870,24 @@ mux_1455507309 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1608697313 [shape = "plaintext" label=<
+mux_572337974 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_29 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -816,7 +909,7 @@ mux_1838317754 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_23 [shape = "plaintext" label=<
+op_eq_30 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">4</TD>
@@ -829,7 +922,7 @@ op_eq_23 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_235985868 [shape = "plaintext" label=<
+mux_874002514 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -842,11 +935,24 @@ mux_235985868 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_740155527 [shape = "plaintext" label=<
+mux_2017586236 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_31 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -868,7 +974,7 @@ mux_330652191 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_24 [shape = "plaintext" label=<
+op_eq_32 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">5</TD>
@@ -881,7 +987,7 @@ op_eq_24 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_1599572244 [shape = "plaintext" label=<
+mux_1783006003 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -894,11 +1000,24 @@ mux_1599572244 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_935652800 [shape = "plaintext" label=<
+mux_120652929 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_33 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -920,7 +1039,7 @@ mux_2146020759 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_25 [shape = "plaintext" label=<
+op_eq_34 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">6</TD>
@@ -933,7 +1052,7 @@ op_eq_25 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_294874192 [shape = "plaintext" label=<
+mux_1925154018 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -946,11 +1065,24 @@ mux_294874192 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_133738944 [shape = "plaintext" label=<
+mux_738490784 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_35 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -972,7 +1104,7 @@ mux_1853219119 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_26 [shape = "plaintext" label=<
+op_eq_36 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">7</TD>
@@ -985,7 +1117,7 @@ op_eq_26 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_232190830 [shape = "plaintext" label=<
+mux_428433484 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">0</TD>
@@ -998,11 +1130,24 @@ mux_232190830 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-mux_460228083 [shape = "plaintext" label=<
+mux_55035637 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#AFEEEE">
   <TR>
     <TD PORT="in1">&#x25cf;</TD>
     <TD ROWSPAN="2" PORT="select">a?</TD>
+    <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
+  </TR>
+  <TR>
+    <TD PORT="in2">&#x25cf;</TD>
+  </TR>
+</TABLE>>];
+       
+
+op_and_37 [shape = "plaintext" label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
+  <TR>
+    <TD PORT="in1">&#x25cf;</TD>
+    <TD ROWSPAN="2" > and </TD>
     <TD ROWSPAN="2" PORT="out">&#x25cf;</TD>
   </TR>
   <TR>
@@ -1024,7 +1169,7 @@ mux_2023673415 [shape = "plaintext" label=<
 </TABLE>>];
        
 
-op_eq_27 [shape = "plaintext" label=<
+op_eq_38 [shape = "plaintext" label=<
 <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#D8BFD8">
   <TR>
     <TD PORT="in1">8</TD>
@@ -1037,168 +1182,190 @@ op_eq_27 [shape = "plaintext" label=<
 </TABLE>>];
        
 
+  cluster_SPadAddrModule_reset -> mux_169654343:select
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_36:in2
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> cluster_SPadAddrModule_io_commonIO_columnNum
+  mux_330652191:out -> mux_2017586236:in1
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_330652191:in1
-  mux_139702981:out -> mux_1032720460:in1
   mux_20185978:out -> mux_794809759:in2
-  struct_cluster_SPadAddrModule_addrSPad_5:out -> mux_740155527:in2
+  op_and_21:out -> mux_1129305920:select
+  mux_139702981:out -> mux_1986404580:in1
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_25:in1
   struct_cluster_SPadAddrModule_addrSPad_0:out -> mux_1053384027:in2
+  mux_55035637:out -> mux_428433484:in2
   struct_cluster_SPadAddrModule_addrSPad_4:out -> mux_1838317754:in2
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_streamLen -> mux_1917568076:in2
-  struct_cluster_SPadAddrModule_addrSPad_0:out -> mux_687242275:in2
-  mux_133738944:out -> mux_294874192:in2
-  op_eq_26:out -> mux_1853219119:select
+  op_eq_36:out -> mux_1853219119:select
   struct_cluster_SPadAddrModule_addrSPad_6:out -> mux_813141388:in1
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_128296247:select
-  struct_cluster_SPadAddrModule_addrSPad_2:out -> mux_96244437:in2
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_29:in1
+  mux_2017586236:out -> mux_874002514:in2
+  mux_1986404580:out -> mux_169654343:in2
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> mux_1145489358:in2
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_27:in2
   struct_cluster_SPadAddrModule_addrSPad_6:out -> mux_2146020759:in2
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_740155527:select
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_23:in2
+  mux_1129305920:out -> mux_1236010222:in2
+  mux_1145489358:out -> mux_1505323958:in2
   cluster_SPadAddrModule_readWrapWire -> mux_1879217376:select
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_139702981:in1
-  mux_726925123:out -> struct_cluster_SPadAddrModule_padReadIndexReg:in
+  mux_1853219119:out -> mux_738490784:in1
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_757808781:in1
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_27:in2
+  mux_726925123:out -> struct_cluster_SPadAddrModule_padReadIndexReg:in
+  mux_2146020759:out -> mux_120652929:in1
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_31:in1
+  op_and_31:out -> mux_2017586236:select
+  cluster_SPadAddrModule_reset -> mux_1505323958:select
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_16:in1
+  op_and_35:out -> mux_738490784:select
   struct_cluster_SPadAddrModule_addrSPad_8:out -> mux_2023673415:in2
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_10:in2
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_2006009045:select
-  cluster_SPadAddrModule_writeWrapWire -> op_and_14:in2
-  op_eq_20:out -> mux_1947825395:select
-  struct_cluster_SPadAddrModule_addrSPad_7:out -> mux_133738944:in2
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_14:in2
+  op_eq_24:out -> mux_1947825395:select
+  op_and_25:out -> mux_1347886748:select
+  mux_1947825395:out -> mux_1530946951:in1
   struct_cluster_SPadAddrModule_addrSPad_7:out -> mux_66755092:in1
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_ready
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_23:in2
+  op_and_14:out -> cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_ready
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_35:in1
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_33:in2
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_9:in2
-  mux_2146020759:out -> mux_935652800:in1
   op_eq_2:out -> cluster_SPadAddrModule_writeWrapWire
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_4:in1
-  mux_260158353:out -> mux_687242275:in1
-  mux_2143785277:out -> struct_cluster_SPadAddrModule_addrSPad_2:in
+  mux_757808781:out -> mux_1347886748:in1
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_37:in2
+  struct_cluster_SPadAddrModule_addrSPad_0:out -> mux_1129305920:in2
+  mux_1936985877:out -> struct_cluster_SPadAddrModule_addrSPad_2:in
+  struct_cluster_SPadAddrModule_addrSPad_8:out -> mux_55035637:in2
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_1947825395:in1
-  struct_cluster_SPadAddrModule_addrSPad_8:out -> mux_460228083:in2
   cluster_SPadAddrModule_reset -> mux_726925123:select
-  mux_1191789408:out -> struct_cluster_SPadAddrModule_addrSPad_0:in
-  mux_935652800:out -> mux_1599572244:in2
-  struct_cluster_SPadAddrModule_addrSPad_4:out -> mux_1608697313:in2
-  struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_add_18:in1
-  mux_232190830:out -> struct_cluster_SPadAddrModule_addrSPad_8:in
-  mux_1455507309:out -> struct_cluster_SPadAddrModule_addrSPad_4:in
+  mux_1236010222:out -> struct_cluster_SPadAddrModule_addrSPad_0:in
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_add_18:in1
+  mux_428433484:out -> struct_cluster_SPadAddrModule_addrSPad_8:in
+  mux_372857080:out -> struct_cluster_SPadAddrModule_addrSPad_4:in
   struct_cluster_SPadAddrModule_dataLenReg:out -> op_sub_1:in1
   cluster_SPadAddrModule_io_addrIO_indexInc -> mux_1453398523:select
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> mux_2006009045:in2
-  mux_1599572244:out -> struct_cluster_SPadAddrModule_addrSPad_6:in
+  mux_1783006003:out -> struct_cluster_SPadAddrModule_addrSPad_6:in
   op_sub_1:out -> cluster_SPadAddrModule__T
-  mux_128296247:out -> mux_317470931:in2
-  cluster_SPadAddrModule_reset -> mux_1599572244:select
+  op_and_33:out -> mux_120652929:select
   mux_794809759:out -> mux_831107581:in2
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_20:in2
-  op_and_14:out -> cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeFin
+  mux_120652929:out -> mux_1783006003:in2
+  struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_add_20:in1
+  op_and_15:out -> cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeFin
+  op_and_27:out -> mux_1986404580:select
   struct_cluster_SPadAddrModule_addrSPad_0:out -> mux_260158353:in2
-  cluster_SPadAddrModule_reset -> mux_317470931:select
-  cluster_SPadAddrModule_reset -> mux_2143785277:select
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_1608697313:select
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_1838317754:in1
-  mux_330652191:out -> mux_740155527:in1
+  cluster_SPadAddrModule_reset -> mux_1925154018:select
+  cluster_SPadAddrModule_reset -> mux_1332203526:select
   cluster_SPadAddrModule__T -> op_tail_3:in1
   mux_831107581:out -> mux_133399193:in2
   struct_cluster_SPadAddrModule_addrSPad_3:out -> mux_794809759:in1
+  struct_cluster_SPadAddrModule_addrSPad_4:out -> mux_572337974:in2
   struct_cluster_SPadAddrModule_addrSPad_1:out -> mux_1053384027:in1
   struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_24:in2
   op_tail_3:out -> op_eq_2:in2
-  op_add_16:out -> op_tail_15:in1
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_1032720460:select
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_23:in1
+  mux_260158353:out -> mux_1129305920:in1
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_6:in2
+  cluster_SPadAddrModule_reset -> mux_1783006003:select
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_28:in2
+  op_and_16:out -> mux_1145489358:select
   cluster_SPadAddrModule_writeWrapWire -> mux_1200765837:select
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_133738944:select
-  mux_757808781:out -> mux_96244437:in1
-  mux_1655311714:out -> struct_cluster_SPadAddrModule_padWriteIndexReg:in
+  op_add_20:out -> op_tail_19:in1
+  mux_1505323958:out -> struct_cluster_SPadAddrModule_padWriteIndexReg:in
   struct_cluster_SPadAddrModule_addrSPad_7:out -> mux_1853219119:in2
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_2146020759:in1
+  op_and_29:out -> mux_572337974:select
   op_eq_4:out -> cluster_SPadAddrModule_readWrapWire
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_27:in1
+  cluster_SPadAddrModule_writeWrapWire -> op_and_15:in2
   op_eq_6:out -> mux_1495366125:select
-  mux_96244437:out -> mux_2143785277:in2
+  mux_1200765837:out -> mux_1145489358:in1
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_11:in2
-  cluster_SPadAddrModule_reset -> mux_294874192:select
-  cluster_SPadAddrModule_reset -> mux_235985868:select
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_30:in2
   op_eq_9:out -> mux_133399193:select
   cluster_SPadAddrModule_reset -> mux_1917568076:select
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_2023673415:in1
+  mux_1347886748:out -> mux_1936985877:in2
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_260158353:in1
   struct_cluster_SPadAddrModule_addrSPad_4:out -> mux_831107581:in1
-  mux_460228083:out -> mux_232190830:in2
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_460228083:select
-  cluster_SPadAddrModule_reset -> mux_1455507309:select
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_14:in1
-  struct_cluster_SPadAddrModule_addrSPad_1:out -> mux_128296247:in2
-  mux_1853219119:out -> mux_133738944:in1
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_935652800:select
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_19:in2
+  mux_1838317754:out -> mux_572337974:in1
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_33:in1
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_34:in2
+  cluster_SPadAddrModule_reset -> mux_1936985877:select
   mux_1917568076:out -> struct_cluster_SPadAddrModule_dataLenReg:in
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> mux_1453398523:in2
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_687242275:select
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_21:in2
+  cluster_SPadAddrModule_reset -> mux_1236010222:select
   op_eq_7:out -> mux_66755092:select
   struct_cluster_SPadAddrModule_padWriteIndexReg:out -> cluster_SPadAddrModule_io_commonIO_writeIdx
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_12:in2
-  mux_2006009045:out -> mux_1655311714:in2
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_25:in2
+  cluster_SPadAddrModule_reset -> mux_874002514:select
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_38:in2
+  struct_cluster_SPadAddrModule_addrSPad_5:out -> mux_2017586236:in2
   op_eq_12:out -> mux_20185978:select
   op_eq_10:out -> mux_831107581:select
-  mux_1032720460:out -> mux_388634555:in2
-  mux_1838317754:out -> mux_1608697313:in1
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_add_16:in1
-  mux_2023673415:out -> mux_460228083:in1
+  mux_2023673415:out -> mux_55035637:in1
+  cluster_SPadAddrModule_reset -> mux_372857080:select
+  mux_1530946951:out -> mux_1332203526:in2
   op_eq_11:out -> mux_794809759:select
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_21:in2
-  cluster_SPadAddrModule_reset -> mux_388634555:select
-  op_eq_19:out -> mux_260158353:select
-  op_eq_22:out -> mux_139702981:select
-  mux_1200765837:out -> mux_2006009045:in1
-  mux_1947825395:out -> mux_128296247:in1
-  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_25:in2
+  op_eq_22:out -> mux_260158353:select
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_37:in1
+  struct_cluster_SPadAddrModule_addrSPad_3:out -> mux_1986404580:in2
+  op_eq_28:out -> mux_139702981:select
+  mux_738490784:out -> mux_1925154018:in2
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_29:in2
   mux_1495366125:out -> cluster_SPadAddrModule_io_commonIO_readOutData
   mux_66755092:out -> mux_1495366125:in2
-  mux_317470931:out -> struct_cluster_SPadAddrModule_addrSPad_1:in
-  mux_294874192:out -> struct_cluster_SPadAddrModule_addrSPad_7:in
+  mux_1332203526:out -> struct_cluster_SPadAddrModule_addrSPad_1:in
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_16:in2
+  mux_1925154018:out -> struct_cluster_SPadAddrModule_addrSPad_7:in
+  struct_cluster_SPadAddrModule_addrSPad_6:out -> mux_120652929:in2
   struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_2:in1
   struct_cluster_SPadAddrModule_addrSPad_3:out -> mux_139702981:in2
-  mux_235985868:out -> struct_cluster_SPadAddrModule_addrSPad_5:in
+  struct_cluster_SPadAddrModule_addrSPad_7:out -> mux_738490784:in2
+  mux_874002514:out -> struct_cluster_SPadAddrModule_addrSPad_5:in
   struct_cluster_SPadAddrModule_addrSPad_2:out -> mux_757808781:in2
-  op_tail_15:out -> mux_1200765837:in2
+  op_tail_17:out -> mux_1200765837:in2
+  op_and_23:out -> mux_1530946951:select
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_31:in2
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_7:in2
-  mux_388634555:out -> struct_cluster_SPadAddrModule_addrSPad_3:in
-  op_eq_25:out -> mux_2146020759:select
+  mux_169654343:out -> struct_cluster_SPadAddrModule_addrSPad_3:in
+  op_eq_34:out -> mux_2146020759:select
   struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_22:in2
   struct_cluster_SPadAddrModule_addrSPad_5:out -> mux_133399193:in1
   mux_1053384027:out -> mux_20185978:in2
-  mux_740155527:out -> mux_235985868:in2
   struct_cluster_SPadAddrModule_addrSPad_5:out -> mux_330652191:in2
   op_tail_5:out -> op_eq_4:in2
+  op_and_37:out -> mux_55035637:select
   mux_813141388:out -> mux_66755092:in2
-  struct_cluster_SPadAddrModule_addrSPad_6:out -> mux_935652800:in2
+  cluster_SPadAddrModule_reset -> mux_428433484:select
+  struct_cluster_SPadAddrModule_addrSPad_1:out -> mux_1530946951:in2
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_15:in1
   cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_bits_data -> mux_1853219119:in1
   cluster_SPadAddrModule__T -> op_tail_5:in1
   op_eq_8:out -> mux_813141388:select
+  op_eq_26:out -> mux_757808781:select
   struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_26:in2
-  op_eq_21:out -> mux_757808781:select
+  cluster_SPadAddrModule_io_commonIO_writeEn -> op_and_35:in2
   op_add_18:out -> op_tail_17:in1
-  struct_cluster_SPadAddrModule_addrSPad_3:out -> mux_1032720460:in2
-  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> mux_96244437:select
   mux_133399193:out -> mux_813141388:in2
   struct_cluster_SPadAddrModule_addrSPad_8:out -> mux_1495366125:in1
+  mux_572337974:out -> mux_372857080:in2
   op_eq_13:out -> mux_1053384027:select
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_8:in2
   struct_cluster_SPadAddrModule_addrSPad_1:out -> mux_1947825395:in2
-  cluster_SPadAddrModule_reset -> mux_1655311714:select
-  cluster_SPadAddrModule_reset -> mux_1191789408:select
-  cluster_SPadAddrModule_reset -> mux_232190830:select
   struct_cluster_SPadAddrModule_padReadIndexReg:out -> op_eq_13:in2
-  mux_1608697313:out -> mux_1455507309:in2
+  struct_cluster_SPadAddrModule_addrSPad_2:out -> mux_1347886748:in2
   mux_1453398523:out -> mux_726925123:in2
-  mux_687242275:out -> mux_1191789408:in2
-  op_tail_17:out -> mux_1879217376:in2
+  op_tail_19:out -> mux_1879217376:in2
+  struct_cluster_SPadAddrModule_padWriteIndexReg:out -> op_eq_32:in2
   struct_cluster_SPadAddrModule_addrSPad_2:out -> mux_20185978:in1
-  op_eq_23:out -> mux_1838317754:select
-  op_eq_27:out -> mux_2023673415:select
+  op_eq_30:out -> mux_1838317754:select
+  op_eq_38:out -> mux_2023673415:select
   mux_1879217376:out -> mux_1453398523:in1
-  op_eq_24:out -> mux_330652191:select
+  cluster_SPadAddrModule_io_commonIO_dataLenFinIO_writeInDataIO_valid -> op_and_21:in1
+  op_eq_32:out -> mux_330652191:select
   
   
 }

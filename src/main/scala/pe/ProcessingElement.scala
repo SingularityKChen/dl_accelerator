@@ -28,7 +28,23 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
     pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
  }
   peCtrl.io.ctrlPad <> pePad.io.padCtrl
-  io.topCtrl <> peCtrl.io.ctrlTop
+  io.topCtrl.pSumEnqOrProduct <> peCtrl.io.ctrlTop.pSumEnqOrProduct
+  io.topCtrl.calFinish := peCtrl.io.ctrlTop.calFinish
+  peCtrl.io.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
+  val SPadSeq = Seq(pePad.io.dataStream.iactIOs.addrIOs, pePad.io.dataStream.iactIOs.dataIOs, pePad.io.dataStream.weightIOs.addrIOs, pePad.io.dataStream.weightIOs.dataIOs)
+  val writeFinishWire: Bool = Wire(Bool())
+  val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(4)(false.B)))
+  for (i <- 0 until 4) {
+    when (SPadSeq(i).writeFin) {
+      writeFinishRegVec(i) := true.B
+    }
+    when (io.topCtrl.calFinish) {
+      writeFinishRegVec(i) := false.B
+    }
+  }
+  writeFinishWire := writeFinishRegVec.reduce(_ && _) // when all Scratch Pad write finished
+  io.topCtrl.writeFinish := writeFinishWire
+  peCtrl.io.ctrlTop.writeFinish := writeFinishWire
   pePad.io.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true)
   io.dataStream.opsIO <> Queue(pePad.io.dataStream.opsIO, fifoSize, flow = true)
   if (debug) {
@@ -42,10 +58,9 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
 class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig {
   val io = IO(new Bundle{
     val ctrlPad = new PECtrlToPadIO
-    val ctrlTop = new PETopToHigherIO
+    val ctrlTop = new PEControlToTopIO
     val debugIO = new PEControlDebugIO
   })
-  io.ctrlTop.writeFinish := io.ctrlPad.fromTopIO.writeFinish
   io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
   // some config of RS+
   // logic of PE MAC
@@ -67,7 +82,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
       }
     }
     is (psLoad) {
-      when (io.ctrlPad.fromTopIO.writeFinish) { //after the pad receives the data
+      when (io.ctrlTop.writeFinish) { //after the pad receives the data
         stateMac := psCal
       }
     }
@@ -79,6 +94,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   }
   if (debug) {
     io.debugIO.peState := stateMac
+    io.debugIO.doMACEnDebug := io.ctrlPad.doMACEn
   } else {
     io.debugIO := DontCare
   }
@@ -196,6 +212,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val SPadSeq = Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad)
   // Connections
   SPadSeq.map(_.io.commonIO.writeEn := io.padCtrl.fromTopIO.doLoadEn)
+  io.padCtrl.fromTopIO.writeFinish := DontCare
   // Input activation Address Scratch Pad
   iactAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.addrIOs
   iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
@@ -251,16 +268,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   }
   // SPadToCtrl
   io.padCtrl.fromTopIO.pSumEnqOrProduct.ready := padEqMpy
-  val SPadWriteFinReg: Vec[Bool] = VecInit(Seq.fill(4)(false.B))
-  for (i <- 0 until 4) {
-    when (SPadSeq(i).io.commonIO.dataLenFinIO.writeFin) {
-      SPadWriteFinReg(i) := true.B
-    }
-    when (io.padCtrl.doMACEn) {
-      SPadWriteFinReg(i) := false.B
-    }
-  }
-  io.padCtrl.fromTopIO.writeFinish := SPadWriteFinReg.reduce(_ && _) // when all Scratch Pad write finished
   pSumResultWire := Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
   /*
   val mcrenfReg: Vec[UInt] = RegInit(VecInit(Seq.fill(6)(0.U(log2Ceil(MCRENF.max).W))))

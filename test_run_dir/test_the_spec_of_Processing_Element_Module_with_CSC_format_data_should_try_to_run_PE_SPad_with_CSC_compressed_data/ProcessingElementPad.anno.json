@@ -1,17 +1,6 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElementPad|ProcessingElementPad>io_padCtrl_fromTopIO_writeFinish",
-    "sources":[
-      "~ProcessingElementPad|ProcessingElementPad>io_padCtrl_doMACEn",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid",
-      "~ProcessingElementPad|ProcessingElementPad>io_dataStream_iactIOs_dataIOs_writeInDataIO_valid"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeFin",
     "sources":[
       "~ProcessingElementPad|ProcessingElementPad>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid"

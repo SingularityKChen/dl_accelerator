@@ -161,20 +161,56 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theTopIO.dataStream.weightIOs.addrIOs.streamLen.poke(inWeightAddr.length.U)
       theTopIO.dataStream.weightIOs.dataIOs.streamLen.poke(inWeightDataCountDec.length.U)
       iactAndWeightReadInFuc(inIactAddr,inIactDataCountDec, inWeightAddr, inWeightDataCountDec, theTopIO.dataStream, theClock)
+      theTopIO.debugIO.peControlDebugIO.peState.expect(1.U, "wait it jump from load to cal")
+      theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(false.B, s"now it should be load")
       theClock.step(1)
       theTopIO.topCtrl.writeFinish.expect(true.B, s"after write in all data, write should finish")
+      theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(true.B, s"now it should be calculating state")
+      theTopIO.debugIO.peControlDebugIO.peState.expect(2.U, "now it should be calculating state")
       theTopIO.topCtrl.doLoadEn.poke(false.B)
       theTopIO.topCtrl.pSumEnqOrProduct.bits.poke(false.B)
-      theClock.step(145)
-      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
+      theTopIO.topCtrl.pSumEnqOrProduct.valid.poke(true.B)
+      theClock.step(1)
+      for (i<- 0 until 146) {
+        /*
+        println(s"--------------- $i-th read cycle -----------")
+        println(s"----- SPad State   =  ${theTopIO.debugIO.peSPadDebugIO.sPadState.peek()}")
+        println(s"----- iactMatrix   = (${theTopIO.debugIO.peSPadDebugIO.iactMatrixData.peek()}, ${theTopIO.debugIO.peSPadDebugIO.iactMatrixRow.peek()}, ${theTopIO.debugIO.peSPadDebugIO.iactMatrixColumn.peek()})")
+        println(s"----- IAddrIndex   =  ${theTopIO.debugIO.peSPadDebugIO.iactAddrIdx.peek()}, ${theTopIO.debugIO.peSPadDebugIO.iactAddrInc.peek()}")
+        println(s"----- IDataInc     =  ${theTopIO.debugIO.peSPadDebugIO.iactDataInc.peek()}")
+        println(s"----- weightMatrix = (${theTopIO.debugIO.peSPadDebugIO.weightMatrixData.peek()}, ${theTopIO.debugIO.peSPadDebugIO.weightMatrixRow.peek()}, ${theTopIO.debugIO.peSPadDebugIO.iactMatrixRow.peek()})")
+        println(s"----- WAddrData    =  ${theTopIO.debugIO.peSPadDebugIO.weightAddrSPadReadOut.peek()}")
+        println(s"----- WAInIndex    =  ${theTopIO.debugIO.peSPadDebugIO.weightAddrInIdx.peek()}")
+        println(s"----- product      =  ${theTopIO.debugIO.peSPadDebugIO.productResult.peek()}")
+        println(s"----- pSumResult   =  ${theTopIO.debugIO.peSPadDebugIO.pSumResult.peek()}")
+        println(s"----- pSumLoad     =  ${theTopIO.debugIO.peSPadDebugIO.pSumLoad.peek()}")
+         */
+        theClock.step(1)
+      }
+      println("-------------- MAC now finish ----------------")
+      println(s"----- peState      =  ${theTopIO.debugIO.peControlDebugIO.peState.peek()}")
+      println(s"----- doMACEn      =  ${theTopIO.debugIO.peControlDebugIO.doMACEnDebug.peek()}")
+      println(s"whether MAC finish =  ${theTopIO.topCtrl.calFinish.peek()}")
+      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+      theClock.step(2)
+      println("-------------- read partial sum ---------------")
+      theTopIO.topCtrl.doLoadEn.poke(true.B)
+      theTopIO.debugIO.peSPadDebugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
+      println(s"----- peState      =  ${theTopIO.debugIO.peControlDebugIO.peState.peek()}")
+      println(s"----- doMACEn      =  ${theTopIO.debugIO.peControlDebugIO.doMACEnDebug.peek()}")
+      println(s"whether MAC finish =  ${theTopIO.topCtrl.calFinish.peek()}")
       println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
       theClock.step(1)
-      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
-      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
-      theClock.step(1)
-      println(s"whether finished MAC = ${theTopIO.topCtrl.calFinish.peek()}")
-      println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
-      theClock.step(1)
+      theTopIO.dataStream.opsIO.ready.poke(true.B)
+      theClock.step(fifoSize) // wait for fifo size clock cycle to let data flow out
+      for (i <- 0 until M0*E*N0*F0) {
+        println(s"--------- $i-th pSumSPad read cycle --------")
+        theTopIO.debugIO.peControlDebugIO.peState.expect(1.U, s"the control state should be load when read out partial sun")
+        theTopIO.debugIO.peSPadDebugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
+        println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
+        theTopIO.dataStream.opsIO.bits.expect(outpSum(i).U, s"the out partial sum should be ${outpSum(i)} at $i-th index")
+        theClock.step(1)
+      }
     }
   }
 
@@ -197,6 +233,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theClock.step(1) // from idle to address SPad read
       theTopIO.padCtrl.doMACEn.poke(false.B) // end the state machine
       for (i<- 0 until 146) {
+        /*
         println(s"--------------- $i-th read cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.sPadState.peek()}")
         println(s"----- iactMatrix   = (${theTopIO.debugIO.iactMatrixData.peek()}, ${theTopIO.debugIO.iactMatrixRow.peek()}, ${theTopIO.debugIO.iactMatrixColumn.peek()})")
@@ -208,6 +245,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- product      =  ${theTopIO.debugIO.productResult.peek()}")
         println(s"----- pSumResult   =  ${theTopIO.debugIO.pSumResult.peek()}")
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
+         */
         theClock.step(1)
       }
       theClock.step(2)
@@ -215,7 +253,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theTopIO.padCtrl.fromTopIO.doLoadEn.poke(true.B) // begin to read out partial sum
       theTopIO.dataStream.opsIO.ready.poke(true.B)
       theTopIO.debugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
-      for (i <- 0 until M0*E*N0*F0 - 1) {
+      for (i <- 0 until M0*E*N0*F0) {
         println(s"--------- $i-th pSumSPad read cycle --------")
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
         theTopIO.dataStream.opsIO.bits.expect(outpSum(i).U, s"the out partial sum should be ${outpSum(i)} at $i-th index")

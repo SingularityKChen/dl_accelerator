@@ -10,6 +10,7 @@ class PETopDebugIO extends Bundle {
 
 class PEControlDebugIO extends Bundle {
   val peState: UInt = Output(UInt(2.W))
+  val doMACEnDebug: Bool = Output(Bool())
 }
 
 class PESPadDebugIO extends Bundle with PESizeConfig {
@@ -75,6 +76,10 @@ class StreamBitsIO(val dataWidth: Int) extends Bundle {
 class PECtrlToPadIO extends Bundle {
   val doMACEn: Bool = Output(Bool()) // true, then begin MAC computations
   val fromTopIO: PETopToHigherIO = Flipped(new PETopToHigherIO)
+}
+
+class PEControlToTopIO extends PETopToHigherIO {
+  override val writeFinish: Bool = Input(Bool())
 }
 
 class PETopToHigherIO extends Bundle {
