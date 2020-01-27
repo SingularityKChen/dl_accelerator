@@ -31,7 +31,6 @@ trait PESizeConfig {
   val weightAddrWidth: Int = 7
   val cscDataWidth: Int = 8 // compressed sparse column data width
   val cscCountWidth: Int = 4 // compressed sparse column count width
-  val calDataWidth: Int = 20
   val psDataWidth: Int = 20
   val fifoSize: Int = 4
   val fifoEn: Boolean = true

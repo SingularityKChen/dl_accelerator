@@ -274,7 +274,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val when_carry: IndexedSeq[Bool] = mcrenfReg.zip(MCRENF.map(x=> x - 1)).map{ case (x,y) => x === y.U}
   // when_carry stores the information of whether m0 === M0.U, et al.
   */
-  val pSumResultIdxReg: UInt = RegInit(0.U(calDataWidth.W)) // store the index for write back
+  val pSumResultIdxReg: UInt = RegInit(0.U(psDataWidth.W)) // store the index for write back
   // several signals which can help to indicate the process
   val mightIactZeroColumnWire: Bool = Wire(Bool())
   val iactSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
