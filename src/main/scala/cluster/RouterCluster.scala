@@ -5,7 +5,7 @@ import chisel3.util._
 
 class RouterCluster extends Module {
   val io = IO(new Bundle {
-
+    val routerToPE = new PEAndRouterIO
   })
 }
 

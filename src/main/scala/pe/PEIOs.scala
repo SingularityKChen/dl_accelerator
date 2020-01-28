@@ -54,11 +54,11 @@ class SPadCommonIO(val dataLenWidth: Int, val dataWidth: Int, val padSize: Int) 
 class DataStreamIO extends Bundle with PESizeConfig {
   val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
   val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
-  val iactIOs = new DataAddrStreanIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
-  val weightIOs = new DataAddrStreanIO(weightDataWidth, weightAddrWidth, weightDataLenWidth, commonLenWidth)
+  val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
+  val weightIOs = new DataAddrStreamIO(weightDataWidth, weightAddrWidth, weightDataLenWidth, commonLenWidth)
 }
 
-class DataAddrStreanIO(val dataWidth: Int, addr_width: Int, dataLenWidth: Int, addrLen_width: Int) extends Bundle {
+class DataAddrStreamIO(val dataWidth: Int, addr_width: Int, dataLenWidth: Int, addrLen_width: Int) extends Bundle {
   val dataIOs = new StreamDataLenFinIO(dataWidth, dataLenWidth) // dataSPad inputs and output writeFin
   val addrIOs = new StreamDataLenFinIO(addr_width, addrLen_width) // addrSPad inputs and output writeFin
 }

@@ -2,11 +2,11 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.util._
-import dla.pe.{DataAddrStreanIO, SPadAddrModule, SPadDataModule, SPadSizeConfig}
+import dla.pe.{DataAddrStreamIO, SPadAddrModule, SPadDataModule, SPadSizeConfig}
 
 class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   val io = IO(new Bundle{
-    val iactIOs = new DataAddrStreanIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
+    val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
     val iactAddrWriteIdx: UInt = Output(UInt(commonLenWidth.W)) // use for test
     val iactDataReq: Bool = Input(Bool()) // control to read data vector
     // we are supposed to see address SPad and data SPad together
