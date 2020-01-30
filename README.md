@@ -86,15 +86,15 @@ This is used for monitoring Scratch Pad module.
 + iactMatrixData: input activations matrix element;
 + iactMatrixRow: input activations matrix row index;
 + iactMatrixColumn: input activations matrix column index, also the column index of output partial sum;
-+ iactAddrInc: true then the index of iact address vector will increase;
-+ iactDataInc: true then the index of iact data and count vector will increase;
-+ iactAddrIdx: the index number of iact address vector;
++ iactAddrInc: true then the index of input activation address vector will increase;
++ iactDataInc: true then the index of input activation data and count vector will increase;
++ iactAddrIdx: the index number of input activation address vector;
 + weightAddrSPadReadOut: this is the current value read from weight address vector;
 + weightMatrixData: weight matrix element;
 + weightMatrixRow: weight matrix row index, also the row index of output partial sum;
-+ productResult: iactMatrixData * weightMatrixData;
-+ pSumLoad: the correspond partial sum produced previous;
-+ pSumResult: productResult + pSumLoad;
++ productResult: `iactMatrixData * weightMatrixData`;
++ pSumLoad: the corresponding partial sum produced previous;
++ pSumResult: `productResult + pSumLoad`;
 + weightAddrInIdx: the weight address vector index;
 + sPadState: the state of Scratch Pad state machine, i.e., MAC process;
 
@@ -139,11 +139,52 @@ This is the global buffer cluster module.
 
 #### [PE Cluster](./src/main/scala/cluster/PECluster.scala)
 
-This is the processing element cluster module.
+This is the processing element cluster module. It is a PE Array which contains `peArrayColumnNum` columns and `peArrayRowNum` rows.
 
 #### [Router Cluster](./src/main/scala/cluster/RouterCluster.scala)
 
-This is the router cluster module.
+This is the router cluster module. It contains `iactRouterNum` input activations router, `weightRouterNum` weight router, `pSumRouterNum` partial sum router.
+
+Each router cluster not only connects to one GLB cluster, one PE cluster, but also at least one another router cluster.
+
+##### IactRouter
+
+This class is the generator of one input activations router.
+
+
+- InIOs\(0\): the input activation comes from its corresponding input activations SRAM back;
+- InIOs\(1\): the input activation comes from its northern iact router;
+- InIOs\(2\): the input activation comes from its southern iact router;
+- InIOs\(3\): the input activation comes from its horizontal iact router;
+- OutIOs\(0\): send the input activation to PE Array;
+- OutIOs\(1\): send the input activation to northern iact router;
+- OutIOs\(2\): send the input activation to southern iact router;
+- OutIOs\(3\): send the input activation to horizontal iact router;
+- outSelWire: 0: unicast, 1: horizontal, 2: vertical, 3: broadcast
+
+##### WeightRouter
+
+This class is the generator of one weight router.
+
+- inIOs\(0\): the weight comes from its corresponding GLB Cluster;
+- inIOs\(1\): the weight comes from its only horizontal neighborhood WeightRouter;
+- OutIOs\(0\): send the data to its corresponding PE Array row;
+- OutIOs\(1\): send the data to its only horizontal neighborhood WeightRouter;
+- inSelWire: 0 enables inIOs\(0\) and 1 enables inIOs\(1\)
+- OutSelWire: 0 enables outIOs\(0\) and 1 enables outIOs\(1\)
+
+##### PSumRouter
+
+This class is the generator of one partial sum router.
+
+- inIOs\(0\): the output partial sum computed by its corresponding PE Array column;
+- inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
+- inIOs\(2\): the partial sum transferred from its northern neighborhood PSumRouter;
+- OutIOs\(0\): send the partial sum to its corresponding PE Array column;
+- OutIOs\(1\): send the partial sum back to its corresponding partial sum SRAM bank;
+- OutIOs\(2\): send the partial sum to its southern neighborhood PSumRouter;
+- inSelWire: its value enable the corresponding inIOs, i.e., 0 enables inIOs\(0\)
+- outSelWire: its value enable the corresponding outIOs, i.e., 0 enables outIOs\(0\)
 
 ## [Tests](./src/test/scala)
 
