@@ -51,7 +51,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
     io.debugIO.peControlDebugIO <> peCtrl.io.debugIO
     io.debugIO.peSPadDebugIO <> pePad.io.debugIO
   } else {
-    io.debugIO := DontCare
+    io.debugIO <> DontCare
   }
 }
 
@@ -96,7 +96,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
     io.debugIO.peState := stateMac
     io.debugIO.doMACEnDebug := io.ctrlPad.doMACEn
   } else {
-    io.debugIO := DontCare
+    io.debugIO <> DontCare
   }
 }
 
@@ -221,7 +221,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
   iactAddrSPad.io.addrIO.readInIdx := DontCare
   iactAddrSPad.io.addrIO.readInIdxEn := DontCare
-  iactAddrSPad.io.dataIO := DontCare
+  iactAddrSPad.io.dataIO <> DontCare
   // Input activation Data Scratch Pad
   iactDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.dataIOs
   iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
@@ -232,7 +232,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
   iactDataSPad.io.dataIO.readInIdx := iactAddrDataWire
   iactDataSPad.io.dataIO.readInIdxEn := DontCare
-  iactDataSPad.io.addrIO := DontCare
+  iactDataSPad.io.addrIO <> DontCare
   // Weight Address Scratch Pad
   weightAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.addrIOs
   weightAddrIndexWire := weightAddrSPad.io.commonIO.columnNum
@@ -243,7 +243,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
                                                           // for the reg inside SPad to change the index it need
   weightAddrSPad.io.addrIO.indexInc := weightAddrSPadIdxIncWire
   weightAddrSPad.io.addrIO.readInIdxEn := weightAddrIdxEnWire
-  weightAddrSPad.io.dataIO := DontCare
+  weightAddrSPad.io.dataIO <> DontCare
   // Weight Data Scratch Pad
   weightDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.dataIOs
   weightDataIndexWire := weightDataSPad.io.commonIO.columnNum
@@ -254,7 +254,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.io.dataIO.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAddrDataWire)
   weightDataSPad.io.dataIO.indexInc := weightDataSPadIdxIncWire
   weightDataSPad.io.dataIO.readInIdxEn := weightDataIdxEnWire
-  weightDataSPad.io.addrIO := DontCare
+  weightDataSPad.io.addrIO <> DontCare
   // Partial Sum Scratch Pad
   io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.fromTopIO.pSumEnqOrProduct.bits
   val psPadReadIdxCounter: Counter = Counter(M0*E*N0*F0 + 1)
@@ -403,6 +403,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     io.debugIO.weightAddrInIdx := weightAddrSPadReadIdxWire
     io.debugIO.sPadState := sPad
   }else {
-    io.debugIO := DontCare
+    io.debugIO <> DontCare
   }
 }

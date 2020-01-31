@@ -53,7 +53,7 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   iactAddrSPad.io.commonIO.readEn := iactAddrSPadReadEnReg
   io.iactAddrReadEn := iactAddrSPadReadEnReg
   iactAddrSPad.io.commonIO.writeEn := io.writeEn
-  iactAddrSPad.io.dataIO := DontCare
+  iactAddrSPad.io.dataIO <> DontCare
   iactAddrSPad.io.addrIO.readInIdx := DontCare
   iactAddrSPad.io.addrIO.readInIdxEn := DontCare
   // DataSPad
@@ -68,7 +68,7 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   // disable the unused IOs
   iactDataSPad.io.dataIO.readInIdx := DontCare
   iactDataSPad.io.dataIO.readInIdxEn := DontCare
-  iactDataSPad.io.addrIO := DontCare
+  iactDataSPad.io.addrIO <> DontCare
   // the_index_m0 = m0 + count_m0
   // addr_m0_index*M0
   // SPad read state machine
