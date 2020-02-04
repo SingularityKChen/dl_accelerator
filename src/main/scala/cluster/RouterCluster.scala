@@ -10,20 +10,20 @@ class RouterCluster extends Module with ClusterConfig {
     val pSRIO: Vec[PSumRouterIO] = Vec(pSumRouterNum, new PSumRouterIO)
     val routerPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Output(Decoupled(UInt(psDataWidth.W))))
   })
-  val iRouter: Vec[IactRouterIO] = Vec(iactRouterNum, Module(new IactRouter).io)
-  val wRouter: Vec[WeightRouterIO] = Vec(weightRouterNum, Module(new WeightRouter).io)
-  val pSRouter: Vec[PSumRouterIO] = Vec(pSumRouterNum, Module(new PSumRouter).io)
-  io.iRIO.zip(iRouter).foreach({case (x, y) => x <> y})
-  io.wRIO.zip(wRouter).foreach({case (x, y) => x <> y})
-  io.pSRIO.zip(pSRouter).foreach({case (x, y) => x <> y})
-  io.routerPSumToPEIO.zip(pSRouter).foreach({ case (x, y) => x <> y.outIOs.dataPath.head})
+  val iRouters: Vec[IactRouterIO] = Vec(iactRouterNum, Module(new IactRouter).io)
+  val wRouters: Vec[WeightRouterIO] = Vec(weightRouterNum, Module(new WeightRouter).io)
+  val pSRouters: Vec[PSumRouterIO] = Vec(pSumRouterNum, Module(new PSumRouter).io)
+  io.iRIO.zip(iRouters).foreach({case (x, y) => x <> y})
+  io.wRIO.zip(wRouters).foreach({case (x, y) => x <> y})
+  io.pSRIO.zip(pSRouters).foreach({case (x, y) => x <> y})
+  io.routerPSumToPEIO.zip(pSRouters).foreach({ case (x, y) => x <> y.outIOs.dataPath.head})
 }
 
 class IactRouter extends Module with ClusterConfig {
   val io = new IactRouterIO
-  val inSelWire: UInt = Wire(UInt(log2Ceil(iactPortNum).W)) // 0 for PE Cluster, 1 for GLB Cluster
-  // outSelWire: 0: unicast, 1: horizontal, 2: vertical, 3: broadcast
-  val outSelWire: UInt = Wire(UInt(log2Ceil(iactPortNum).W)) // 0 for PE Cluster, 1 for GLB Cluster
+  val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+  // router model: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
+  val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
   val inDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
   val outDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
   inDataWire <> outDataWire
@@ -32,7 +32,7 @@ class IactRouter extends Module with ClusterConfig {
       i.asUInt -> o
   }))
   switch (outSelWire) {
-    is (0.U) { // unicast
+    is (0.U) { // uni-cast
       io.outIOs.dataPath(0) <> outDataWire // 0 to PE array
       io.outIOs.dataPath.takeRight(3).foreach(_ <> DontCare)
     }
@@ -50,6 +50,9 @@ class IactRouter extends Module with ClusterConfig {
       io.outIOs.dataPath.foreach(_ <> outDataWire)
     }
   }
+  // control path
+  inSelWire := io.outIOs.ctrlPath.inDataSel
+  outSelWire := io.outIOs.ctrlPath.outDataSel
 }
 
 class WeightRouter extends Module with ClusterConfig {
@@ -64,12 +67,16 @@ class WeightRouter extends Module with ClusterConfig {
   inDataWire <> Mux(inSelWire, io.inIOs.dataPath(1), io.inIOs.dataPath.head)
   io.outIOs.dataPath.head <> outDataWire
   io.outIOs.dataPath(1) <> Mux(outSelWire, outDataWire, DontCare)
+  io.outIOs.ctrlPath <> DontCare
+  // control path
+  inSelWire := io.inIOs.ctrlPath.inDataSel
+  outSelWire := io.inIOs.ctrlPath.outDataSel
 }
 
 class PSumRouter extends Module with ClusterConfig {
   val io = new PSumRouterIO
-  val inSelWire: UInt = Wire(UInt(log2Ceil(pSumPortNum).W)) // 0 for PE Cluster, 1 for GLB Cluster
-  val outSelWire: UInt = Wire(UInt(log2Ceil(pSumPortNum).W)) // 0 for PE Cluster, 1 for GLB Cluster
+  val inSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
   val inDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   val outDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   inDataWire <> outDataWire
@@ -78,4 +85,7 @@ class PSumRouter extends Module with ClusterConfig {
       i.asUInt -> value
   }))
   io.outIOs.dataPath.zipWithIndex.foreach({ case (value, i) => value <> Mux(outSelWire === i.asUInt, outDataWire, DontCare)})
+  // control path
+  inSelWire := io.inIOs.ctrlPath.inDataSel
+  outSelWire := io.inIOs.ctrlPath.outDataSel
 }

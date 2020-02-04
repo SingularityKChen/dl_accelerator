@@ -5,13 +5,19 @@ import chisel3.util._
 import dla.pe._
 
 class PECluster(val peColNum: Int, val peRowNum: Int, debug: Boolean) extends Module with ClusterConfig {
+  val diagNum: Int = peColNum + peRowNum - 1
   val io = new PEAndRouterIO
+  // io.iactCluster.ctrlPath.outDataSel should be assigned to DontCare
   val peRow =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
   val peArray = Vec(peRowNum, peRow)
   val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
   val muxIactDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
-  val iactRoutingMode: UInt = Wire(UInt(2.W))
-  val muxIactCtrlWire: UInt = Wire(UInt(log2Ceil(iactRouterNum).W))
+  val iactRoutingMode: UInt = Wire(UInt(2.W)) // connect directly to inDaraSel
+  // muxIactCtrlWire: correspond to each diagonal, to choose data read in;
+  // 0-2 to iactCluster dataPath's responding index, 3 means wait for a while
+  val muxIactCtrlWire: Vec[UInt] = Vec(diagNum ,Wire(UInt(2.W)))
+  // iactFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
+  val iactFormerOrLater: Vec[Bool] = Vec(iactRouterNum, Wire(Bool())) // true for former, false for later readF
   val muxInPSumCtrlWire: Bool = Wire(Bool()) // TODO: whether each column needs one select signal?
   muxIactDataWire := MuxLookup(muxIactCtrlWire, 0.U, io.iactCluster.dataPath.zipWithIndex.map({
     case (x,y) =>
@@ -38,7 +44,11 @@ class PECluster(val peColNum: Int, val peRowNum: Int, debug: Boolean) extends Mo
       iactWeightConnection(peArray(j)(i).dataStream.iactIOs, muxIactDataWire)
     }
   }
-  iactRoutingMode := io.iactCluster.ctrlPath.routingMode
+  iactRoutingMode := io.iactCluster.ctrlPath.inDataSel
   // iact mux control logic here
-  muxIactCtrlWire := iactRoutingMode // FIXME
+  // FIXME
+  for (idx <- 0 until iactRouterNum) {
+    muxIactCtrlWire(idx) := Mux(iactFormerOrLater(idx), iactRoutingMode, 3.U) // former PEs
+    muxIactCtrlWire(idx + iactRouterNum) := Mux(!iactFormerOrLater(idx), iactRoutingMode, 3.U) // later PEs
+  }
 }

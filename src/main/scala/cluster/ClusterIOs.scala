@@ -37,16 +37,29 @@ class IactClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int, addrLenWidth: 
 
 class WeightClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
   val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth)) // output bits and valid
-  //val ctrlPath
+  val ctrlPath = new WeightClusterCtrlIO
 }
 
 class PSumClusterIO(portNum: Int, dataWidth: Int) extends Bundle {
   val dataPath: Vec[DecoupledIO[UInt]] = Vec(portNum, Decoupled(UInt(dataWidth.W))) // output bits and valid
-  //val ctrlPath =
+  val ctrlPath = new PSumClusterCtrlIO
 }
 
-class IactClusterCtrlIO extends Bundle {
-  val routingMode: UInt = Output(UInt(2.W)) // unicast, horizontal, vertical, broadcast
+class PSumClusterCtrlIO extends Bundle with ClusterConfig {
+  val inDataSel: UInt = Output(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  val outDataSel: UInt = Output(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+}
+
+class WeightClusterCtrlIO extends Bundle {
+  // broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
+  val inDataSel: Bool = Output(Bool()) // true for broad-cast and multi-cast, false for uni-cast
+  val outDataSel: Bool = Output(Bool()) // 0, send the data to PE Cluster; 1, send it to its neighboring WeightRouter and PE Cluster
+}
+
+class IactClusterCtrlIO extends Bundle with ClusterConfig {
+  // uni-cast, horizontal, vertical, broad-cast
+  val inDataSel: UInt = Output(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+  val outDataSel: UInt = Output(UInt(2.W)) // 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
 }
 
 class ClusterAddrWithDataCommonIO(addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
