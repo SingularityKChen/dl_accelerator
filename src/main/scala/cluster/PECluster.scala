@@ -4,9 +4,13 @@ import chisel3._
 import chisel3.util._
 import dla.pe._
 
-class PECluster(val peColNum: Int, val peRowNum: Int, debug: Boolean) extends Module with ClusterConfig {
+class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val diagNum: Int = peColNum + peRowNum - 1
-  val io = new PEAndRouterIO
+  val io = IO(new Bundle {
+    val iactCluster: IactClusterIO[Bool, UInt] = Flipped(new IactClusterIO[Bool, UInt](Bool(), UInt(2.W), iactRouterNum, iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
+    val weightCluster: WeightClusterIO = Flipped(new WeightClusterIO(weightRouterNum, weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth))
+    val pSUmCluster: PEAndPSumCluster = Flipped(new PEAndPSumCluster)
+  })
   // io.iactCluster.ctrlPath.inDataSel indicates whether the input activations should be broad-cast;
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
@@ -20,7 +24,7 @@ class PECluster(val peColNum: Int, val peRowNum: Int, debug: Boolean) extends Mo
   val iactRoutingMode: Bool = Wire(Bool())
   // iactMuxDiagIdxWire: correspond to each diagonal, to choose data read in;
   // 0-2 to iactCluster dataPath's responding index, 3 means wait for a while
-  val iactMuxDiagIdxWire: Vec[UInt] = Vec(diagNum ,Wire(UInt(2.W)))
+  val iactMuxDiagIdxWire: Vec[UInt] = Vec(diagNum, Wire(UInt(2.W)))
   val iactBroadCastIdxWire: UInt = Wire(UInt(2.W))
   // iactFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
   val iactFormerOrLater: Vec[Bool] = Vec(iactRouterNum, Wire(Bool())) // true for former, false for later readF
@@ -44,7 +48,7 @@ class PECluster(val peColNum: Int, val peRowNum: Int, debug: Boolean) extends Mo
     for (j <- 0 until peRowNum) {
       iactWeightConnection(peArray(j)(i).dataStream.weightIOs, io.weightCluster.dataPath(j))
       iactWeightConnection(peArray(j)(i).dataStream.iactIOs, muxIactDataWire(j)(i))
-      muxIactDataWire(j)(i) <> Mux(iactMuxDiagIdxWire(j + i) === 3.U, MuxLookup(iactMuxDiagIdxWire, 0.U, io.iactCluster.dataPath.zipWithIndex.map({
+      muxIactDataWire(j)(i) <> Mux(iactMuxDiagIdxWire(j + i) =/= 3.U, MuxLookup(iactMuxDiagIdxWire, 0.U, io.iactCluster.dataPath.zipWithIndex.map({
         case (x,y) =>
           y.asUInt -> x
       })), DontCare) // TODO: check whether the valid equals to false when muxIdxWire equals to 3.U

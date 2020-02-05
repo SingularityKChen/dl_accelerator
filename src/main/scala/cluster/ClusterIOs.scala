@@ -2,12 +2,10 @@ package dla.cluster
 
 import chisel3._
 import chisel3.util._
-import dla.pe._
 
-class PEAndRouterIO extends Bundle with ClusterConfig {
-  val iactCluster: IactClusterIO[Bool, UInt] = Flipped(new IactClusterIO[Bool, UInt](Bool(), UInt(2.W), iactRouterNum, iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
-  val weightCluster: WeightClusterIO = Flipped(new WeightClusterIO(weightRouterNum, weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth))
-  val pSUmCluster: PEAndPSumCluster = Flipped(new PEAndPSumCluster)
+class ClusterGroupConfigIO extends Bundle {
+  val peClusterCtrl = new ClusterCommonCtrlIO[Bool, UInt](Bool(), UInt(2.W))
+  //val routerClusterCtrl =
 }
 
 class PEAndPSumCluster extends Bundle with ClusterConfig {
@@ -35,11 +33,11 @@ class IactClusterIO[T1, T2](dataType1: T1, dataType2: T2, portNum: Int, addrWidt
   val ctrlPath = new ClusterCommonCtrlIO[T1, T2](dataType1, dataType2)
   // uni-cast, horizontal, vertical, broad-cast
   // ctrlPath.inDataSel:
-  //                     in Router:UInt 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
-  //                     in PE Cluster:Bool true for broad-cast, false for others
+  //   in Router:UInt 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+  //   in PE Cluster:Bool true for broad-cast, false for others
   // ctrlPath.outDataSel:
-  //                     in Router:UInt 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
-  //                     in PE Cluster:UInt the value indicates the index of router
+  //   in Router:UInt 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
+  //   in PE Cluster:UInt the value indicates the index of router
 }
 
 class WeightClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {

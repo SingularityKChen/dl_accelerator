@@ -11,6 +11,8 @@ trait ClusterConfig extends PESizeConfig {
   val pSumPortNum: Int = 3
   val peArrayColumnNum: Int = 4
   val peArrayRowNum: Int = 3
+  val peColNum: Int = 4
+  val peRowNum: Int = 3
 }
 
 trait GNMFCSConfig {

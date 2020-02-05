@@ -6,6 +6,8 @@ And it will extend some custom RISC-V instructions in the near future.
 
 ## TODO
 
+You can find more at [the project page](https://github.com/SingularityKChen/dl_accelerator/projects/1).
+
 - [X] Implementation of Processing Elements
 
 - [X] Test file of PE
@@ -133,9 +135,13 @@ Used for data reuse.
 
 ### [Cluster](./src/main/scala/cluster)
 
+#### [Cluster Group](./src/main/scala/cluster/ClusterGroup.scala)
+
+This is the top module of cluster group. It contains one GLB cluster, one Router cluster, one PE cluster.
+
 #### [GLB Cluster](./src/main/scala/cluster/GLBCluster.scala)
 
-This is the global buffer cluster module.
+This is the global buffer cluster module. It contains three input activation SRAM bank, four partial sum SRAM bank.
 
 #### [PE Cluster](./src/main/scala/cluster/PECluster.scala)
 
@@ -167,9 +173,9 @@ This class is the generator of one input activations router.
 This class is the generator of one weight router.
 
 - inIOs\(0\): the weight comes from its corresponding GLB Cluster;
-- inIOs\(1\): the weight comes from its only horizontal neighborhood WeightRouter;
+- inIOs\(1\): the weight comes from its only horizontal neighboring WeightRouter;
 - OutIOs\(0\): send the data to its corresponding PE Array row;
-- OutIOs\(1\): send the data to its only horizontal neighborhood WeightRouter;
+- OutIOs\(1\): send the data to its only horizontal neighboring WeightRouter;
 - inSelWire: 0 enables inIOs\(0\) and 1 enables inIOs\(1\)
 - OutSelWire: 0 enables outIOs\(0\) and 1 enables outIOs\(1\)
 
@@ -179,12 +185,16 @@ This class is the generator of one partial sum router.
 
 - inIOs\(0\): the output partial sum computed by its corresponding PE Array column;
 - inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
-- inIOs\(2\): the partial sum transferred from its northern neighborhood PSumRouter;
+- inIOs\(2\): the partial sum transferred from its northern neighboring PSumRouter;
 - OutIOs\(0\): send the partial sum to its corresponding PE Array column;
 - OutIOs\(1\): send the partial sum back to its corresponding partial sum SRAM bank;
-- OutIOs\(2\): send the partial sum to its southern neighborhood PSumRouter;
+- OutIOs\(2\): send the partial sum to its southern neighboring PSumRouter;
 - inSelWire: its value enable the corresponding inIOs, i.e., 0 enables inIOs\(0\)
 - outSelWire: its value enable the corresponding outIOs, i.e., 0 enables outIOs\(0\)
+
+#### [Cluster Config](./src/main/scala/cluster/ClusterConfig.scala)
+
+This file contains some basic static parameters needed in the Cluster Group.
 
 ## [Tests](./src/test/scala)
 

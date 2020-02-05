@@ -3,7 +3,7 @@ package dla.cluster
 import chisel3._
 import chisel3.util._
 
-class RouterCluster extends Module with ClusterConfig {
+class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   val io = IO(new Bundle {
     val iRIO: Vec[IactRouterIO] = Vec(iactRouterNum, new IactRouterIO)
     val wRIO: Vec[WeightRouterIO] = Vec(weightRouterNum, new WeightRouterIO)
