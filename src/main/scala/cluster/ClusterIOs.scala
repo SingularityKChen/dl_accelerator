@@ -5,7 +5,13 @@ import chisel3.util._
 
 class ClusterGroupConfigIO extends Bundle {
   val peClusterCtrl = new ClusterCommonCtrlIO[Bool, UInt](Bool(), UInt(2.W))
-  //val routerClusterCtrl =
+  val routerClusterCtrl: RouterClusterCtrlIO = Flipped(new RouterClusterCtrlIO)
+}
+
+class RouterClusterCtrlIO extends Bundle { // TODO: check whether each router needs its own config signals
+  val iactCtrlSel = new ClusterCommonCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))
+  val weightCtrlSel = new ClusterCommonCtrlIO[Bool, Bool](Bool(), Bool())
+  val pSumCtrlSel = new ClusterCommonCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))
 }
 
 class PEAndPSumCluster extends Bundle with ClusterConfig {
