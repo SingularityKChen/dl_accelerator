@@ -8,7 +8,7 @@ class EyerissTopIOs extends Bundle with EyerissTopConfig {
   val configIOs = new EyerissConfigIOs
 }
 class EyerissConfigIOs extends Bundle with EyerissTopConfig {
-  val iactCtrlSel: Vec[ClusterCommonCtrlIO[UInt, UInt]] = Vec(5, new ClusterCommonCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
+  val iactCtrlSel: Vec[ClusterCommonCtrlIO[UInt, UInt]] = Vec(clusterColNum*clusterRowNum, new ClusterCommonCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
   //
   val weightCtrlSel: Vec[ClusterCommonCtrlIO[Bool, Bool]] = Vec(clusterRowNum, new ClusterCommonCtrlIO[Bool, Bool](Bool(), Bool()))
   // weightCtrlSel.inSel indicates whether the cluster group need to translate the data to other side;

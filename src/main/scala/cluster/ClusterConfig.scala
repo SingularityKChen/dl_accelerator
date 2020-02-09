@@ -15,6 +15,14 @@ trait ClusterConfig extends PESizeConfig {
   val peRowNum: Int = 3
 }
 
+trait ClusterSRAMConfig extends PESizeConfig {
+  val iactDataSRAMSize: Int = 862 // 1.5KB*1024*8/12-bit
+  val iactAddrSRAMSize: Int = 486 // 486/3=162, 162+862=1024=1.5KB*1024*8/12-bit
+  val pSumSRAMSize: Int = 768 // 1.875KB*1024*8/20-bit
+  val iactSRAMNum: Int = 3
+  val pSumSRAMNum: Int = 4
+}
+
 trait GNMFCSConfig {
   val G1: Int = 4
   val N1: Int = 2
