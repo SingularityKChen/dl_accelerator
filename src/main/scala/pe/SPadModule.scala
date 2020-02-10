@@ -3,14 +3,14 @@ package dla.pe
 import chisel3._
 import chisel3.util._
 
-class WeightSPadAddrModule(DataLenWidth: Int, PadSize: Int, DataWidth: Int) extends SPadAddrModule(DataLenWidth, PadSize, DataWidth) {
+class WeightSPadAddrModule(PadSize: Int, DataWidth: Int) extends SPadAddrModule(PadSize, DataWidth) {
   when (io.addrIO.readInIdxEn) {
     padReadIndexReg := io.addrIO.readInIdx
   }
 }
 
-class SPadAddrModule(DataLenWidth: Int, PadSize: Int, val DataWidth: Int)
-  extends SPadCommonModule(DataLenWidth, PadSize, DataWidth) with SPadSizeConfig {
+class SPadAddrModule(PadSize: Int, val DataWidth: Int)
+  extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
   val addrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
   // write logic 2
   when (decoupledDataIO.valid && io.commonIO.writeEn) {
@@ -29,8 +29,8 @@ class SPadAddrModule(DataLenWidth: Int, PadSize: Int, val DataWidth: Int)
   readIndexInc := io.addrIO.indexInc
 }
 
-class SPadDataModule(DataLenWidth: Int, PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
-  extends SPadCommonModule(DataLenWidth, PadSize, DataWidth) with SPadSizeConfig {
+class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
+  extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
   if (sramOrReg) { // true for weight SPad
     val dataSPad: SyncReadMem[UInt] = SyncReadMem(PadSize,UInt(DataWidth.W))
     // write logic 2
@@ -69,24 +69,22 @@ class SPadDataModule(DataLenWidth: Int, PadSize: Int, DataWidth: Int, val sramOr
   io.commonIO.readOutData := dataWire
 }
 
-class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) extends Module {
+class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
   val io = IO(new Bundle{
-    val commonIO = new SPadCommonIO(dataLenWidth, dataWidth, padSize)
+    val commonIO = new SPadCommonIO(dataWidth, padSize)
     val addrIO = new SPadAddrIO(dataWidth, padSize)
     val dataIO = new SPadDataIO(dataWidth, padSize)
   })
   val decoupledDataIO: DecoupledIO[StreamBitsIO] = io.commonIO.dataLenFinIO.writeInDataIO
-  val dataLenReg: UInt = RegInit(9.U(dataLenWidth.W))
   val dataWire: UInt = Wire(UInt(dataWidth.W))
-  dataLenReg := io.commonIO.dataLenFinIO.streamLen
   val padWriteIndexReg: UInt = RegInit(0.U(log2Ceil(padSize).W))
   val padReadIndexReg: UInt = RegInit(0.U(log2Ceil(padSize).W))
 
   val writeWrapWire: Bool = Wire(Bool())
   val readWrapWire: Bool = Wire(Bool())
   val readIndexInc: Bool = Wire(Bool()) // true, then read index increase
-  writeWrapWire := padWriteIndexReg === (dataLenReg - 1.U)
-  readWrapWire := padReadIndexReg === (dataLenReg - 1.U)
+  writeWrapWire := decoupledDataIO.bits.data === 0.U && io.commonIO.writeEn
+  readWrapWire := dataWire === 0.U && readIndexInc
   // write logic 1
   when (decoupledDataIO.valid && io.commonIO.writeEn) {
     decoupledDataIO.ready := true.B
@@ -99,6 +97,6 @@ class SPadCommonModule(val dataLenWidth: Int, padSize: Int, val dataWidth: Int) 
   }
   // common IO connections
   io.commonIO.writeIdx := padWriteIndexReg
-  io.commonIO.dataLenFinIO.writeFin := decoupledDataIO.valid && writeWrapWire
+  io.commonIO.dataLenFinIO.writeFin := writeWrapWire
   io.commonIO.columnNum := padReadIndexReg
 }

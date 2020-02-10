@@ -24,8 +24,8 @@ class IactRouter extends Module with ClusterConfig {
   val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   // router model: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
-  val inDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
-  val outDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
+  val inDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth))
+  val outDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth))
   inDataWire <> outDataWire
   inDataWire <> MuxLookup(inSelWire, 0.U, io.inIOs.dataPath.zipWithIndex.map({
     case (o, i) =>
@@ -61,8 +61,8 @@ class WeightRouter extends Module with ClusterConfig {
   val inSelWire: Bool = Wire(Bool())
   // outSelWire: 0, send the data to PE Cluster; 1, send it to its neighborhood WeightRouter and PE Cluster
   val outSelWire: Bool = Wire(Bool())
-  val inDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth))
-  val outDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth))
+  val inDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(weightAddrWidth, weightDataWidth))
+  val outDataWire: ClusterAddrWithDataCommonIO = Wire(new ClusterAddrWithDataCommonIO(weightAddrWidth, weightDataWidth))
   inDataWire <> outDataWire
   inDataWire <> Mux(inSelWire, io.inIOs.dataPath(1), io.inIOs.dataPath.head)
   io.outIOs.dataPath.head <> outDataWire

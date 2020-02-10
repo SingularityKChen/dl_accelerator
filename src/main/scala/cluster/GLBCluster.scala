@@ -22,12 +22,12 @@ class IactSRAMBank extends Module with ClusterSRAMConfig {
 }
 
 class IactSRAMBankIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new IactSRAMDataIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth)
+  val dataPath = new IactSRAMDataIO(iactAddrWidth, iactDataWidth)
 }
 
-class IactSRAMDataIO(addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
-  val inIOs: ClusterAddrWithDataCommonIO = Flipped(new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth))
-  val outIOs = new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth)
+class IactSRAMDataIO(addrWidth: Int, dataWidth: Int) extends Bundle {
+  val inIOs: ClusterAddrWithDataCommonIO = Flipped(new ClusterAddrWithDataCommonIO(addrWidth, dataWidth))
+  val outIOs = new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)
 }
 
 class PSumSRAMBankIO extends Bundle with ClusterSRAMConfig {
@@ -46,5 +46,5 @@ class GLBClusterIO extends Bundle {
 }
 
 class WeightGLBIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new IactSRAMDataIO(weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth)
+  val dataPath = new IactSRAMDataIO(weightAddrWidth, weightDataWidth)
 }

@@ -1,6 +1,7 @@
 package dla.pe
 
 import scala.math.pow
+import chisel3.util.log2Ceil
 
 trait MCRENFConfig extends PESizeConfig { // contains some scala values
   val M0: Int = 4 // weights reuse M0 times
@@ -20,6 +21,11 @@ trait SPadSizeConfig extends PESizeConfig {
   val iactAddrSPadSize: Int = 9
   val weightDataSPadSize: Int = 192 // 96 if SIMD
   val weightAddrSPadSize: Int = 16
+  val iactAddrIdxWidth: Int = log2Ceil(iactAddrSPadSize)
+  val iactDataIdxWidth: Int = log2Ceil(iactDataSPadSize)
+  val weightAddrIdxWidth: Int = log2Ceil(weightAddrSPadSize)
+  val weightDataIdxWidth: Int = log2Ceil(weightDataSPadSize)
+  val pSumDataIdxWidth: Int = log2Ceil(pSumDataSPadSize)
 }
 
 trait PESizeConfig {
@@ -34,8 +40,6 @@ trait PESizeConfig {
   val psDataWidth: Int = 20
   val fifoSize: Int = 4
   val fifoEn: Boolean = true
-  val commonLenWidth: Int = 4
-  val weightDataLenWidth: Int = 8
   val iactZeroColumnCode: Int = pow(2, iactAddrWidth).toInt - 1 // when one address vector's element equals to iactZeroColumnCode, then it is a zero column
   val weightZeroColumnCode: Int = pow(2, weightAddrWidth).toInt - 1
 }

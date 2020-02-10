@@ -16,7 +16,7 @@ class PEControlDebugIO extends Bundle {
 class PESPadDebugIO extends Bundle with PESizeConfig {
   val iactMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val iactMatrixRow: UInt = Output(UInt(cscCountWidth.W))
-  val iactMatrixColumn: UInt = Output(UInt(commonLenWidth.W))
+  val iactMatrixColumn: UInt = Output(UInt(iactAddrWidth.W))
   val iactAddrInc: Bool = Output(Bool())
   val iactDataInc: Bool = Output(Bool())
   val iactAddrIdx: UInt = Output(UInt(iactAddrWidth.W))
@@ -42,30 +42,29 @@ class SPadDataIO(val dataWidth: Int, val padSize: Int) extends Bundle {
   val readInIdxEn: Bool = Input(Bool()) // for weight SPad only, true then padReadIndexReg = readInIdx
 }
 
-class SPadCommonIO(val dataLenWidth: Int, val dataWidth: Int, val padSize: Int) extends Bundle {
-  val columnNum: UInt = Output(UInt(dataLenWidth.W)) // the column number, address only
+class SPadCommonIO(val dataWidth: Int, val padSize: Int) extends Bundle {
+  val columnNum: UInt = Output(UInt(log2Ceil(padSize).W)) // the column number, address only
   val readOutData: UInt = Output(UInt(dataWidth.W)) // the data read from SPad
   val readEn: Bool = Input(Bool())
   val writeEn: Bool = Input(Bool())
   val writeIdx: UInt = Output(UInt(log2Ceil(padSize).W))
-  val dataLenFinIO = new StreamDataLenFinIO(dataWidth, dataLenWidth)
+  val dataLenFinIO = new StreamDataLenFinIO(dataWidth)
 }
 
 class DataStreamIO extends Bundle with PESizeConfig {
   val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
   val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
-  val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
-  val weightIOs = new DataAddrStreamIO(weightDataWidth, weightAddrWidth, weightDataLenWidth, commonLenWidth)
+  val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth)
+  val weightIOs = new DataAddrStreamIO(weightDataWidth, weightAddrWidth)
 }
 
-class DataAddrStreamIO(val dataWidth: Int, addr_width: Int, dataLenWidth: Int, addrLen_width: Int) extends Bundle {
-  val dataIOs = new StreamDataLenFinIO(dataWidth, dataLenWidth) // dataSPad inputs and output writeFin
-  val addrIOs = new StreamDataLenFinIO(addr_width, addrLen_width) // addrSPad inputs and output writeFin
+class DataAddrStreamIO(val dataWidth: Int, addr_width: Int) extends Bundle {
+  val dataIOs = new StreamDataLenFinIO(dataWidth) // dataSPad inputs and output writeFin
+  val addrIOs = new StreamDataLenFinIO(addr_width) // addrSPad inputs and output writeFin
 }
 
-class StreamDataLenFinIO(val streamWidth: Int, streamLenWidth: Int) extends Bundle { // for write data into SPad
+class StreamDataLenFinIO(val streamWidth: Int) extends Bundle { // for write data into SPad
   val writeInDataIO: DecoupledIO[StreamBitsIO] = Flipped(Decoupled(new StreamBitsIO(streamWidth)))
-  val streamLen: UInt = Input(UInt(streamLenWidth.W)) // length of addr
   val writeFin: Bool = Output(Bool())
 }
 

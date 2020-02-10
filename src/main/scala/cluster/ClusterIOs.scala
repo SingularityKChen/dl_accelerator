@@ -20,13 +20,13 @@ class PEAndPSumCluster extends Bundle with ClusterConfig {
 }
 
 class IactRouterIO extends Bundle with ClusterConfig {
-  val outIOs = new IactClusterIO(UInt(2.W), UInt(2.W), iactPortNum, iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth)
-  val inIOs: IactClusterIO[UInt, UInt] = Flipped(new IactClusterIO(UInt(2.W), UInt(2.W), iactPortNum, iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
+  val outIOs = new IactClusterIO(UInt(2.W), UInt(2.W), iactPortNum, iactAddrWidth, iactDataWidth)
+  val inIOs: IactClusterIO[UInt, UInt] = Flipped(new IactClusterIO(UInt(2.W), UInt(2.W), iactPortNum, iactAddrWidth, iactDataWidth))
 }
 
 class WeightRouterIO extends Bundle with ClusterConfig {
-  val outIOs = new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth)
-  val inIOs: WeightClusterIO = Flipped(new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth)) // output bits and valid, routerMode
+  val outIOs = new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth)
+  val inIOs: WeightClusterIO = Flipped(new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth)) // output bits and valid, routerMode
 }
 
 class PSumRouterIO extends Bundle with ClusterConfig {
@@ -34,8 +34,8 @@ class PSumRouterIO extends Bundle with ClusterConfig {
   val inIOs: PSumClusterIO = Flipped(new PSumClusterIO(pSumPortNum, psDataWidth))
 }
 
-class IactClusterIO[T1, T2](dataType1: T1, dataType2: T2, portNum: Int, addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
-  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth)) // output bits and valid
+class IactClusterIO[T1<: Data, T2<:Data](dataType1: T1, dataType2: T2, portNum: Int, addrWidth: Int, dataWidth: Int) extends Bundle {
+  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)) // output bits and valid
   val ctrlPath = new ClusterCommonCtrlIO[T1, T2](dataType1, dataType2)
   // uni-cast, horizontal, vertical, broad-cast
   // ctrlPath.inDataSel:
@@ -46,8 +46,8 @@ class IactClusterIO[T1, T2](dataType1: T1, dataType2: T2, portNum: Int, addrWidt
   //   in PE Cluster:UInt the value indicates the index of router
 }
 
-class WeightClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
-  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth)) // output bits and valid
+class WeightClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int) extends Bundle {
+  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)) // output bits and valid
   val ctrlPath = new ClusterCommonCtrlIO[Bool, Bool](Bool(), Bool())
   // broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
   // ctrlPath.inDataSel: true for broad-cast and multi-cast, false for uni-cast
@@ -61,17 +61,16 @@ class PSumClusterIO(portNum: Int, dataWidth: Int) extends Bundle {
   // ctrlPath.outDataSel: 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
 }
 
-class ClusterCommonCtrlIO[T1, T2](dataType1: T1, dataType2: T2) extends Bundle {
+class ClusterCommonCtrlIO[T1<: Data, T2<: Data](dataType1: T1, dataType2: T2) extends Bundle {
   val inDataSel: T1 = Output(dataType1)
   val outDataSel: T2 = Output(dataType2)
 }
 
-class ClusterAddrWithDataCommonIO(addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
-  val addrIOs = new ClusterDataWithLenCommonIO(addrWidth, addrLenWidth) // output bits and valid
-  val dataIOs = new ClusterDataWithLenCommonIO(dataWidth, dataLenWidth)
+class ClusterAddrWithDataCommonIO(addrWidth: Int, dataWidth: Int) extends Bundle {
+  val addrIOs = new ClusterDataWithLenCommonIO(addrWidth) // output bits and valid
+  val dataIOs = new ClusterDataWithLenCommonIO(dataWidth)
 }
 
-class ClusterDataWithLenCommonIO(dataWidth: Int, dataLenWidth: Int) extends Bundle {
+class ClusterDataWithLenCommonIO(dataWidth: Int) extends Bundle {
   val dataIO: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W)) // output bits and valid
-  val dataLenIO: UInt = Input(UInt(dataLenWidth.W))
 }

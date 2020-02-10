@@ -1,6 +1,14 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeFin",
+    "sources":[
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeInDataIO_bits_data"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~ProcessingElement|ProcessingElement>io_dataStream_opsIO_bits",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn"
@@ -8,31 +16,26 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_topCtrl_calFinish",
+    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeFin",
     "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_streamLen",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_streamLen"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeFin",
-    "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeInDataIO_valid"
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeInDataIO_bits_data"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
     "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeFin",
     "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeInDataIO_valid"
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeInDataIO_bits_data"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeFin",
     "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeInDataIO_valid"
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeInDataIO_bits_data"
     ]
   },
   {
@@ -40,13 +43,6 @@
     "sink":"~ProcessingElement|ProcessingElement>io_dataStream_opsIO_valid",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeFin",
-    "sources":[
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeInDataIO_valid"
     ]
   },
   {

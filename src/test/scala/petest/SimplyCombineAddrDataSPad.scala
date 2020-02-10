@@ -6,36 +6,36 @@ import dla.pe.{DataAddrStreamIO, SPadAddrModule, SPadDataModule, SPadSizeConfig}
 
 class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   val io = IO(new Bundle{
-    val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth, commonLenWidth, commonLenWidth)
-    val iactAddrWriteIdx: UInt = Output(UInt(commonLenWidth.W)) // use for test
+    val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth)
+    val iactAddrWriteIdx: UInt = Output(UInt(iactAddrIdxWidth.W)) // use for test
     val iactDataReq: Bool = Input(Bool()) // control to read data vector
     // we are supposed to see address SPad and data SPad together
-    val iactMatrixColumn: UInt = Output(UInt(commonLenWidth.W))
+    val iactMatrixColumn: UInt = Output(UInt(iactAddrIdxWidth.W))
     val iactMatrixRow: UInt = Output(UInt(cscCountWidth.W))
     val iactMatrixData: UInt = Output(UInt(cscDataWidth.W))
     val iactMatrixDataBin: UInt = Output(UInt(iactDataWidth.W))
     val iactAddrReadEn: Bool = Output(Bool())
     val iactAddrReadData: UInt = Output(UInt(iactAddrWidth.W))
     // val iactAddrReadIndex: UInt = Output(UInt(commonLenWidth.W)) = iactMatrixColumn
-    val iactDataReadIndex: UInt = Output(UInt(commonLenWidth.W))
-    val iactDataWriteIdx: UInt = Output(UInt(commonLenWidth.W))
+    val iactDataReadIndex: UInt = Output(UInt(iactDataIdxWidth.W))
+    val iactDataWriteIdx: UInt = Output(UInt(log2Ceil(iactDataSPadSize).W))
     val writeEn: Bool = Input(Bool())
   })
-  val iactAddrSPad: SPadAddrModule = Module(new SPadAddrModule(commonLenWidth, iactAddrSPadSize, iactAddrWidth))
-  val iactDataSPad: SPadDataModule = Module(new SPadDataModule(commonLenWidth, iactDataSPadSize, iactDataWidth, false))
+  val iactAddrSPad: SPadAddrModule = Module(new SPadAddrModule(iactAddrSPadSize, iactAddrWidth))
+  val iactDataSPad: SPadDataModule = Module(new SPadDataModule(iactDataSPadSize, iactDataWidth, false))
 
   val padIdle :: padIactAddr :: padIactData :: Nil = Enum(3)
   val sPad: UInt = RegInit(padIdle)
-  val iactAddrIndexWire: UInt = Wire(UInt(commonLenWidth.W))
+  val iactAddrIndexWire: UInt = Wire(UInt(iactAddrIdxWidth.W))
   val iactAddrDataWire: UInt = Wire(UInt(iactAddrWidth.W))
-  val iactDataIndexWire: UInt = Wire(UInt(commonLenWidth.W)) // use for address vector readEn
+  val iactDataIndexWire: UInt = Wire(UInt(iactDataIdxWidth.W)) // use for address vector readEn
   val iactSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
   val iactAddrSPadReadEnReg: Bool = RegInit(false.B)
   val iactDataSPadReadEnReg: Bool = RegInit(false.B)
   val iactAddrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of address SPad
   val iactDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of data SPad
-  val iactMatrixColumnReg: UInt = RegInit(0.U(commonLenWidth.W))
-  val iactZeroColumnNumber: UInt = RegInit(0.U(commonLenWidth.W)) // use for get the right column number
+  val iactMatrixColumnReg: UInt = RegInit(0.U(iactAddrIdxWidth.W))
+  val iactZeroColumnNumber: UInt = RegInit(0.U(iactAddrIdxWidth.W)) // use for get the right column number
   val iactDataSPadFirstReadReg: Bool = RegInit(true.B)
   iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
   iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
@@ -97,7 +97,7 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
     }
     is(padIactData) {
       iactDataSPadFirstReadReg := false.B
-      when (iactDataIndexWire === io.iactIOs.dataIOs.streamLen - 1.U) {
+      when (io.iactMatrixData === 0.U) { // that's means we're finished
         sPad := padIdle
         iactDataSPadReadEnReg := false.B
         iactSPadZeroColumnReg := false.B

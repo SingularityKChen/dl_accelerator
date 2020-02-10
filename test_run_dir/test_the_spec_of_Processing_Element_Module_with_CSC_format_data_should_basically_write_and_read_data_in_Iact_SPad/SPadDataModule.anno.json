@@ -3,7 +3,8 @@
     "class":"firrtl.transforms.CombinationalPath",
     "sink":"~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeFin",
     "sources":[
-      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeInDataIO_valid"
+      "~SPadDataModule|SPadDataModule>io_commonIO_writeEn",
+      "~SPadDataModule|SPadDataModule>io_commonIO_dataLenFinIO_writeInDataIO_bits_data"
     ]
   },
   {

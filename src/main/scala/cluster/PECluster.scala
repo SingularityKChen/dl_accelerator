@@ -7,8 +7,8 @@ import dla.pe._
 class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val diagNum: Int = peColNum + peRowNum - 1
   val io = IO(new Bundle {
-    val iactCluster: IactClusterIO[Bool, UInt] = Flipped(new IactClusterIO[Bool, UInt](Bool(), UInt(2.W), iactRouterNum, iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))
-    val weightCluster: WeightClusterIO = Flipped(new WeightClusterIO(weightRouterNum, weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth))
+    val iactCluster: IactClusterIO[Bool, UInt] = Flipped(new IactClusterIO[Bool, UInt](Bool(), UInt(2.W), iactRouterNum, iactAddrWidth, iactDataWidth))
+    val weightCluster: WeightClusterIO = Flipped(new WeightClusterIO(weightRouterNum, weightAddrWidth, weightDataWidth))
     val pSUmCluster: PEAndPSumCluster = Flipped(new PEAndPSumCluster)
   })
   // io.iactCluster.ctrlPath.inDataSel indicates whether the input activations should be broad-cast;
@@ -18,7 +18,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val peRow =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
   val peArray = Vec(peRowNum, peRow)
   val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
-  val muxIactDataWire: Vec[Vec[ClusterAddrWithDataCommonIO]] = Vec(peColNum, Vec(peRowNum,Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth))))
+  val muxIactDataWire: Vec[Vec[ClusterAddrWithDataCommonIO]] = Vec(peColNum, Vec(peRowNum,Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth))))
   // iactRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router, that's outDataSel's value;
   val iactRoutingMode: Bool = Wire(Bool())
@@ -32,7 +32,6 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   def iactWeightConnection(peIO: DataAddrStreamIO, connectIO: ClusterAddrWithDataCommonIO): Any = {
     Seq(peIO.addrIOs, peIO.dataIOs).zip(Seq(connectIO.addrIOs, connectIO.dataIOs)).foreach({
       case (x, y) =>
-        x.streamLen := y.dataLenIO
         x.writeInDataIO <> y.dataIO
     })
   }
@@ -48,7 +47,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
     for (j <- 0 until peRowNum) {
       iactWeightConnection(peArray(j)(i).dataStream.weightIOs, io.weightCluster.dataPath(j))
       iactWeightConnection(peArray(j)(i).dataStream.iactIOs, muxIactDataWire(j)(i))
-      muxIactDataWire(j)(i) <> Mux(iactMuxDiagIdxWire(j + i) =/= 3.U, MuxLookup(iactMuxDiagIdxWire, 0.U, io.iactCluster.dataPath.zipWithIndex.map({
+      muxIactDataWire(j)(i) <> Mux(iactMuxDiagIdxWire(j + i) =/= 3.U, MuxLookup(iactMuxDiagIdxWire(j + i), 0.U, io.iactCluster.dataPath.zipWithIndex.map({
         case (x,y) =>
           y.asUInt -> x
       })), DontCare) // TODO: check whether the valid equals to false when muxIdxWire equals to 3.U
