@@ -7,6 +7,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io = new GLBClusterIO
   val iSRAMs: Vec[IactSRAMBankIO] = Vec(iactSRAMNum, Module(new IactSRAMBank).io)
   val pSRAMs: Vec[PSumSRAMBankIO] = Vec(pSumSRAMNum, Module(new PSumSRAMBank).io)
+  io.weightIO.dataPath.inIOs <> io.weightIO.dataPath.outIOs
 }
 
 class PSumSRAMBank extends Module with ClusterSRAMConfig {
@@ -22,7 +23,6 @@ class IactSRAMBank extends Module with ClusterSRAMConfig {
 
 class IactSRAMBankIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new IactSRAMDataIO(iactAddrWidth, iactDataWidth, commonLenWidth, commonLenWidth)
-  val ctrlPath = new IactSRAMIdxIO(iactAddrSRAMSize, iactDataSRAMSize)
 }
 
 class IactSRAMDataIO(addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenWidth: Int) extends Bundle {
@@ -30,24 +30,13 @@ class IactSRAMDataIO(addrWidth: Int, dataWidth: Int, addrLenWidth: Int, dataLenW
   val outIOs = new ClusterAddrWithDataCommonIO(addrWidth, dataWidth, addrLenWidth, dataLenWidth)
 }
 
-class IactSRAMIdxIO(addrSize: Int, dataSize: Int) extends Bundle {
-  val addrIdx = new SRAMIdxIO(log2Ceil(addrSize))
-  val dataIdx = new SRAMIdxIO(log2Ceil(dataSize))
-}
-
 class PSumSRAMBankIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new PSumSRAMDataIO(psDataWidth)
-  val ctrlPath = new SRAMIdxIO(log2Ceil(pSumSRAMSize))
 }
 
 class PSumSRAMDataIO(dataWidth: Int) extends Bundle {
   val inIOs: DecoupledIO[UInt] = Flipped(Decoupled(UInt(dataWidth.W)))
   val outIOs: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W))
-}
-
-class SRAMIdxIO(idxWidth: Int) extends Bundle {
-  val fromInIOs: UInt = Input(UInt(idxWidth.W))
-  val fromOutIOs: UInt = Input(UInt(idxWidth.W))
 }
 
 class GLBClusterIO extends Bundle {
@@ -58,5 +47,4 @@ class GLBClusterIO extends Bundle {
 
 class WeightGLBIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new IactSRAMDataIO(weightAddrWidth, weightDataWidth, commonLenWidth, weightDataLenWidth)
-  val ctrlPath = new IactSRAMIdxIO(10086,10086) // TODO: improve those read methodology
 }
