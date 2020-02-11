@@ -6,17 +6,13 @@ import dla.pe._
 
 class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val diagNum: Int = peColNum + peRowNum - 1
-  val io = IO(new Bundle {
-    val iactCluster: IactClusterIO[Bool, UInt] = Flipped(new IactClusterIO[Bool, UInt](Bool(), UInt(2.W), iactRouterNum, iactAddrWidth, iactDataWidth))
-    val weightCluster: WeightClusterIO = Flipped(new WeightClusterIO(weightRouterNum, weightAddrWidth, weightDataWidth))
-    val pSUmCluster: PEAndPSumCluster = Flipped(new PEAndPSumCluster)
-  })
+  val io = new PEClusterIO
   // io.iactCluster.ctrlPath.inDataSel indicates whether the input activations should be broad-cast;
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
   // io.iactCluster.ctrlPath.outDataSel should be assigned to the index of router port when broad-cast;
-  val peRow =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
-  val peArray = Vec(peRowNum, peRow)
+  val peRow: Vec[ProcessingElementIO] =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
+  val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, peRow)
   val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
   val muxIactDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum,Wire(new CSCStreamIO(iactAddrWidth, iactDataWidth))))
   // iactRoutingMode: whether the input activations should be broad-cast;

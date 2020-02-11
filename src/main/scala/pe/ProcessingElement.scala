@@ -4,12 +4,7 @@ import chisel3._
 import chisel3.util._
 // TODO: add reset signal for every module
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
-  val io = IO(new Bundle{
-    val dataStream = new DataStreamIO
-    val padWF = new PEPadWriteFinIO
-    val topCtrl = new PETopToHigherIO
-    val debugIO = new PETopDebugIO
-  })
+  val io = new ProcessingElementIO
   val peCtrl: ProcessingElementControl = Module(new ProcessingElementControl(debug = debug))
   val pePad: ProcessingElementPad = Module(new ProcessingElementPad(debug = debug))
   val iactAndWeightIOs = Seq(pePad.io.padWF.iactWriteFin, pePad.io.padWF.weightWriteFin)

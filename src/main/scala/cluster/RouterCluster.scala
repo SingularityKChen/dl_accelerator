@@ -5,18 +5,13 @@ import chisel3.util._
 import dla.pe.CSCStreamIO
 
 class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
-  val io = IO(new Bundle {
-    val iRIO: Vec[IactRouterIO] = Vec(iactRouterNum, new IactRouterIO)
-    val wRIO: Vec[WeightRouterIO] = Vec(weightRouterNum, new WeightRouterIO)
-    val pSRIO: Vec[PSumRouterIO] = Vec(pSumRouterNum, new PSumRouterIO)
-    val routerPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Output(Decoupled(UInt(psDataWidth.W))))
-  })
+  val io = new RouterClusterIO
   val iRouters: Vec[IactRouterIO] = Vec(iactRouterNum, Module(new IactRouter).io)
   val wRouters: Vec[WeightRouterIO] = Vec(weightRouterNum, Module(new WeightRouter).io)
   val pSRouters: Vec[PSumRouterIO] = Vec(pSumRouterNum, Module(new PSumRouter).io)
-  io.iRIO.zip(iRouters).foreach({case (x, y) => x <> y})
-  io.wRIO.zip(wRouters).foreach({case (x, y) => x <> y})
-  io.pSRIO.zip(pSRouters).foreach({case (x, y) => x <> y})
+  io.routerIOs.iRIO.zip(iRouters).foreach({case (x, y) => x <> y})
+  io.routerIOs.wRIO.zip(wRouters).foreach({case (x, y) => x <> y})
+  io.routerIOs.pSRIO.zip(pSRouters).foreach({case (x, y) => x <> y})
   io.routerPSumToPEIO.zip(pSRouters).foreach({ case (x, y) => x <> y.outIOs.dataPath.head})
 }
 

@@ -3,6 +3,13 @@ package dla.pe
 import chisel3._
 import chisel3.util._
 
+class ProcessingElementIO extends Bundle {
+  val dataStream = new DataStreamIO
+  val padWF = new PEPadWriteFinIO
+  val topCtrl = new PETopToHigherIO
+  val debugIO = new PETopDebugIO
+}
+
 class PETopDebugIO extends Bundle {
   val peControlDebugIO = new PEControlDebugIO
   val peSPadDebugIO = new PESPadDebugIO
