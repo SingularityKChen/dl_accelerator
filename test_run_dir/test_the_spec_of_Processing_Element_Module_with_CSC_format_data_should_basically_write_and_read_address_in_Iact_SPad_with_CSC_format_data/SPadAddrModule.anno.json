@@ -1,18 +1,18 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeFin",
+    "sink":"~SPadAddrModule|SPadAddrModule>io_dataPath_writeInData_data_ready",
     "sources":[
-      "~SPadAddrModule|SPadAddrModule>io_commonIO_writeEn",
-      "~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_bits_data"
+      "~SPadAddrModule|SPadAddrModule>io_dataPath_writeInData_data_valid",
+      "~SPadAddrModule|SPadAddrModule>io_ctrlPath_writeEn"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_ready",
+    "sink":"~SPadAddrModule|SPadAddrModule>io_ctrlPath_writeFin",
     "sources":[
-      "~SPadAddrModule|SPadAddrModule>io_commonIO_dataLenFinIO_writeInDataIO_valid",
-      "~SPadAddrModule|SPadAddrModule>io_commonIO_writeEn"
+      "~SPadAddrModule|SPadAddrModule>io_ctrlPath_writeEn",
+      "~SPadAddrModule|SPadAddrModule>io_dataPath_writeInData_data_bits"
     ]
   },
   {

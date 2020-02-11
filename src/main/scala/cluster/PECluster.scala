@@ -18,7 +18,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val peRow =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
   val peArray = Vec(peRowNum, peRow)
   val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
-  val muxIactDataWire: Vec[Vec[ClusterAddrWithDataCommonIO]] = Vec(peColNum, Vec(peRowNum,Wire(new ClusterAddrWithDataCommonIO(iactAddrWidth, iactDataWidth))))
+  val muxIactDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum,Wire(new CSCStreamIO(iactAddrWidth, iactDataWidth))))
   // iactRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router, that's outDataSel's value;
   val iactRoutingMode: Bool = Wire(Bool())
@@ -29,10 +29,10 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   // iactFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
   val iactFormerOrLater: Vec[Bool] = Vec(iactRouterNum, Wire(Bool())) // true for former, false for later readF
   val muxInPSumCtrlWire: Bool = Wire(Bool()) // TODO: whether each column needs one select signal?
-  def iactWeightConnection(peIO: DataAddrStreamIO, connectIO: ClusterAddrWithDataCommonIO): Any = {
+  def iactWeightConnection(peIO: CSCStreamIO, connectIO: CSCStreamIO): Any = {
     Seq(peIO.addrIOs, peIO.dataIOs).zip(Seq(connectIO.addrIOs, connectIO.dataIOs)).foreach({
       case (x, y) =>
-        x.writeInDataIO <> y.dataIO
+        x.data <> y.data
     })
   }
   iactRoutingMode := io.iactCluster.ctrlPath.inDataSel // true for broad-cast

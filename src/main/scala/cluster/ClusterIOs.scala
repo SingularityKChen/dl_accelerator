@@ -2,6 +2,7 @@ package dla.cluster
 
 import chisel3._
 import chisel3.util._
+import dla.pe.CSCStreamIO
 
 class ClusterGroupConfigIO extends Bundle {
   val peClusterCtrl = new ClusterCommonCtrlIO[Bool, UInt](Bool(), UInt(2.W))
@@ -26,7 +27,7 @@ class IactRouterIO extends Bundle with ClusterConfig {
 
 class WeightRouterIO extends Bundle with ClusterConfig {
   val outIOs = new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth)
-  val inIOs: WeightClusterIO = Flipped(new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth)) // output bits and valid, routerMode
+  val inIOs: WeightClusterIO = Flipped(new WeightClusterIO(weightPortNum, weightAddrWidth, weightDataWidth)) // input bits and valid, routerMode
 }
 
 class PSumRouterIO extends Bundle with ClusterConfig {
@@ -35,7 +36,7 @@ class PSumRouterIO extends Bundle with ClusterConfig {
 }
 
 class IactClusterIO[T1<: Data, T2<:Data](dataType1: T1, dataType2: T2, portNum: Int, addrWidth: Int, dataWidth: Int) extends Bundle {
-  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)) // output bits and valid
+  val dataPath: Vec[CSCStreamIO] = Vec(portNum, new CSCStreamIO(addrWidth, dataWidth)) // output bits and valid
   val ctrlPath = new ClusterCommonCtrlIO[T1, T2](dataType1, dataType2)
   // uni-cast, horizontal, vertical, broad-cast
   // ctrlPath.inDataSel:
@@ -47,7 +48,7 @@ class IactClusterIO[T1<: Data, T2<:Data](dataType1: T1, dataType2: T2, portNum: 
 }
 
 class WeightClusterIO(portNum: Int, addrWidth: Int, dataWidth: Int) extends Bundle {
-  val dataPath: Vec[ClusterAddrWithDataCommonIO] = Vec(portNum, new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)) // output bits and valid
+  val dataPath: Vec[CSCStreamIO] = Vec(portNum, new CSCStreamIO(addrWidth, dataWidth)) // output bits and valid
   val ctrlPath = new ClusterCommonCtrlIO[Bool, Bool](Bool(), Bool())
   // broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
   // ctrlPath.inDataSel: true for broad-cast and multi-cast, false for uni-cast
@@ -64,13 +65,4 @@ class PSumClusterIO(portNum: Int, dataWidth: Int) extends Bundle {
 class ClusterCommonCtrlIO[T1<: Data, T2<: Data](dataType1: T1, dataType2: T2) extends Bundle {
   val inDataSel: T1 = Output(dataType1)
   val outDataSel: T2 = Output(dataType2)
-}
-
-class ClusterAddrWithDataCommonIO(addrWidth: Int, dataWidth: Int) extends Bundle {
-  val addrIOs = new ClusterDataWithLenCommonIO(addrWidth) // output bits and valid
-  val dataIOs = new ClusterDataWithLenCommonIO(dataWidth)
-}
-
-class ClusterDataWithLenCommonIO(dataWidth: Int) extends Bundle {
-  val dataIO: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W)) // output bits and valid
 }

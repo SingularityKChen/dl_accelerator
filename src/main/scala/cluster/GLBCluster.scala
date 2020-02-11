@@ -2,6 +2,7 @@ package dla.cluster
 
 import chisel3._
 import chisel3.util._
+import dla.pe.CSCStreamIO
 
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io = new GLBClusterIO
@@ -26,8 +27,8 @@ class IactSRAMBankIO extends Bundle with ClusterSRAMConfig {
 }
 
 class IactSRAMDataIO(addrWidth: Int, dataWidth: Int) extends Bundle {
-  val inIOs: ClusterAddrWithDataCommonIO = Flipped(new ClusterAddrWithDataCommonIO(addrWidth, dataWidth))
-  val outIOs = new ClusterAddrWithDataCommonIO(addrWidth, dataWidth)
+  val inIOs: CSCStreamIO = Flipped(new CSCStreamIO(addrWidth, dataWidth))
+  val outIOs = new CSCStreamIO(addrWidth, dataWidth)
 }
 
 class PSumSRAMBankIO extends Bundle with ClusterSRAMConfig {

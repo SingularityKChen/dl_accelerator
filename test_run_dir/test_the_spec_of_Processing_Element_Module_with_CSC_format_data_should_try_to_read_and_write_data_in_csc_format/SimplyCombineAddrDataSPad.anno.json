@@ -1,34 +1,34 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeFin",
+    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactWF_dataWriteFin",
     "sources":[
       "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn",
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_bits_data"
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_data_bits"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_ready",
+    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_data_ready",
     "sources":[
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_valid",
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_data_valid",
       "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeFin",
+    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_data_ready",
     "sources":[
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn",
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_writeInDataIO_bits_data"
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_data_valid",
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_ready",
+    "sink":"~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactWF_addrWriteFin",
     "sources":[
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_dataIOs_writeInDataIO_valid",
-      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn"
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_writeEn",
+      "~SimplyCombineAddrDataSPad|SimplyCombineAddrDataSPad>io_iactIOs_addrIOs_data_bits"
     ]
   },
   {

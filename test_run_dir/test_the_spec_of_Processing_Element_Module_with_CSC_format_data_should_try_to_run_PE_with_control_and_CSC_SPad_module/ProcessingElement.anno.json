@@ -1,10 +1,18 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_weightWriteFin_dataWriteFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_writeInDataIO_bits_data"
+      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_dataIOs_data_bits"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_iactWriteFin_addrWriteFin",
+    "sources":[
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_data_bits"
     ]
   },
   {
@@ -16,26 +24,18 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_iactWriteFin_dataWriteFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_writeInDataIO_bits_data"
+      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_data_bits"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_weightWriteFin_addrWriteFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_writeInDataIO_bits_data"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeFin",
-    "sources":[
-      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_writeInDataIO_bits_data"
+      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_data_bits"
     ]
   },
   {

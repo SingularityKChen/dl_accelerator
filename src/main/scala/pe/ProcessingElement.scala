@@ -6,21 +6,21 @@ import chisel3.util._
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io = IO(new Bundle{
     val dataStream = new DataStreamIO
+    val padWF = new PEPadWriteFinIO
     val topCtrl = new PETopToHigherIO
     val debugIO = new PETopDebugIO
   })
   val peCtrl: ProcessingElementControl = Module(new ProcessingElementControl(debug = debug))
   val pePad: ProcessingElementPad = Module(new ProcessingElementPad(debug = debug))
+  val iactAndWeightIOs = Seq(pePad.io.padWF.iactWriteFin, pePad.io.padWF.weightWriteFin)
   if (fifoEn) {
-    pePad.io.dataStream.iactIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
-    pePad.io.dataStream.iactIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.iactIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
-    pePad.io.dataStream.weightIOs.addrIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.addrIOs.writeInDataIO, fifoSize, flow = true)
-    pePad.io.dataStream.weightIOs.dataIOs.writeInDataIO <> Queue(io.dataStream.weightIOs.dataIOs.writeInDataIO, fifoSize, flow = true)
-    val iactAndWeightIOs = Seq(pePad.io.dataStream.iactIOs, pePad.io.dataStream.weightIOs)
-    val iactAndWeightTopIOs = Seq(io.dataStream.iactIOs, io.dataStream.weightIOs)
+    pePad.io.dataStream.iactIOs.addrIOs.data <> Queue(io.dataStream.iactIOs.addrIOs.data, fifoSize, flow = true)
+    pePad.io.dataStream.iactIOs.dataIOs.data <> Queue(io.dataStream.iactIOs.dataIOs.data, fifoSize, flow = true)
+    pePad.io.dataStream.weightIOs.addrIOs.data <> Queue(io.dataStream.weightIOs.addrIOs.data, fifoSize, flow = true)
+    pePad.io.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true)
+    val iactAndWeightTopIOs = Seq(io.padWF.iactWriteFin, io.padWF.weightWriteFin)
     val zipThem = iactAndWeightIOs zip iactAndWeightTopIOs
-    zipThem.foreach{case (x, y) => y.addrIOs.writeFin := x.addrIOs.writeFin}
-    zipThem.foreach{case (x, y) => y.dataIOs.writeFin := x.dataIOs.writeFin}
+    zipThem.foreach{case (x, y) => y <> x}
   } else {
     pePad.io.dataStream.iactIOs <> io.dataStream.iactIOs
     pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
@@ -29,11 +29,11 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   io.topCtrl.pSumEnqOrProduct <> peCtrl.io.ctrlTop.pSumEnqOrProduct
   io.topCtrl.calFinish := peCtrl.io.ctrlTop.calFinish
   peCtrl.io.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
-  val SPadSeq = Seq(pePad.io.dataStream.iactIOs.addrIOs, pePad.io.dataStream.iactIOs.dataIOs, pePad.io.dataStream.weightIOs.addrIOs, pePad.io.dataStream.weightIOs.dataIOs)
+  val SPadWFSeq = Seq(iactAndWeightIOs.head.addrWriteFin, iactAndWeightIOs.head.dataWriteFin, iactAndWeightIOs.last.addrWriteFin, iactAndWeightIOs.last.dataWriteFin)
   val writeFinishWire: Bool = Wire(Bool())
   val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(4)(false.B)))
   for (i <- 0 until 4) {
-    when (SPadSeq(i).writeFin) {
+    when (SPadWFSeq(i)) {
       writeFinishRegVec(i) := true.B
     }
     when (io.topCtrl.calFinish) {
@@ -103,6 +103,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     val padCtrl: PECtrlToPadIO = Flipped(new PECtrlToPadIO)
     val dataStream = new DataStreamIO
     val debugIO = new PESPadDebugIO
+    val padWF = new PEPadWriteFinIO
   })
   private def nextSPadIactAddr(): Unit = {
     sPad := padIactAddr
@@ -208,50 +209,50 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
   val SPadSeq = Seq(iactAddrSPad, iactDataSPad, weightAddrSPad, weightDataSPad)
   // Connections
-  SPadSeq.map(_.io.commonIO.writeEn := io.padCtrl.fromTopIO.doLoadEn)
+  SPadSeq.map(_.io.ctrlPath.writeEn := io.padCtrl.fromTopIO.doLoadEn)
   io.padCtrl.fromTopIO.writeFinish := DontCare
   // Input activation Address Scratch Pad
-  iactAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.addrIOs
-  iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
-  iactAddrDataWire := iactAddrSPad.io.commonIO.readOutData
-  iactAddrSPad.io.commonIO.readEn := iactAddrSPadReadEnReg
-  iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
-  iactAddrSPad.io.addrIO.readInIdx := DontCare
-  iactAddrSPad.io.addrIO.readInIdxEn := DontCare
-  iactAddrSPad.io.dataIO <> DontCare
+  iactAddrSPad.io.dataPath.writeInData <> io.dataStream.iactIOs.addrIOs
+  iactAddrIndexWire := iactAddrSPad.io.dataPath.columnNum
+  iactAddrDataWire := iactAddrSPad.io.dataPath.readOutData
+  io.padWF.iactWriteFin.addrWriteFin := iactAddrSPad.io.ctrlPath.writeFin
+  iactAddrSPad.io.ctrlPath.readEn := iactAddrSPadReadEnReg
+  iactAddrSPad.io.ctrlPath.readInIdx := DontCare
+  iactAddrSPad.io.ctrlPath.indexInc := iactAddrSPadIdxIncWire
+  iactAddrSPad.io.ctrlPath.readInIdxEn := DontCare
   // Input activation Data Scratch Pad
-  iactDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.iactIOs.dataIOs
-  iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
-  val iactDataCountVec: Seq[Bool] = iactDataSPad.io.commonIO.readOutData.asBools
+  iactDataSPad.io.dataPath.writeInData <> io.dataStream.iactIOs.dataIOs
+  iactDataIndexWire := iactDataSPad.io.dataPath.columnNum
+  val iactDataCountVec: Seq[Bool] = iactDataSPad.io.dataPath.readOutData.asBools
   iactMatrixDataWire := Cat(iactDataCountVec.reverse.take(cscDataWidth)).asUInt // TODO: figure out why it need reverse
   iactMatrixRowWire := Cat(iactDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
-  iactDataSPad.io.commonIO.readEn := iactDataSPadReadEnReg
-  iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
-  iactDataSPad.io.dataIO.readInIdx := iactAddrDataWire
-  iactDataSPad.io.dataIO.readInIdxEn := DontCare
-  iactDataSPad.io.addrIO <> DontCare
+  io.padWF.iactWriteFin.dataWriteFin := iactDataSPad.io.ctrlPath.writeFin
+  iactDataSPad.io.ctrlPath.readEn := iactDataSPadReadEnReg
+  iactDataSPad.io.ctrlPath.readInIdx := iactAddrDataWire
+  iactDataSPad.io.ctrlPath.indexInc := iactDataSPadIdxIncWire
+  iactDataSPad.io.ctrlPath.readInIdxEn := DontCare
   // Weight Address Scratch Pad
-  weightAddrSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.addrIOs
-  weightAddrIndexWire := weightAddrSPad.io.commonIO.columnNum
-  weightAddrDataWire := weightAddrSPad.io.commonIO.readOutData
-  weightAddrSPad.io.commonIO.readEn := weightAddrSPadReadEnReg
-  weightAddrSPad.io.addrIO.readInIdx := weightAddrSPadReadIdxWire // the weight address SPad's columns corresponds to
+  weightAddrSPad.io.dataPath.writeInData <> io.dataStream.weightIOs.addrIOs
+  weightAddrIndexWire := weightAddrSPad.io.dataPath.columnNum
+  weightAddrDataWire := weightAddrSPad.io.dataPath.readOutData
+  io.padWF.weightWriteFin.addrWriteFin := weightAddrSPad.io.ctrlPath.writeFin
+  weightAddrSPad.io.ctrlPath.readEn := weightAddrSPadReadEnReg
+  weightAddrSPad.io.ctrlPath.readInIdx := weightAddrSPadReadIdxWire // the weight address SPad's columns corresponds to
                                                           // the iact address SPad's rows, and it takes one clock cycle
                                                           // for the reg inside SPad to change the index it need
-  weightAddrSPad.io.addrIO.indexInc := weightAddrSPadIdxIncWire
-  weightAddrSPad.io.addrIO.readInIdxEn := weightAddrIdxEnWire
-  weightAddrSPad.io.dataIO <> DontCare
+  weightAddrSPad.io.ctrlPath.indexInc := weightAddrSPadIdxIncWire
+  weightAddrSPad.io.ctrlPath.readInIdxEn := weightAddrIdxEnWire
   // Weight Data Scratch Pad
-  weightDataSPad.io.commonIO.dataLenFinIO <> io.dataStream.weightIOs.dataIOs
-  weightDataIndexWire := weightDataSPad.io.commonIO.columnNum
-  val weightDataCountVec: Seq[Bool] = weightDataSPad.io.commonIO.readOutData.asBools
+  weightDataSPad.io.dataPath.writeInData <> io.dataStream.weightIOs.dataIOs
+  weightDataIndexWire := weightDataSPad.io.dataPath.columnNum
+  val weightDataCountVec: Seq[Bool] = weightDataSPad.io.dataPath.readOutData.asBools
   weightMatrixDataReg := Cat(weightDataCountVec.reverse.take(cscDataWidth)).asUInt
   weightMatrixRowReg := Cat(weightDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
-  weightDataSPad.io.commonIO.readEn := iactDataSPadReadEnReg
-  weightDataSPad.io.dataIO.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAddrDataWire)
-  weightDataSPad.io.dataIO.indexInc := weightDataSPadIdxIncWire
-  weightDataSPad.io.dataIO.readInIdxEn := weightDataIdxEnWire
-  weightDataSPad.io.addrIO <> DontCare
+  io.padWF.weightWriteFin.dataWriteFin := weightDataSPad.io.ctrlPath.writeFin
+  weightDataSPad.io.ctrlPath.readEn := iactDataSPadReadEnReg
+  weightDataSPad.io.ctrlPath.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAddrDataWire)
+  weightDataSPad.io.ctrlPath.indexInc := weightDataSPadIdxIncWire
+  weightDataSPad.io.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
   io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.fromTopIO.pSumEnqOrProduct.bits
   val psPadReadIdxCounter: Counter = Counter(M0*E*N0*F0 + 1)

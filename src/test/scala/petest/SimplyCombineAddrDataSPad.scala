@@ -2,11 +2,12 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.util._
-import dla.pe.{DataAddrStreamIO, SPadAddrModule, SPadDataModule, SPadSizeConfig}
+import dla.pe.{CSCStreamIO, CSCWriteFinIO, SPadAddrModule, SPadDataModule, SPadSizeConfig}
 
 class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   val io = IO(new Bundle{
-    val iactIOs = new DataAddrStreamIO(iactDataWidth, iactAddrWidth)
+    val iactIOs: CSCStreamIO = Flipped(new CSCStreamIO(iactDataWidth, iactAddrWidth))
+    val iactWF = new CSCWriteFinIO
     val iactAddrWriteIdx: UInt = Output(UInt(iactAddrIdxWidth.W)) // use for test
     val iactDataReq: Bool = Input(Bool()) // control to read data vector
     // we are supposed to see address SPad and data SPad together
@@ -37,38 +38,37 @@ class SimplyCombineAddrDataSPad extends Module with SPadSizeConfig{
   val iactMatrixColumnReg: UInt = RegInit(0.U(iactAddrIdxWidth.W))
   val iactZeroColumnNumber: UInt = RegInit(0.U(iactAddrIdxWidth.W)) // use for get the right column number
   val iactDataSPadFirstReadReg: Bool = RegInit(true.B)
-  iactAddrSPad.io.addrIO.indexInc := iactAddrSPadIdxIncWire
-  iactDataSPad.io.dataIO.indexInc := iactDataSPadIdxIncWire
   iactAddrSPadIdxIncWire := ((sPad === padIactData) && (iactAddrDataWire === (iactDataIndexWire + 1.U))) || ((sPad === padIactAddr) && (iactAddrDataWire === iactZeroColumnCode.U))
   iactDataSPadIdxIncWire := ((sPad === padIactAddr) && !iactSPadZeroColumnReg && !iactDataSPadFirstReadReg) || ((sPad === padIactData) && !iactAddrSPadIdxIncWire)// if first read, then keep the read index of zero
-  iactAddrSPad.io.commonIO.dataLenFinIO <> io.iactIOs.addrIOs // this is different from the real module
-  iactDataSPad.io.commonIO.dataLenFinIO <> io.iactIOs.dataIOs
-  io.iactAddrWriteIdx := iactAddrSPad.io.commonIO.writeIdx
-  io.iactDataWriteIdx := iactDataSPad.io.commonIO.writeIdx
   // AddrSPad
-  iactAddrIndexWire := iactAddrSPad.io.commonIO.columnNum
+  iactAddrSPad.io.dataPath.writeInData <> io.iactIOs.addrIOs
+  iactAddrIndexWire := iactAddrSPad.io.dataPath.columnNum
   io.iactMatrixColumn := iactMatrixColumnReg // for debug
-  iactAddrDataWire := iactAddrSPad.io.commonIO.readOutData
+  iactAddrDataWire := iactAddrSPad.io.dataPath.readOutData
   io.iactAddrReadData := iactAddrDataWire // for debug
-  iactAddrSPad.io.commonIO.readEn := iactAddrSPadReadEnReg
   io.iactAddrReadEn := iactAddrSPadReadEnReg
-  iactAddrSPad.io.commonIO.writeEn := io.writeEn
-  iactAddrSPad.io.dataIO <> DontCare
-  iactAddrSPad.io.addrIO.readInIdx := DontCare
-  iactAddrSPad.io.addrIO.readInIdxEn := DontCare
+  iactAddrSPad.io.ctrlPath.writeEn := io.writeEn
+  io.iactAddrWriteIdx := iactAddrSPad.io.ctrlPath.writeIdx
+  io.iactWF.addrWriteFin := iactAddrSPad.io.ctrlPath.writeFin
+  iactAddrSPad.io.ctrlPath.readEn := iactAddrSPadReadEnReg
+  iactAddrSPad.io.ctrlPath.readInIdx := DontCare
+  iactAddrSPad.io.ctrlPath.indexInc := iactAddrSPadIdxIncWire
+  iactAddrSPad.io.ctrlPath.readInIdxEn := DontCare
   // DataSPad
-  iactDataIndexWire := iactDataSPad.io.commonIO.columnNum
+  iactDataSPad.io.dataPath.writeInData <> io.iactIOs.dataIOs
+  iactDataIndexWire := iactDataSPad.io.dataPath.columnNum
   io.iactDataReadIndex := iactDataIndexWire // for debug
-  io.iactMatrixDataBin := iactDataSPad.io.commonIO.readOutData
-  val iactDataCountVec: Seq[Bool] = iactDataSPad.io.commonIO.readOutData.asBools
+  io.iactMatrixDataBin := iactDataSPad.io.dataPath.readOutData
+  val iactDataCountVec: Seq[Bool] = iactDataSPad.io.dataPath.readOutData.asBools
   io.iactMatrixData := Cat(iactDataCountVec.reverse.take(cscDataWidth)).asUInt
   io.iactMatrixRow := Cat(iactDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
-  iactDataSPad.io.commonIO.readEn := iactDataSPadReadEnReg
-  iactDataSPad.io.commonIO.writeEn := io.writeEn
-  // disable the unused IOs
-  iactDataSPad.io.dataIO.readInIdx := DontCare
-  iactDataSPad.io.dataIO.readInIdxEn := DontCare
-  iactDataSPad.io.addrIO <> DontCare
+  iactDataSPad.io.ctrlPath.writeEn := io.writeEn
+  io.iactDataWriteIdx := iactDataSPad.io.ctrlPath.writeIdx
+  io.iactWF.dataWriteFin := iactDataSPad.io.ctrlPath.writeFin
+  iactDataSPad.io.ctrlPath.readEn := iactDataSPadReadEnReg
+  iactDataSPad.io.ctrlPath.readInIdx := DontCare
+  iactDataSPad.io.ctrlPath.indexInc := iactDataSPadIdxIncWire
+  iactDataSPad.io.ctrlPath.readInIdxEn := DontCare
   // the_index_m0 = m0 + count_m0
   // addr_m0_index*M0
   // SPad read state machine

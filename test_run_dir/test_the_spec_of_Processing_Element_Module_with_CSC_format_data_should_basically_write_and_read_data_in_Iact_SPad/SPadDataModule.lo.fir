@@ -2,28 +2,25 @@ circuit SPadDataModule :
   module SPadDataModule :
     input clock : Clock
     input reset : UInt<1>
-    output io_commonIO_columnNum : UInt<4>
-    output io_commonIO_readOutData : UInt<12>
-    input io_commonIO_readEn : UInt<1>
-    input io_commonIO_writeEn : UInt<1>
-    output io_commonIO_writeIdx : UInt<4>
-    output io_commonIO_dataLenFinIO_writeInDataIO_ready : UInt<1>
-    input io_commonIO_dataLenFinIO_writeInDataIO_valid : UInt<1>
-    input io_commonIO_dataLenFinIO_writeInDataIO_bits_data : UInt<12>
-    output io_commonIO_dataLenFinIO_writeFin : UInt<1>
-    input io_addrIO_readInIdx : UInt<4>
-    input io_addrIO_indexInc : UInt<1>
-    input io_addrIO_readInIdxEn : UInt<1>
-    input io_dataIO_readInIdx : UInt<4>
-    input io_dataIO_indexInc : UInt<1>
-    input io_dataIO_readInIdxEn : UInt<1>
+    output io_dataPath_columnNum : UInt<4>
+    output io_dataPath_readOutData : UInt<12>
+    output io_dataPath_writeInData_data_ready : UInt<1>
+    input io_dataPath_writeInData_data_valid : UInt<1>
+    input io_dataPath_writeInData_data_bits : UInt<12>
+    input io_ctrlPath_writeEn : UInt<1>
+    output io_ctrlPath_writeIdx : UInt<4>
+    output io_ctrlPath_writeFin : UInt<1>
+    input io_ctrlPath_readEn : UInt<1>
+    input io_ctrlPath_readInIdx : UInt<4>
+    input io_ctrlPath_indexInc : UInt<1>
+    input io_ctrlPath_readInIdxEn : UInt<1>
   
     reg padWriteIndexReg : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), padWriteIndexReg) @[SPadModule.scala 80:39]
+      reset => (UInt<1>("h0"), padWriteIndexReg) @[SPadModule.scala 79:39]
     reg padReadIndexReg : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), padReadIndexReg) @[SPadModule.scala 81:38]
-    node _T = eq(io_commonIO_dataLenFinIO_writeInDataIO_bits_data, UInt<1>("h0")) @[SPadModule.scala 86:46]
-    node _T_1 = and(_T, io_commonIO_writeEn) @[SPadModule.scala 86:54]
+      reset => (UInt<1>("h0"), padReadIndexReg) @[SPadModule.scala 80:38]
+    node _T = eq(io_dataPath_writeInData_data_bits, UInt<1>("h0")) @[SPadModule.scala 84:41]
+    node _T_1 = and(_T, io_ctrlPath_writeEn) @[SPadModule.scala 84:49]
     reg _T_8_15 : UInt<12>, clock with :
       reset => (UInt<1>("h0"), _T_8_15) @[SPadModule.scala 54:38]
     reg _T_8_14 : UInt<12>, clock with :
@@ -73,19 +70,19 @@ circuit SPadDataModule :
     node _GEN_51 = mux(eq(UInt<4>("he"), padReadIndexReg), _T_8_14, _GEN_50) @[SPadModule.scala 66:14]
     node _GEN_52 = mux(eq(UInt<4>("hf"), padReadIndexReg), _T_8_15, _GEN_51) @[SPadModule.scala 66:14]
     node _T_8_padReadIndexReg = _GEN_52 @[SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14 SPadModule.scala 66:14]
-    node dataWire = _T_8_padReadIndexReg @[SPadModule.scala 79:28 SPadModule.scala 66:14]
-    node _T_2 = eq(dataWire, UInt<1>("h0")) @[SPadModule.scala 87:28]
-    node readIndexInc = io_dataIO_indexInc @[SPadModule.scala 85:32 SPadModule.scala 68:16]
-    node _T_3 = and(_T_2, readIndexInc) @[SPadModule.scala 87:36]
-    node _T_4 = and(io_commonIO_dataLenFinIO_writeInDataIO_valid, io_commonIO_writeEn) @[SPadModule.scala 89:31]
-    node _T_5 = add(padWriteIndexReg, UInt<1>("h1")) @[SPadModule.scala 91:42]
-    node _T_6 = tail(_T_5, 1) @[SPadModule.scala 91:42]
-    node writeWrapWire = _T_1 @[SPadModule.scala 83:33 SPadModule.scala 86:17]
-    node _GEN_0 = mux(writeWrapWire, UInt<1>("h0"), _T_6) @[SPadModule.scala 92:26]
-    node _GEN_1 = mux(_T_4, UInt<1>("h1"), UInt<1>("h0")) @[SPadModule.scala 89:55]
-    node _GEN_2 = mux(_T_4, _GEN_0, padWriteIndexReg) @[SPadModule.scala 89:55]
-    node _T_9 = and(io_commonIO_dataLenFinIO_writeInDataIO_valid, io_commonIO_writeEn) @[SPadModule.scala 55:33]
-    node _T_8_padWriteIndexReg = io_commonIO_dataLenFinIO_writeInDataIO_bits_data @[SPadModule.scala 56:34 SPadModule.scala 56:34]
+    node dataWire = _T_8_padReadIndexReg @[SPadModule.scala 78:28 SPadModule.scala 66:14]
+    node _T_2 = eq(dataWire, UInt<1>("h0")) @[SPadModule.scala 85:28]
+    node readIndexInc = io_ctrlPath_indexInc @[SPadModule.scala 83:32 SPadModule.scala 68:16]
+    node _T_3 = and(_T_2, readIndexInc) @[SPadModule.scala 85:36]
+    node _T_4 = and(io_dataPath_writeInData_data_valid, io_ctrlPath_writeEn) @[SPadModule.scala 87:31]
+    node _T_5 = add(padWriteIndexReg, UInt<1>("h1")) @[SPadModule.scala 89:42]
+    node _T_6 = tail(_T_5, 1) @[SPadModule.scala 89:42]
+    node writeWrapWire = _T_1 @[SPadModule.scala 81:33 SPadModule.scala 84:17]
+    node _GEN_0 = mux(writeWrapWire, UInt<1>("h0"), _T_6) @[SPadModule.scala 90:26]
+    node _GEN_1 = mux(_T_4, UInt<1>("h1"), UInt<1>("h0")) @[SPadModule.scala 87:55]
+    node _GEN_2 = mux(_T_4, _GEN_0, padWriteIndexReg) @[SPadModule.scala 87:55]
+    node _T_9 = and(io_dataPath_writeInData_data_valid, io_ctrlPath_writeEn) @[SPadModule.scala 55:33]
+    node _T_8_padWriteIndexReg = io_dataPath_writeInData_data_bits @[SPadModule.scala 56:34 SPadModule.scala 56:34]
     node _GEN_3 = mux(eq(UInt<1>("h0"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_0) @[SPadModule.scala 56:34]
     node _GEN_4 = mux(eq(UInt<1>("h1"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_1) @[SPadModule.scala 56:34]
     node _GEN_5 = mux(eq(UInt<2>("h2"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_2) @[SPadModule.scala 56:34]
@@ -120,7 +117,7 @@ circuit SPadDataModule :
     node _GEN_34 = mux(_T_9, _GEN_18, _T_8_15) @[SPadModule.scala 55:57]
     node _T_10 = add(padReadIndexReg, UInt<1>("h1")) @[SPadModule.scala 60:42]
     node _T_11 = tail(_T_10, 1) @[SPadModule.scala 60:42]
-    node readWrapWire = _T_3 @[SPadModule.scala 84:32 SPadModule.scala 87:16]
+    node readWrapWire = _T_3 @[SPadModule.scala 82:32 SPadModule.scala 85:16]
     node _GEN_35 = mux(readWrapWire, UInt<1>("h0"), _T_11) @[SPadModule.scala 61:27]
     node _GEN_36 = mux(readIndexInc, _GEN_35, padReadIndexReg) @[SPadModule.scala 59:25]
     node _T_7_0 = UInt<12>("h0") @[SPadModule.scala 54:46 SPadModule.scala 54:46]
@@ -139,12 +136,12 @@ circuit SPadDataModule :
     node _T_7_13 = UInt<12>("h0") @[SPadModule.scala 54:46 SPadModule.scala 54:46]
     node _T_7_14 = UInt<12>("h0") @[SPadModule.scala 54:46 SPadModule.scala 54:46]
     node _T_7_15 = UInt<12>("h0") @[SPadModule.scala 54:46 SPadModule.scala 54:46]
-    io_commonIO_columnNum <= padReadIndexReg @[SPadModule.scala 101:25]
-    io_commonIO_readOutData <= dataWire @[SPadModule.scala 69:27]
-    io_commonIO_writeIdx <= padWriteIndexReg @[SPadModule.scala 99:24]
-    io_commonIO_dataLenFinIO_writeInDataIO_ready <= _GEN_1 @[SPadModule.scala 90:27 SPadModule.scala 96:27]
-    io_commonIO_dataLenFinIO_writeFin <= writeWrapWire @[SPadModule.scala 100:37]
-    padWriteIndexReg <= mux(reset, UInt<4>("h0"), _GEN_2) @[SPadModule.scala 91:22 SPadModule.scala 93:24]
+    io_dataPath_columnNum <= padReadIndexReg @[SPadModule.scala 99:25]
+    io_dataPath_readOutData <= dataWire @[SPadModule.scala 69:27]
+    io_dataPath_writeInData_data_ready <= _GEN_1 @[SPadModule.scala 88:27 SPadModule.scala 94:27]
+    io_ctrlPath_writeIdx <= padWriteIndexReg @[SPadModule.scala 97:24]
+    io_ctrlPath_writeFin <= writeWrapWire @[SPadModule.scala 98:24]
+    padWriteIndexReg <= mux(reset, UInt<4>("h0"), _GEN_2) @[SPadModule.scala 89:22 SPadModule.scala 91:24]
     padReadIndexReg <= mux(reset, UInt<4>("h0"), _GEN_36) @[SPadModule.scala 60:23 SPadModule.scala 62:25]
     _T_8_0 <= mux(reset, _T_7_0, _GEN_19) @[SPadModule.scala 56:34]
     _T_8_1 <= mux(reset, _T_7_1, _GEN_20) @[SPadModule.scala 56:34]
