@@ -3,16 +3,14 @@ package dla.cluster
 import dla.pe.PESizeConfig
 
 trait ClusterConfig extends PESizeConfig {
-  val iactRouterNum: Int = 3
-  val iactPortNum: Int = 4
-  val weightRouterNum: Int = 3
-  val weightPortNum: Int = 2
-  val pSumRouterNum: Int = 4
-  val pSumPortNum: Int = 3
-  val peArrayColumnNum: Int = 4
-  val peArrayRowNum: Int = 3
   val peColNum: Int = 4
   val peRowNum: Int = 3
+  val iactRouterNum: Int = 3
+  val iactPortNum: Int = 4
+  val weightRouterNum: Int = peRowNum
+  val weightPortNum: Int = 2
+  val pSumRouterNum: Int = peColNum
+  val pSumPortNum: Int = 3
 }
 
 trait ClusterSRAMConfig extends ClusterConfig {
