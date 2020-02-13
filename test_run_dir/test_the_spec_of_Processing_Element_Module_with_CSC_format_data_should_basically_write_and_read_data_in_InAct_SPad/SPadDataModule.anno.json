@@ -1,0 +1,34 @@
+[
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~SPadDataModule|SPadDataModule>io_dataPath_writeInData_data_ready",
+    "sources":[
+      "~SPadDataModule|SPadDataModule>io_dataPath_writeInData_data_valid",
+      "~SPadDataModule|SPadDataModule>io_ctrlPath_writeEn"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~SPadDataModule|SPadDataModule>io_ctrlPath_writeFin",
+    "sources":[
+      "~SPadDataModule|SPadDataModule>io_ctrlPath_writeEn",
+      "~SPadDataModule|SPadDataModule>io_dataPath_writeInData_data_bits"
+    ]
+  },
+  {
+    "class":"firrtl.EmitCircuitAnnotation",
+    "emitter":"firrtl.LowFirrtlEmitter"
+  },
+  {
+    "class":"firrtl.options.TargetDirAnnotation",
+    "directory":"test_run_dir/test_the_spec_of_Processing_Element_Module_with_CSC_format_data_should_basically_write_and_read_data_in_InAct_SPad"
+  },
+  {
+    "class":"firrtl.options.OutputAnnotationFileAnnotation",
+    "file":"SPadDataModule"
+  },
+  {
+    "class":"firrtl.transforms.BlackBoxTargetDirAnno",
+    "targetDir":"test_run_dir/test_the_spec_of_Processing_Element_Module_with_CSC_format_data_should_basically_write_and_read_data_in_InAct_SPad"
+  }
+]

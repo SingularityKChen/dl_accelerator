@@ -9,14 +9,6 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_padWF_iactWriteFin_addrWriteFin",
-    "sources":[
-      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_addrIOs_data_bits"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~ProcessingElement|ProcessingElement>io_dataStream_opsIO_bits",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn"
@@ -24,18 +16,26 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_padWF_iactWriteFin_dataWriteFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_inActWriteFin_dataWriteFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_iactIOs_dataIOs_data_bits"
+      "~ProcessingElement|ProcessingElement>io_dataStream_inActIOs_dataIOs_data_bits"
     ]
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~ProcessingElement|ProcessingElement>io_padWF_weightWriteFin_addrWriteFin",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_weightWriteFin_adrWriteFin",
     "sources":[
       "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
-      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_addrIOs_data_bits"
+      "~ProcessingElement|ProcessingElement>io_dataStream_weightIOs_adrIOs_data_bits"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~ProcessingElement|ProcessingElement>io_padWF_inActWriteFin_adrWriteFin",
+    "sources":[
+      "~ProcessingElement|ProcessingElement>io_topCtrl_doLoadEn",
+      "~ProcessingElement|ProcessingElement>io_dataStream_inActIOs_adrIOs_data_bits"
     ]
   },
   {

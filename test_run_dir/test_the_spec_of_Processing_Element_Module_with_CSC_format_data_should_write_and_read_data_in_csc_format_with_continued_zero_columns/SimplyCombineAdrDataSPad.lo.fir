@@ -1,5 +1,5 @@
-circuit SimplyCombineAddrDataSPad :
-  module SPadAddrModule :
+circuit SimplyCombineAdrDataSPad :
+  module SPadAdrModule :
     input clock : Clock
     input reset : UInt<1>
     output io_dataPath_columnNum : UInt<4>
@@ -22,23 +22,23 @@ circuit SimplyCombineAddrDataSPad :
     node _T = eq(io_dataPath_writeInData_data_bits, UInt<1>("h0")) @[SPadModule.scala 81:41]
     node _T_1 = and(_T, io_ctrlPath_writeEn) @[SPadModule.scala 81:49]
     reg _T_8_8 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_8) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_8) @[SPadModule.scala 14:43]
     reg _T_8_7 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_7) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_7) @[SPadModule.scala 14:43]
     reg _T_8_6 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_6) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_6) @[SPadModule.scala 14:43]
     reg _T_8_5 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_5) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_5) @[SPadModule.scala 14:43]
     reg _T_8_4 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_4) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_4) @[SPadModule.scala 14:43]
     reg _T_8_3 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_3) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_3) @[SPadModule.scala 14:43]
     reg _T_8_2 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_2) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_2) @[SPadModule.scala 14:43]
     reg _T_8_1 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_1) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_1) @[SPadModule.scala 14:43]
     reg _T_8_0 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_8_0) @[SPadModule.scala 14:44]
+      reset => (UInt<1>("h0"), _T_8_0) @[SPadModule.scala 14:43]
     node _GEN_23 = validif(eq(UInt<1>("h0"), padReadIndexReg), _T_8_0) @[SPadModule.scala 27:12]
     node _GEN_24 = mux(eq(UInt<1>("h1"), padReadIndexReg), _T_8_1, _GEN_23) @[SPadModule.scala 27:12]
     node _GEN_25 = mux(eq(UInt<2>("h2"), padReadIndexReg), _T_8_2, _GEN_24) @[SPadModule.scala 27:12]
@@ -61,16 +61,16 @@ circuit SimplyCombineAddrDataSPad :
     node _GEN_1 = mux(_T_4, UInt<1>("h1"), UInt<1>("h0")) @[SPadModule.scala 84:55]
     node _GEN_2 = mux(_T_4, _GEN_0, padWriteIndexReg) @[SPadModule.scala 84:55]
     node _T_9 = and(io_dataPath_writeInData_data_valid, io_ctrlPath_writeEn) @[SPadModule.scala 16:31]
-    node _T_8_padWriteIndexReg = io_dataPath_writeInData_data_bits @[SPadModule.scala 17:32 SPadModule.scala 17:32]
-    node _GEN_3 = mux(eq(UInt<1>("h0"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_0) @[SPadModule.scala 17:32]
-    node _GEN_4 = mux(eq(UInt<1>("h1"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_1) @[SPadModule.scala 17:32]
-    node _GEN_5 = mux(eq(UInt<2>("h2"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_2) @[SPadModule.scala 17:32]
-    node _GEN_6 = mux(eq(UInt<2>("h3"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_3) @[SPadModule.scala 17:32]
-    node _GEN_7 = mux(eq(UInt<3>("h4"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_4) @[SPadModule.scala 17:32]
-    node _GEN_8 = mux(eq(UInt<3>("h5"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_5) @[SPadModule.scala 17:32]
-    node _GEN_9 = mux(eq(UInt<3>("h6"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_6) @[SPadModule.scala 17:32]
-    node _GEN_10 = mux(eq(UInt<3>("h7"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_7) @[SPadModule.scala 17:32]
-    node _GEN_11 = mux(eq(UInt<4>("h8"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_8) @[SPadModule.scala 17:32]
+    node _T_8_padWriteIndexReg = io_dataPath_writeInData_data_bits @[SPadModule.scala 17:31 SPadModule.scala 17:31]
+    node _GEN_3 = mux(eq(UInt<1>("h0"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_0) @[SPadModule.scala 17:31]
+    node _GEN_4 = mux(eq(UInt<1>("h1"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_1) @[SPadModule.scala 17:31]
+    node _GEN_5 = mux(eq(UInt<2>("h2"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_2) @[SPadModule.scala 17:31]
+    node _GEN_6 = mux(eq(UInt<2>("h3"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_3) @[SPadModule.scala 17:31]
+    node _GEN_7 = mux(eq(UInt<3>("h4"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_4) @[SPadModule.scala 17:31]
+    node _GEN_8 = mux(eq(UInt<3>("h5"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_5) @[SPadModule.scala 17:31]
+    node _GEN_9 = mux(eq(UInt<3>("h6"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_6) @[SPadModule.scala 17:31]
+    node _GEN_10 = mux(eq(UInt<3>("h7"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_7) @[SPadModule.scala 17:31]
+    node _GEN_11 = mux(eq(UInt<4>("h8"), padWriteIndexReg), _T_8_padWriteIndexReg, _T_8_8) @[SPadModule.scala 17:31]
     node _GEN_12 = mux(_T_9, _GEN_3, _T_8_0) @[SPadModule.scala 16:55]
     node _GEN_13 = mux(_T_9, _GEN_4, _T_8_1) @[SPadModule.scala 16:55]
     node _GEN_14 = mux(_T_9, _GEN_5, _T_8_2) @[SPadModule.scala 16:55]
@@ -85,15 +85,15 @@ circuit SimplyCombineAddrDataSPad :
     node readWrapWire = _T_3 @[SPadModule.scala 79:42 SPadModule.scala 82:16]
     node _GEN_21 = mux(readWrapWire, UInt<1>("h0"), _T_11) @[SPadModule.scala 22:25]
     node _GEN_22 = mux(readIndexInc, _GEN_21, padReadIndexReg) @[SPadModule.scala 20:23]
-    node _T_7_0 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_1 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_2 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_3 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_4 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_5 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_6 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_7 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
-    node _T_7_8 = UInt<4>("h0") @[SPadModule.scala 14:52 SPadModule.scala 14:52]
+    node _T_7_0 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_1 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_2 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_3 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_4 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_5 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_6 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_7 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
+    node _T_7_8 = UInt<4>("h0") @[SPadModule.scala 14:51 SPadModule.scala 14:51]
     io_dataPath_columnNum <= padReadIndexReg @[SPadModule.scala 96:25]
     io_dataPath_readOutData <= dataWire @[SPadModule.scala 28:27]
     io_dataPath_writeInData_data_ready <= _GEN_1 @[SPadModule.scala 85:27 SPadModule.scala 91:27]
@@ -101,15 +101,15 @@ circuit SimplyCombineAddrDataSPad :
     io_ctrlPath_writeFin <= writeWrapWire @[SPadModule.scala 95:24]
     padWriteIndexReg <= mux(reset, UInt<4>("h0"), _GEN_2) @[SPadModule.scala 86:22 SPadModule.scala 88:24]
     padReadIndexReg <= mux(reset, UInt<4>("h0"), _GEN_22) @[SPadModule.scala 21:21 SPadModule.scala 23:23]
-    _T_8_0 <= mux(reset, _T_7_0, _GEN_12) @[SPadModule.scala 17:32]
-    _T_8_1 <= mux(reset, _T_7_1, _GEN_13) @[SPadModule.scala 17:32]
-    _T_8_2 <= mux(reset, _T_7_2, _GEN_14) @[SPadModule.scala 17:32]
-    _T_8_3 <= mux(reset, _T_7_3, _GEN_15) @[SPadModule.scala 17:32]
-    _T_8_4 <= mux(reset, _T_7_4, _GEN_16) @[SPadModule.scala 17:32]
-    _T_8_5 <= mux(reset, _T_7_5, _GEN_17) @[SPadModule.scala 17:32]
-    _T_8_6 <= mux(reset, _T_7_6, _GEN_18) @[SPadModule.scala 17:32]
-    _T_8_7 <= mux(reset, _T_7_7, _GEN_19) @[SPadModule.scala 17:32]
-    _T_8_8 <= mux(reset, _T_7_8, _GEN_20) @[SPadModule.scala 17:32]
+    _T_8_0 <= mux(reset, _T_7_0, _GEN_12) @[SPadModule.scala 17:31]
+    _T_8_1 <= mux(reset, _T_7_1, _GEN_13) @[SPadModule.scala 17:31]
+    _T_8_2 <= mux(reset, _T_7_2, _GEN_14) @[SPadModule.scala 17:31]
+    _T_8_3 <= mux(reset, _T_7_3, _GEN_15) @[SPadModule.scala 17:31]
+    _T_8_4 <= mux(reset, _T_7_4, _GEN_16) @[SPadModule.scala 17:31]
+    _T_8_5 <= mux(reset, _T_7_5, _GEN_17) @[SPadModule.scala 17:31]
+    _T_8_6 <= mux(reset, _T_7_6, _GEN_18) @[SPadModule.scala 17:31]
+    _T_8_7 <= mux(reset, _T_7_7, _GEN_19) @[SPadModule.scala 17:31]
+    _T_8_8 <= mux(reset, _T_7_8, _GEN_20) @[SPadModule.scala 17:31]
 
   module SPadDataModule :
     input clock : Clock
@@ -272,78 +272,78 @@ circuit SimplyCombineAddrDataSPad :
     _T_8_14 <= mux(reset, _T_7_14, _GEN_33) @[SPadModule.scala 56:34]
     _T_8_15 <= mux(reset, _T_7_15, _GEN_34) @[SPadModule.scala 56:34]
 
-  module SimplyCombineAddrDataSPad :
+  module SimplyCombineAdrDataSPad :
     input clock : Clock
     input reset : UInt<1>
-    output io_iactIOs_addrIOs_data_ready : UInt<1>
-    input io_iactIOs_addrIOs_data_valid : UInt<1>
-    input io_iactIOs_addrIOs_data_bits : UInt<4>
-    output io_iactIOs_dataIOs_data_ready : UInt<1>
-    input io_iactIOs_dataIOs_data_valid : UInt<1>
-    input io_iactIOs_dataIOs_data_bits : UInt<12>
-    output io_iactWF_addrWriteFin : UInt<1>
-    output io_iactWF_dataWriteFin : UInt<1>
-    output io_iactAddrWriteIdx : UInt<4>
-    input io_iactDataReq : UInt<1>
-    output io_iactMatrixColumn : UInt<4>
-    output io_iactMatrixRow : UInt<4>
-    output io_iactMatrixData : UInt<8>
-    output io_iactMatrixDataBin : UInt<12>
-    output io_iactAddrReadEn : UInt<1>
-    output io_iactAddrReadData : UInt<4>
-    output io_iactDataReadIndex : UInt<4>
-    output io_iactDataWriteIdx : UInt<4>
+    output io_inActIOs_adrIOs_data_ready : UInt<1>
+    input io_inActIOs_adrIOs_data_valid : UInt<1>
+    input io_inActIOs_adrIOs_data_bits : UInt<4>
+    output io_inActIOs_dataIOs_data_ready : UInt<1>
+    input io_inActIOs_dataIOs_data_valid : UInt<1>
+    input io_inActIOs_dataIOs_data_bits : UInt<12>
+    output io_inActWF_adrWriteFin : UInt<1>
+    output io_inActWF_dataWriteFin : UInt<1>
+    output io_inActAdrWriteIdx : UInt<4>
+    input io_inActDataReq : UInt<1>
+    output io_inActMatrixColumn : UInt<4>
+    output io_inActMatrixRow : UInt<4>
+    output io_inActMatrixData : UInt<8>
+    output io_inActMatrixDataBin : UInt<12>
+    output io_inActAdrReadEn : UInt<1>
+    output io_inActAdrReadData : UInt<4>
+    output io_inActDataReadIndex : UInt<4>
+    output io_inActDataWriteIdx : UInt<4>
     input io_writeEn : UInt<1>
   
-    inst SPadAddrModule of SPadAddrModule @[SimplyCombineAddrDataSPad.scala 9:52]
-    inst SPadDataModule of SPadDataModule @[SimplyCombineAddrDataSPad.scala 10:52]
+    inst SPadAdrModule of SPadAdrModule @[SimplyCombineAddrDataSPad.scala 9:51]
+    inst SPadDataModule of SPadDataModule @[SimplyCombineAddrDataSPad.scala 10:53]
     reg _T : UInt<2>, clock with :
       reset => (UInt<1>("h0"), _T) @[SimplyCombineAddrDataSPad.scala 12:35]
     reg _T_4 : UInt<1>, clock with :
-      reset => (UInt<1>("h0"), _T_4) @[SimplyCombineAddrDataSPad.scala 16:52]
+      reset => (UInt<1>("h0"), _T_4) @[SimplyCombineAddrDataSPad.scala 16:53]
     reg _T_5 : UInt<1>, clock with :
       reset => (UInt<1>("h0"), _T_5) @[SimplyCombineAddrDataSPad.scala 17:52]
     reg _T_6 : UInt<1>, clock with :
-      reset => (UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 18:52]
+      reset => (UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 18:53]
     reg _T_9 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_9) @[SimplyCombineAddrDataSPad.scala 21:50]
+      reset => (UInt<1>("h0"), _T_9) @[SimplyCombineAddrDataSPad.scala 21:51]
     reg _T_10 : UInt<4>, clock with :
-      reset => (UInt<1>("h0"), _T_10) @[SimplyCombineAddrDataSPad.scala 22:51]
+      reset => (UInt<1>("h0"), _T_10) @[SimplyCombineAddrDataSPad.scala 22:52]
     reg _T_11 : UInt<1>, clock with :
-      reset => (UInt<1>("h0"), _T_11) @[SimplyCombineAddrDataSPad.scala 23:55]
+      reset => (UInt<1>("h0"), _T_11) @[SimplyCombineAddrDataSPad.scala 23:56]
     node _T_12 = eq(_T, UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 24:36]
-    node _T_3 = SPadDataModule.io_dataPath_columnNum @[SimplyCombineAddrDataSPad.scala 15:45 SimplyCombineAddrDataSPad.scala 42:21]
-    node _T_13 = add(_T_3, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 24:97]
-    node _T_14 = tail(_T_13, 1) @[SimplyCombineAddrDataSPad.scala 24:97]
-    node _T_2 = SPadAddrModule.io_dataPath_readOutData @[SimplyCombineAddrDataSPad.scala 14:44 SimplyCombineAddrDataSPad.scala 30:20]
-    node _T_15 = eq(_T_2, _T_14) @[SimplyCombineAddrDataSPad.scala 24:74]
-    node _T_16 = and(_T_12, _T_15) @[SimplyCombineAddrDataSPad.scala 24:53]
-    node _T_17 = eq(_T, UInt<2>("h1")) @[SimplyCombineAddrDataSPad.scala 24:116]
-    node _T_18 = eq(_T_2, UInt<4>("hf")) @[SimplyCombineAddrDataSPad.scala 24:154]
-    node _T_19 = and(_T_17, _T_18) @[SimplyCombineAddrDataSPad.scala 24:133]
-    node _T_20 = or(_T_16, _T_19) @[SimplyCombineAddrDataSPad.scala 24:106]
-    node _T_21 = eq(_T, UInt<2>("h1")) @[SimplyCombineAddrDataSPad.scala 25:36]
-    node _T_22 = eq(_T_4, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:56]
-    node _T_23 = and(_T_21, _T_22) @[SimplyCombineAddrDataSPad.scala 25:53]
-    node _T_24 = eq(_T_11, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:82]
-    node _T_25 = and(_T_23, _T_24) @[SimplyCombineAddrDataSPad.scala 25:79]
-    node _T_26 = eq(_T, UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 25:119]
+    node _T_3 = SPadDataModule.io_dataPath_columnNum @[SimplyCombineAddrDataSPad.scala 15:46 SimplyCombineAddrDataSPad.scala 42:22]
+    node _T_13 = add(_T_3, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 24:99]
+    node _T_14 = tail(_T_13, 1) @[SimplyCombineAddrDataSPad.scala 24:99]
+    node _T_2 = SPadAdrModule.io_dataPath_readOutData @[SimplyCombineAddrDataSPad.scala 14:44 SimplyCombineAddrDataSPad.scala 30:20]
+    node _T_15 = eq(_T_2, _T_14) @[SimplyCombineAddrDataSPad.scala 24:75]
+    node _T_16 = and(_T_12, _T_15) @[SimplyCombineAddrDataSPad.scala 24:54]
+    node _T_17 = eq(_T, UInt<2>("h1")) @[SimplyCombineAddrDataSPad.scala 24:118]
+    node _T_18 = eq(_T_2, UInt<4>("hf")) @[SimplyCombineAddrDataSPad.scala 24:156]
+    node _T_19 = and(_T_17, _T_18) @[SimplyCombineAddrDataSPad.scala 24:135]
+    node _T_20 = or(_T_16, _T_19) @[SimplyCombineAddrDataSPad.scala 24:108]
+    node _T_21 = eq(_T, UInt<2>("h1")) @[SimplyCombineAddrDataSPad.scala 25:37]
+    node _T_22 = eq(_T_4, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:57]
+    node _T_23 = and(_T_21, _T_22) @[SimplyCombineAddrDataSPad.scala 25:54]
+    node _T_24 = eq(_T_11, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:84]
+    node _T_25 = and(_T_23, _T_24) @[SimplyCombineAddrDataSPad.scala 25:81]
+    node _T_26 = eq(_T, UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 25:122]
     node _T_7 = _T_20 @[SimplyCombineAddrDataSPad.scala 19:50 SimplyCombineAddrDataSPad.scala 24:26]
-    node _T_27 = eq(_T_7, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:139]
-    node _T_28 = and(_T_26, _T_27) @[SimplyCombineAddrDataSPad.scala 25:136]
-    node _T_29 = or(_T_25, _T_28) @[SimplyCombineAddrDataSPad.scala 25:109]
-    node _T_30 = bits(SPadDataModule.io_dataPath_readOutData, 0, 0) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_31 = bits(SPadDataModule.io_dataPath_readOutData, 1, 1) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_32 = bits(SPadDataModule.io_dataPath_readOutData, 2, 2) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_33 = bits(SPadDataModule.io_dataPath_readOutData, 3, 3) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_34 = bits(SPadDataModule.io_dataPath_readOutData, 4, 4) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_35 = bits(SPadDataModule.io_dataPath_readOutData, 5, 5) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_36 = bits(SPadDataModule.io_dataPath_readOutData, 6, 6) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_37 = bits(SPadDataModule.io_dataPath_readOutData, 7, 7) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_38 = bits(SPadDataModule.io_dataPath_readOutData, 8, 8) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_39 = bits(SPadDataModule.io_dataPath_readOutData, 9, 9) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_40 = bits(SPadDataModule.io_dataPath_readOutData, 10, 10) @[SimplyCombineAddrDataSPad.scala 45:82]
-    node _T_41 = bits(SPadDataModule.io_dataPath_readOutData, 11, 11) @[SimplyCombineAddrDataSPad.scala 45:82]
+    node _T_27 = eq(_T_7, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 25:143]
+    node _T_28 = and(_T_26, _T_27) @[SimplyCombineAddrDataSPad.scala 25:140]
+    node _T_29 = or(_T_25, _T_28) @[SimplyCombineAddrDataSPad.scala 25:112]
+    node _T_30 = bits(SPadDataModule.io_dataPath_readOutData, 0, 0) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_31 = bits(SPadDataModule.io_dataPath_readOutData, 1, 1) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_32 = bits(SPadDataModule.io_dataPath_readOutData, 2, 2) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_33 = bits(SPadDataModule.io_dataPath_readOutData, 3, 3) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_34 = bits(SPadDataModule.io_dataPath_readOutData, 4, 4) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_35 = bits(SPadDataModule.io_dataPath_readOutData, 5, 5) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_36 = bits(SPadDataModule.io_dataPath_readOutData, 6, 6) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_37 = bits(SPadDataModule.io_dataPath_readOutData, 7, 7) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_38 = bits(SPadDataModule.io_dataPath_readOutData, 8, 8) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_39 = bits(SPadDataModule.io_dataPath_readOutData, 9, 9) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_40 = bits(SPadDataModule.io_dataPath_readOutData, 10, 10) @[SimplyCombineAddrDataSPad.scala 45:84]
+    node _T_41 = bits(SPadDataModule.io_dataPath_readOutData, 11, 11) @[SimplyCombineAddrDataSPad.scala 45:84]
     node _T_42 = cat(_T_35, _T_34) @[Cat.scala 29:58]
     node _T_43 = cat(_T_37, _T_36) @[Cat.scala 29:58]
     node _T_44 = cat(_T_43, _T_42) @[Cat.scala 29:58]
@@ -355,32 +355,32 @@ circuit SimplyCombineAddrDataSPad :
     node _T_50 = cat(_T_33, _T_32) @[Cat.scala 29:58]
     node _T_51 = cat(_T_50, _T_49) @[Cat.scala 29:58]
     node _T_52 = eq(UInt<2>("h0"), _T) @[Conditional.scala 37:30]
-    node _GEN_0 = mux(io_iactDataReq, UInt<2>("h1"), _T) @[SimplyCombineAddrDataSPad.scala 60:28]
-    node _GEN_1 = mux(io_iactDataReq, UInt<1>("h1"), _T_5) @[SimplyCombineAddrDataSPad.scala 60:28]
-    node _GEN_2 = mux(io_iactDataReq, UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 60:28]
-    node _GEN_3 = mux(io_iactDataReq, UInt<1>("h1"), _T_11) @[SimplyCombineAddrDataSPad.scala 60:28]
+    node _GEN_0 = mux(io_inActDataReq, UInt<2>("h1"), _T) @[SimplyCombineAddrDataSPad.scala 60:29]
+    node _GEN_1 = mux(io_inActDataReq, UInt<1>("h1"), _T_5) @[SimplyCombineAddrDataSPad.scala 60:29]
+    node _GEN_2 = mux(io_inActDataReq, UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 60:29]
+    node _GEN_3 = mux(io_inActDataReq, UInt<1>("h1"), _T_11) @[SimplyCombineAddrDataSPad.scala 60:29]
     node _T_53 = eq(UInt<2>("h1"), _T) @[Conditional.scala 37:30]
     node _T_54 = eq(_T_2, UInt<4>("hf")) @[SimplyCombineAddrDataSPad.scala 69:30]
-    node _T_55 = add(_T_10, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 74:54]
-    node _T_56 = tail(_T_55, 1) @[SimplyCombineAddrDataSPad.scala 74:54]
-    node _GEN_4 = mux(_T_54, UInt<2>("h1"), UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 69:56]
-    node _GEN_5 = mux(_T_54, UInt<1>("h1"), _T_4) @[SimplyCombineAddrDataSPad.scala 69:56]
-    node _GEN_6 = mux(_T_54, UInt<1>("h1"), UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 69:56]
-    node _GEN_7 = mux(_T_54, UInt<1>("h0"), UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 69:56]
-    node _GEN_8 = mux(_T_54, _T_56, _T_10) @[SimplyCombineAddrDataSPad.scala 69:56]
+    node _T_55 = add(_T_10, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 74:56]
+    node _T_56 = tail(_T_55, 1) @[SimplyCombineAddrDataSPad.scala 74:56]
+    node _GEN_4 = mux(_T_54, UInt<2>("h1"), UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 69:57]
+    node _GEN_5 = mux(_T_54, UInt<1>("h1"), _T_4) @[SimplyCombineAddrDataSPad.scala 69:57]
+    node _GEN_6 = mux(_T_54, UInt<1>("h1"), UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 69:57]
+    node _GEN_7 = mux(_T_54, UInt<1>("h0"), UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 69:57]
+    node _GEN_8 = mux(_T_54, _T_56, _T_10) @[SimplyCombineAddrDataSPad.scala 69:57]
     node _T_57 = eq(UInt<2>("h2"), _T) @[Conditional.scala 37:30]
-    node _T_58 = eq(io_iactMatrixData, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 83:31]
-    node _GEN_9 = mux(_T_58, UInt<2>("h0"), _T) @[SimplyCombineAddrDataSPad.scala 83:40]
-    node _GEN_10 = mux(_T_58, UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 83:40]
-    node _GEN_11 = mux(_T_58, UInt<1>("h0"), _T_4) @[SimplyCombineAddrDataSPad.scala 83:40]
-    node _T_59 = add(_T_9, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 95:54]
-    node _T_60 = tail(_T_59, 1) @[SimplyCombineAddrDataSPad.scala 95:54]
-    node _T_61 = add(_T_60, _T_10) @[SimplyCombineAddrDataSPad.scala 95:60]
-    node _T_62 = tail(_T_61, 1) @[SimplyCombineAddrDataSPad.scala 95:60]
-    node _T_63 = add(_T_9, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 99:54]
-    node _T_64 = tail(_T_63, 1) @[SimplyCombineAddrDataSPad.scala 99:54]
-    node _GEN_12 = mux(_T_4, _T_62, _T_64) @[SimplyCombineAddrDataSPad.scala 94:38]
-    node _GEN_13 = mux(_T_4, UInt<1>("h0"), _T_10) @[SimplyCombineAddrDataSPad.scala 94:38]
+    node _T_58 = eq(io_inActMatrixData, UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 83:32]
+    node _GEN_9 = mux(_T_58, UInt<2>("h0"), _T) @[SimplyCombineAddrDataSPad.scala 83:41]
+    node _GEN_10 = mux(_T_58, UInt<1>("h0"), _T_6) @[SimplyCombineAddrDataSPad.scala 83:41]
+    node _GEN_11 = mux(_T_58, UInt<1>("h0"), _T_4) @[SimplyCombineAddrDataSPad.scala 83:41]
+    node _T_59 = add(_T_9, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 95:56]
+    node _T_60 = tail(_T_59, 1) @[SimplyCombineAddrDataSPad.scala 95:56]
+    node _T_61 = add(_T_60, _T_10) @[SimplyCombineAddrDataSPad.scala 95:62]
+    node _T_62 = tail(_T_61, 1) @[SimplyCombineAddrDataSPad.scala 95:62]
+    node _T_63 = add(_T_9, UInt<1>("h1")) @[SimplyCombineAddrDataSPad.scala 99:56]
+    node _T_64 = tail(_T_63, 1) @[SimplyCombineAddrDataSPad.scala 99:56]
+    node _GEN_12 = mux(_T_4, _T_62, _T_64) @[SimplyCombineAddrDataSPad.scala 94:39]
+    node _GEN_13 = mux(_T_4, UInt<1>("h0"), _T_10) @[SimplyCombineAddrDataSPad.scala 94:39]
     node _GEN_14 = mux(_T_7, UInt<2>("h1"), UInt<2>("h2")) @[SimplyCombineAddrDataSPad.scala 88:37]
     node _GEN_15 = mux(_T_7, UInt<1>("h0"), _GEN_11) @[SimplyCombineAddrDataSPad.scala 88:37]
     node _GEN_16 = mux(_T_7, UInt<1>("h1"), UInt<1>("h0")) @[SimplyCombineAddrDataSPad.scala 88:37]
@@ -408,43 +408,43 @@ circuit SimplyCombineAddrDataSPad :
     node _GEN_38 = mux(_T_52, _T_4, _GEN_28) @[Conditional.scala 40:58]
     node _GEN_39 = mux(_T_52, _T_10, _GEN_31) @[Conditional.scala 40:58]
     node _GEN_40 = mux(_T_52, _T_9, _GEN_33) @[Conditional.scala 40:58]
-    node _T_1 = SPadAddrModule.io_dataPath_columnNum @[SimplyCombineAddrDataSPad.scala 13:45 SimplyCombineAddrDataSPad.scala 28:21]
-    node _T_8 = _T_29 @[SimplyCombineAddrDataSPad.scala 20:50 SimplyCombineAddrDataSPad.scala 25:26]
-    io_iactIOs_addrIOs_data_ready <= SPadAddrModule.io_dataPath_writeInData_data_ready @[SimplyCombineAddrDataSPad.scala 27:40]
-    io_iactIOs_dataIOs_data_ready <= SPadDataModule.io_dataPath_writeInData_data_ready @[SimplyCombineAddrDataSPad.scala 41:40]
-    io_iactWF_addrWriteFin <= SPadAddrModule.io_ctrlPath_writeFin @[SimplyCombineAddrDataSPad.scala 35:26]
-    io_iactWF_dataWriteFin <= SPadDataModule.io_ctrlPath_writeFin @[SimplyCombineAddrDataSPad.scala 50:26]
-    io_iactAddrWriteIdx <= SPadAddrModule.io_ctrlPath_writeIdx @[SimplyCombineAddrDataSPad.scala 34:23]
-    io_iactMatrixColumn <= _T_9 @[SimplyCombineAddrDataSPad.scala 29:23]
-    io_iactMatrixRow <= _T_51 @[SimplyCombineAddrDataSPad.scala 47:20]
-    io_iactMatrixData <= _T_48 @[SimplyCombineAddrDataSPad.scala 46:21]
-    io_iactMatrixDataBin <= SPadDataModule.io_dataPath_readOutData @[SimplyCombineAddrDataSPad.scala 44:24]
-    io_iactAddrReadEn <= _T_5 @[SimplyCombineAddrDataSPad.scala 32:21]
-    io_iactAddrReadData <= _T_2 @[SimplyCombineAddrDataSPad.scala 31:23]
-    io_iactDataReadIndex <= _T_3 @[SimplyCombineAddrDataSPad.scala 43:24]
-    io_iactDataWriteIdx <= SPadDataModule.io_ctrlPath_writeIdx @[SimplyCombineAddrDataSPad.scala 49:23]
-    SPadAddrModule.clock <= clock
-    SPadAddrModule.reset <= reset
-    SPadAddrModule.io_dataPath_writeInData_data_valid <= io_iactIOs_addrIOs_data_valid @[SimplyCombineAddrDataSPad.scala 27:40]
-    SPadAddrModule.io_dataPath_writeInData_data_bits <= io_iactIOs_addrIOs_data_bits @[SimplyCombineAddrDataSPad.scala 27:40]
-    SPadAddrModule.io_ctrlPath_writeEn <= io_writeEn @[SimplyCombineAddrDataSPad.scala 33:36]
-    SPadAddrModule.io_ctrlPath_readEn <= _T_5 @[SimplyCombineAddrDataSPad.scala 36:35]
-    SPadAddrModule.io_ctrlPath_readInIdx is invalid
-    SPadAddrModule.io_ctrlPath_indexInc <= _T_7 @[SimplyCombineAddrDataSPad.scala 38:37]
-    SPadAddrModule.io_ctrlPath_readInIdxEn is invalid
+    node _T_1 = SPadAdrModule.io_dataPath_columnNum @[SimplyCombineAddrDataSPad.scala 13:45 SimplyCombineAddrDataSPad.scala 28:21]
+    node _T_8 = _T_29 @[SimplyCombineAddrDataSPad.scala 20:51 SimplyCombineAddrDataSPad.scala 25:27]
+    io_inActIOs_adrIOs_data_ready <= SPadAdrModule.io_dataPath_writeInData_data_ready @[SimplyCombineAddrDataSPad.scala 27:40]
+    io_inActIOs_dataIOs_data_ready <= SPadDataModule.io_dataPath_writeInData_data_ready @[SimplyCombineAddrDataSPad.scala 41:41]
+    io_inActWF_adrWriteFin <= SPadAdrModule.io_ctrlPath_writeFin @[SimplyCombineAddrDataSPad.scala 35:26]
+    io_inActWF_dataWriteFin <= SPadDataModule.io_ctrlPath_writeFin @[SimplyCombineAddrDataSPad.scala 50:27]
+    io_inActAdrWriteIdx <= SPadAdrModule.io_ctrlPath_writeIdx @[SimplyCombineAddrDataSPad.scala 34:23]
+    io_inActMatrixColumn <= _T_9 @[SimplyCombineAddrDataSPad.scala 29:24]
+    io_inActMatrixRow <= _T_51 @[SimplyCombineAddrDataSPad.scala 47:21]
+    io_inActMatrixData <= _T_48 @[SimplyCombineAddrDataSPad.scala 46:22]
+    io_inActMatrixDataBin <= SPadDataModule.io_dataPath_readOutData @[SimplyCombineAddrDataSPad.scala 44:25]
+    io_inActAdrReadEn <= _T_5 @[SimplyCombineAddrDataSPad.scala 32:21]
+    io_inActAdrReadData <= _T_2 @[SimplyCombineAddrDataSPad.scala 31:23]
+    io_inActDataReadIndex <= _T_3 @[SimplyCombineAddrDataSPad.scala 43:25]
+    io_inActDataWriteIdx <= SPadDataModule.io_ctrlPath_writeIdx @[SimplyCombineAddrDataSPad.scala 49:24]
+    SPadAdrModule.clock <= clock
+    SPadAdrModule.reset <= reset
+    SPadAdrModule.io_dataPath_writeInData_data_valid <= io_inActIOs_adrIOs_data_valid @[SimplyCombineAddrDataSPad.scala 27:40]
+    SPadAdrModule.io_dataPath_writeInData_data_bits <= io_inActIOs_adrIOs_data_bits @[SimplyCombineAddrDataSPad.scala 27:40]
+    SPadAdrModule.io_ctrlPath_writeEn <= io_writeEn @[SimplyCombineAddrDataSPad.scala 33:36]
+    SPadAdrModule.io_ctrlPath_readEn <= _T_5 @[SimplyCombineAddrDataSPad.scala 36:35]
+    SPadAdrModule.io_ctrlPath_readInIdx is invalid
+    SPadAdrModule.io_ctrlPath_indexInc <= _T_7 @[SimplyCombineAddrDataSPad.scala 38:37]
+    SPadAdrModule.io_ctrlPath_readInIdxEn is invalid
     SPadDataModule.clock <= clock
     SPadDataModule.reset <= reset
-    SPadDataModule.io_dataPath_writeInData_data_valid <= io_iactIOs_dataIOs_data_valid @[SimplyCombineAddrDataSPad.scala 41:40]
-    SPadDataModule.io_dataPath_writeInData_data_bits <= io_iactIOs_dataIOs_data_bits @[SimplyCombineAddrDataSPad.scala 41:40]
-    SPadDataModule.io_ctrlPath_writeEn <= io_writeEn @[SimplyCombineAddrDataSPad.scala 48:36]
-    SPadDataModule.io_ctrlPath_readEn <= _T_6 @[SimplyCombineAddrDataSPad.scala 51:35]
+    SPadDataModule.io_dataPath_writeInData_data_valid <= io_inActIOs_dataIOs_data_valid @[SimplyCombineAddrDataSPad.scala 41:41]
+    SPadDataModule.io_dataPath_writeInData_data_bits <= io_inActIOs_dataIOs_data_bits @[SimplyCombineAddrDataSPad.scala 41:41]
+    SPadDataModule.io_ctrlPath_writeEn <= io_writeEn @[SimplyCombineAddrDataSPad.scala 48:37]
+    SPadDataModule.io_ctrlPath_readEn <= _T_6 @[SimplyCombineAddrDataSPad.scala 51:36]
     SPadDataModule.io_ctrlPath_readInIdx is invalid
-    SPadDataModule.io_ctrlPath_indexInc <= _T_8 @[SimplyCombineAddrDataSPad.scala 53:37]
+    SPadDataModule.io_ctrlPath_indexInc <= _T_8 @[SimplyCombineAddrDataSPad.scala 53:38]
     SPadDataModule.io_ctrlPath_readInIdxEn is invalid
     _T <= mux(reset, UInt<2>("h0"), _GEN_34) @[SimplyCombineAddrDataSPad.scala 61:14 SimplyCombineAddrDataSPad.scala 70:14 SimplyCombineAddrDataSPad.scala 76:14 SimplyCombineAddrDataSPad.scala 84:14 SimplyCombineAddrDataSPad.scala 89:14 SimplyCombineAddrDataSPad.scala 102:14]
-    _T_4 <= mux(reset, UInt<1>("h0"), _GEN_38) @[SimplyCombineAddrDataSPad.scala 71:31 SimplyCombineAddrDataSPad.scala 86:31 SimplyCombineAddrDataSPad.scala 90:31]
+    _T_4 <= mux(reset, UInt<1>("h0"), _GEN_38) @[SimplyCombineAddrDataSPad.scala 71:32 SimplyCombineAddrDataSPad.scala 86:32 SimplyCombineAddrDataSPad.scala 90:32]
     _T_5 <= mux(reset, UInt<1>("h0"), _GEN_35) @[SimplyCombineAddrDataSPad.scala 62:31 SimplyCombineAddrDataSPad.scala 72:31 SimplyCombineAddrDataSPad.scala 77:31 SimplyCombineAddrDataSPad.scala 92:31 SimplyCombineAddrDataSPad.scala 103:31]
-    _T_6 <= mux(reset, UInt<1>("h0"), _GEN_36) @[SimplyCombineAddrDataSPad.scala 63:31 SimplyCombineAddrDataSPad.scala 73:31 SimplyCombineAddrDataSPad.scala 78:31 SimplyCombineAddrDataSPad.scala 85:31 SimplyCombineAddrDataSPad.scala 93:31 SimplyCombineAddrDataSPad.scala 104:31]
-    _T_9 <= mux(reset, UInt<4>("h0"), _GEN_40) @[SimplyCombineAddrDataSPad.scala 95:31 SimplyCombineAddrDataSPad.scala 99:31]
-    _T_10 <= mux(reset, UInt<4>("h0"), _GEN_39) @[SimplyCombineAddrDataSPad.scala 74:30 SimplyCombineAddrDataSPad.scala 97:32]
-    _T_11 <= mux(reset, UInt<1>("h1"), _GEN_37) @[SimplyCombineAddrDataSPad.scala 64:34 SimplyCombineAddrDataSPad.scala 82:32]
+    _T_6 <= mux(reset, UInt<1>("h0"), _GEN_36) @[SimplyCombineAddrDataSPad.scala 63:32 SimplyCombineAddrDataSPad.scala 73:32 SimplyCombineAddrDataSPad.scala 78:32 SimplyCombineAddrDataSPad.scala 85:32 SimplyCombineAddrDataSPad.scala 93:32 SimplyCombineAddrDataSPad.scala 104:32]
+    _T_9 <= mux(reset, UInt<4>("h0"), _GEN_40) @[SimplyCombineAddrDataSPad.scala 95:32 SimplyCombineAddrDataSPad.scala 99:32]
+    _T_10 <= mux(reset, UInt<4>("h0"), _GEN_39) @[SimplyCombineAddrDataSPad.scala 74:31 SimplyCombineAddrDataSPad.scala 97:33]
+    _T_11 <= mux(reset, UInt<1>("h1"), _GEN_37) @[SimplyCombineAddrDataSPad.scala 64:35 SimplyCombineAddrDataSPad.scala 82:33]

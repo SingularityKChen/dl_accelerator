@@ -1,6 +1,6 @@
 ;buildInfoPackage: chisel3, version: 3.3-SNAPSHOT, scalaVersion: 2.12.10, sbtVersion: 1.3.2
-circuit SPadAddrModule : 
-  module SPadAddrModule : 
+circuit SPadAdrModule : 
+  module SPadAdrModule : 
     input clock : Clock
     input reset : UInt<1>
     output io : {dataPath : {columnNum : UInt<4>, readOutData : UInt<4>, flip writeInData : {data : {flip ready : UInt<1>, valid : UInt<1>, bits : UInt<4>}}}, ctrlPath : {flip writeEn : UInt<1>, writeIdx : UInt<4>, writeFin : UInt<1>, flip readEn : UInt<1>, flip readInIdx : UInt<4>, flip indexInc : UInt<1>, flip readInIdxEn : UInt<1>}}
@@ -33,20 +33,20 @@ circuit SPadAddrModule :
     io.ctrlPath.writeIdx <= padWriteIndexReg @[SPadModule.scala 94:24]
     io.ctrlPath.writeFin <= writeWrapWire @[SPadModule.scala 95:24]
     io.dataPath.columnNum <= padReadIndexReg @[SPadModule.scala 96:25]
-    wire _T_7 : UInt<4>[9] @[SPadModule.scala 14:52]
-    _T_7[0] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[1] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[2] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[3] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[4] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[5] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[6] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[7] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    _T_7[8] <= UInt<4>("h00") @[SPadModule.scala 14:52]
-    reg _T_8 : UInt<4>[9], clock with : (reset => (reset, _T_7)) @[SPadModule.scala 14:44]
+    wire _T_7 : UInt<4>[9] @[SPadModule.scala 14:51]
+    _T_7[0] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[1] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[2] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[3] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[4] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[5] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[6] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[7] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    _T_7[8] <= UInt<4>("h00") @[SPadModule.scala 14:51]
+    reg _T_8 : UInt<4>[9], clock with : (reset => (reset, _T_7)) @[SPadModule.scala 14:43]
     node _T_9 = and(io.dataPath.writeInData.data.valid, io.ctrlPath.writeEn) @[SPadModule.scala 16:31]
     when _T_9 : @[SPadModule.scala 16:55]
-      _T_8[padWriteIndexReg] <= io.dataPath.writeInData.data.bits @[SPadModule.scala 17:32]
+      _T_8[padWriteIndexReg] <= io.dataPath.writeInData.data.bits @[SPadModule.scala 17:31]
       skip @[SPadModule.scala 16:55]
     when readIndexInc : @[SPadModule.scala 20:23]
       node _T_10 = add(padReadIndexReg, UInt<1>("h01")) @[SPadModule.scala 21:40]

@@ -5,8 +5,8 @@ import dla.pe.PESizeConfig
 trait ClusterConfig extends PESizeConfig {
   val peColNum: Int = 4
   val peRowNum: Int = 3
-  val iactRouterNum: Int = 3
-  val iactPortNum: Int = 4
+  val inActRouterNum: Int = 3
+  val inActPortNum: Int = 4
   val weightRouterNum: Int = peRowNum
   val weightPortNum: Int = 2
   val pSumRouterNum: Int = peColNum
@@ -14,10 +14,10 @@ trait ClusterConfig extends PESizeConfig {
 }
 
 trait ClusterSRAMConfig extends ClusterConfig {
-  val iactDataSRAMSize: Int = 862 // 1.5KB*1024*8/12-bit
-  val iactAddrSRAMSize: Int = 486 // 486/3=162, 162+862=1024=1.5KB*1024*8/12-bit
+  val inActDataSRAMSize: Int = 862 // 1.5KB*1024*8/12-bit
+  val inActAdrSRAMSize: Int = 486 // 486/3=162, 162+862=1024=1.5KB*1024*8/12-bit
   val pSumSRAMSize: Int = 768 // 1.875KB*1024*8/20-bit
-  val iactSRAMNum: Int = iactRouterNum
+  val inActSRAMNum: Int = inActRouterNum
   val pSumSRAMNum: Int = pSumRouterNum
 }
 

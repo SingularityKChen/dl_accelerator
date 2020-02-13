@@ -5,29 +5,29 @@ import chisel3.util._
 import dla.pe._
 
 class PECluster(debug: Boolean) extends Module with ClusterConfig {
-  val diagNum: Int = peColNum + peRowNum - 1
-  val io = new PEClusterIO
-  // io.ctrlPath.iactCtrlSel.inDataSel indicates whether the input activations should be broad-cast;
+  val diagnNum: Int = peColNum + peRowNum - 1
+  val io: PEClusterIO = IO(new PEClusterIO)
+  // io.ctrlPath.inActCtrlSel.inDataSel indicates whether the input activations should be broad-cast;
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
-  // io.ctrlPath.iactCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
-  val peRow: Vec[ProcessingElementIO] =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
-  val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, peRow)
-  val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
-  val muxIactDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum,Wire(new CSCStreamIO(iactAddrWidth, iactDataWidth))))
-  // iactRoutingMode: whether the input activations should be broad-cast;
-  // true then all PEs' data receive from the same router, that's outDataSel's value;
-  val iactRoutingMode: Bool = Wire(Bool())
-  // iactMuxDiagIdxWire: correspond to each diagonal, to choose data read in;
-  // 0-2 to iactCluster dataPath's responding index, 3 means wait for a while
-  val iactMuxDiagIdxWire: Vec[UInt] = Vec(diagNum, Wire(UInt(2.W)))
-  val iactBroadCastIdxWire: UInt = Wire(UInt(2.W))
-  // iactFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
-  val iactFormerOrLater: Vec[Bool] = Vec(iactRouterNum, Wire(Bool())) // true for former, false for later readF
+  // io.ctrlPath.inActCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
+  private val peRow: Vec[ProcessingElementIO] =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
+  private val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, peRow)
+  private val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
+  private val muxInActDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum,Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))))
+  // inActRoutingMode: whether the input activations should be broad-cast;
+  // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
+  private val inActRoutingMode: Bool = Wire(Bool())
+  // inActMuxDiagnIdxWire: correspond to each diagonal, to choose data read in;
+  // 0-2 to inActCluster dataPath's responding index, 3 means wait for a while
+  private val inActMuxDiagnIdxWire: Vec[UInt] = Vec(diagnNum, Wire(UInt(2.W)))
+  private val inActBroadCastIdxWire: UInt = Wire(UInt(2.W))
+  // inActFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
+  private val inActFormerOrLater: Vec[Bool] = Vec(inActRouterNum, Wire(Bool())) // true for former, false for later readF
   // muxInPSumCtrlWire: true, then ; false, then
-  val muxInPSumCtrlWire: Bool = Wire(Bool()) // TODO: whether each column needs one select signal?
-  def iactWeightConnection(peIO: CSCStreamIO, connectIO: CSCStreamIO): Any = {
-    Seq(peIO.addrIOs, peIO.dataIOs).zip(Seq(connectIO.addrIOs, connectIO.dataIOs)).foreach({
+  private val muxInPSumCtrlWire: Bool = Wire(Bool()) // TODO: whether each column needs one select signal?
+  private def inActWeightConnection(peIO: CSCStreamIO, connectIO: CSCStreamIO): Any = {
+    Seq(peIO.adrIOs, peIO.dataIOs).zip(Seq(connectIO.adrIOs, connectIO.dataIOs)).foreach({
       case (x, y) =>
         x.data <> y.data
     })
@@ -39,20 +39,20 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
     peArray.last(i).dataStream.ipsIO <> muxInPSumWire(i)
     muxInPSumWire(i) <> Mux(muxInPSumCtrlWire, io.dataPath.pSumIO.inIOs(i), io.dataPath.routerInPSumToPEIO(i))
     for (j <- 0 until peRowNum) {
-      iactWeightConnection(peArray(j)(i).dataStream.weightIOs, io.dataPath.weightIO(j))
-      iactWeightConnection(peArray(j)(i).dataStream.iactIOs, muxIactDataWire(j)(i))
-      muxIactDataWire(j)(i) <> Mux(iactMuxDiagIdxWire(j + i) =/= 3.U, MuxLookup(iactMuxDiagIdxWire(j + i), 0.U, io.dataPath.iactIO.zipWithIndex.map({
+      inActWeightConnection(peArray(j)(i).dataStream.weightIOs, io.dataPath.weightIO(j))
+      inActWeightConnection(peArray(j)(i).dataStream.inActIOs, muxInActDataWire(j)(i))
+      muxInActDataWire(j)(i) <> Mux(inActMuxDiagnIdxWire(j + i) =/= 3.U, MuxLookup(inActMuxDiagnIdxWire(j + i), 0.U, io.dataPath.inActIO.zipWithIndex.map({
         case (x,y) =>
           y.asUInt -> x
       })), DontCare) // TODO: check whether the valid equals to false when muxIdxWire equals to 3.U
     }
   }
-  for (idx <- 0 until iactRouterNum) {
-    iactMuxDiagIdxWire(idx) := Mux(!iactRoutingMode, Mux(iactFormerOrLater(idx), idx.U, 3.U), iactBroadCastIdxWire) // former PEs
-    iactMuxDiagIdxWire(idx + iactRouterNum) := Mux(!iactRoutingMode, Mux(!iactFormerOrLater(idx), idx.U, 3.U), iactBroadCastIdxWire) // later PEs
+  for (idx <- 0 until inActRouterNum) {
+    inActMuxDiagnIdxWire(idx) := Mux(!inActRoutingMode, Mux(inActFormerOrLater(idx), idx.U, 3.U), inActBroadCastIdxWire) // former PEs
+    inActMuxDiagnIdxWire(idx + inActRouterNum) := Mux(!inActRoutingMode, Mux(!inActFormerOrLater(idx), idx.U, 3.U), inActBroadCastIdxWire) // later PEs
   }
   // connections of control IOs
   muxInPSumCtrlWire := io.ctrlPath.pSumCtrlSel.inDataSel
-  iactRoutingMode := io.ctrlPath.iactCtrlSel.inDataSel // true for broad-cast
-  iactBroadCastIdxWire := io.ctrlPath.iactCtrlSel.outDataSel
+  inActRoutingMode := io.ctrlPath.inActCtrlSel.inDataSel // true for broad-cast
+  inActBroadCastIdxWire := io.ctrlPath.inActCtrlSel.outDataSel
 }

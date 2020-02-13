@@ -6,41 +6,41 @@ import dla.pe.CSCStreamIO
 
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io = new GLBClusterIO
-  val iSRAMs: Vec[IactSRAMBankIO] = Vec(iactSRAMNum, Module(new IactSRAMBank).io)
-  val pSRAMs: Vec[PSumSRAMBankIO] = Vec(pSumSRAMNum, Module(new PSumSRAMBank).io)
+  private val iSRAMs: Vec[InActSRAMBankIO] = Vec(inActSRAMNum, Module(new InActSRAMBank).io)
+  private val pSRAMs: Vec[PSumSRAMBankIO] = Vec(pSumSRAMNum, Module(new PSumSRAMBank).io)
   // connections of data path
   io.dataPath.weightIO.foreach(x => x.inIOs <> x.outIOs)
-  io.dataPath.iactIO.zip(iSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
+  io.dataPath.inActIO.zip(iSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
   io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
   // connections of control path
 }
 
 class PSumSRAMBank extends Module with ClusterSRAMConfig {
   val io = new PSumSRAMBankIO
-  val dataSRAM: SyncReadMem[UInt] = SyncReadMem(pSumSRAMSize, UInt(psDataWidth.W))
+  private val dataSRAM: SyncReadMem[UInt] = SyncReadMem(pSumSRAMSize, UInt(psDataWidth.W))
   // SRAM read write logic
-  val readIdxReg: UInt = RegInit(0.U(log2Ceil(pSumSRAMSize).W))
-  val writeIdxReg: UInt = RegInit(0.U(log2Ceil(pSumSRAMSize).W))
+  private val readIdxReg: UInt = RegInit(0.U(log2Ceil(pSumSRAMSize).W))
+  private val writeIdxReg: UInt = RegInit(0.U(log2Ceil(pSumSRAMSize).W))
 }
 
-class IactSRAMBank extends Module with ClusterSRAMConfig {
-  val io = new IactSRAMBankIO
-  val addrSRAM: SyncReadMem[UInt] = SyncReadMem(iactAddrSRAMSize,UInt(iactAddrWidth.W))
-  val dataSRAM: SyncReadMem[UInt] = SyncReadMem(iactDataSRAMSize,UInt(iactDataWidth.W))
+class InActSRAMBank extends Module with ClusterSRAMConfig {
+  val io = new InActSRAMBankIO
+  private val adrSRAM: SyncReadMem[UInt] = SyncReadMem(inActAdrSRAMSize,UInt(inActAdrWidth.W))
+  private val dataSRAM: SyncReadMem[UInt] = SyncReadMem(inActDataSRAMSize,UInt(inActDataWidth.W))
   // SRAM read write logic
-  val readAddrIdxReg: UInt = RegInit(0.U(log2Ceil(iactAddrSRAMSize).W))
-  val writeAddrIdxReg: UInt = RegInit(0.U(log2Ceil(iactAddrSRAMSize).W))
-  val readDataIdxReg: UInt = RegInit(0.U(log2Ceil(iactAddrSRAMSize).W))
-  val writeDataIdxReg: UInt = RegInit(0.U(log2Ceil(iactAddrSRAMSize).W))
+  private val readAdrIdxReg: UInt = RegInit(0.U(log2Ceil(inActAdrSRAMSize).W))
+  private val writeAdrIdxReg: UInt = RegInit(0.U(log2Ceil(inActAdrSRAMSize).W))
+  private val readDataIdxReg: UInt = RegInit(0.U(log2Ceil(inActAdrSRAMSize).W))
+  private val writeDataIdxReg: UInt = RegInit(0.U(log2Ceil(inActAdrSRAMSize).W))
 }
 
-class IactSRAMBankIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new StreamBitsInOutIO(iactAddrWidth, iactDataWidth)
+class InActSRAMBankIO extends Bundle with ClusterSRAMConfig {
+  val dataPath = new StreamBitsInOutIO(inActAdrWidth, inActDataWidth)
 }
 
-class StreamBitsInOutIO(addrWidth: Int, dataWidth: Int) extends Bundle {
-  val inIOs: CSCStreamIO = Flipped(new CSCStreamIO(addrWidth, dataWidth))
-  val outIOs = new CSCStreamIO(addrWidth, dataWidth)
+class StreamBitsInOutIO(adrWidth: Int, dataWidth: Int) extends Bundle {
+  val inIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth, dataWidth))
+  val outIOs = new CSCStreamIO(adrWidth, dataWidth)
 }
 
 class PSumSRAMBankIO extends Bundle with ClusterSRAMConfig {
@@ -58,7 +58,7 @@ class GLBClusterIO extends Bundle with ClusterSRAMConfig {
 }
 
 class WeightGLBIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new StreamBitsInOutIO(weightAddrWidth, weightDataWidth)
+  val dataPath = new StreamBitsInOutIO(weightAdrWidth, weightDataWidth)
 }
 
 class GLBClusterCtrlIO extends Bundle {
@@ -66,7 +66,7 @@ class GLBClusterCtrlIO extends Bundle {
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {
-  val iactIO: Vec[StreamBitsInOutIO] = Vec(iactSRAMNum, new StreamBitsInOutIO(iactAddrWidth, iactDataWidth))
-  val weightIO: Vec[StreamBitsInOutIO] = Vec(weightRouterNum, new StreamBitsInOutIO(weightAddrWidth, weightDataWidth))
+  val inActIO: Vec[StreamBitsInOutIO] = Vec(inActSRAMNum, new StreamBitsInOutIO(inActAdrWidth, inActDataWidth))
+  val weightIO: Vec[StreamBitsInOutIO] = Vec(weightRouterNum, new StreamBitsInOutIO(weightAdrWidth, weightDataWidth))
   val pSumIO: Vec[PSumSRAMDataIO] = Vec(pSumSRAMNum, new PSumSRAMDataIO(psDataWidth))
 }
