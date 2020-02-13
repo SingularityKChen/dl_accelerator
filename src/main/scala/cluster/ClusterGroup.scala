@@ -35,6 +35,7 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
     peCluster.io.dataPath.inActIO(i) <> routerCluster.io.dataPath.routerData.iRIO(i).outIOs.head
   }
   // weight
+  require(io.dataPath.cgDataPath.wRIO.head.inIOs.length == 2, "the number of ports in weight router should be 2 or you should correct the code")
   for (i <- 0 until weightRouterNum) {
     // input: port 0 from GLB Cluster, 1 from neighboring weight router
     // output: port 0 to PE Cluster, 1 to neighboring weight router
@@ -50,6 +51,7 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
     peCluster.io.dataPath.weightIO(i) <> routerCluster.io.dataPath.routerData.wRIO(i).outIOs.head
   }
   // partial sum
+  require(io.dataPath.cgDataPath.pSumRIO.head.inIOs.length == 3, "the number of ports in partial sum router should be 3 or you should correct the code")
   for (i <- 0 until pSumRouterNum) {
     // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
     // top connections
