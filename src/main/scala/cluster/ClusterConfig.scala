@@ -2,7 +2,7 @@ package dla.cluster
 
 import dla.pe.PESizeConfig
 
-trait ClusterConfig extends PESizeConfig {
+trait ClusterConfig extends PESizeConfig { // if any changes, you're supposed to change the data path's connections
   val peColNum: Int = 4
   val peRowNum: Int = 3
   val inActRouterNum: Int = 3

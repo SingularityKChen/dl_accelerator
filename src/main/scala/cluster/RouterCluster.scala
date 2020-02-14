@@ -16,6 +16,10 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   io.ctrlPath.wRIO.zip(wRouters).foreach({case (x, y) => x <> y.ctrlPath})
   io.ctrlPath.pSumRIO.zip(pSRouters).foreach({case (x, y) => x <> y.ctrlPath})
   io.dataPath.routerOutPSumToPEIO.zip(pSRouters).foreach({ case (x, y) => x <> y.dataPath.outIOs.head})
+  io.dataPath.routerData.wRIO.zipWithIndex.foreach({ case (o, i) =>
+    o.outIOs.head.suggestName(s"weightRouter${i}ToPECluster")
+    o.outIOs.last.suggestName(s"weightRouter${i}ToNeighbor")
+  })
 }
 
 class InActRouter extends Module with ClusterConfig {

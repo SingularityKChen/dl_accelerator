@@ -11,10 +11,9 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
   // io.ctrlPath.inActCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
-  private val peRow: Vec[ProcessingElementIO] =  Vec(peColNum, Module(new ProcessingElement(debug = debug)).io)
-  private val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, peRow)
+  private val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, Vec(peColNum, Module(new ProcessingElement(debug = debug)).io))
   private val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
-  private val muxInActDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum,Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))))
+  private val muxInActDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum, Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))))
   // inActRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
   private val inActRoutingMode: Bool = Wire(Bool())
