@@ -21,19 +21,20 @@ trait ClusterSRAMConfig extends ClusterConfig {
   val pSumSRAMNum: Int = pSumRouterNum
 }
 
-trait GNMFCSConfig {
-  val G1: Int = 4
+trait GNMFCS1Config {
+  val G1: Int = 1
   val N1: Int = 2
   val M1: Int = 4
   val F1: Int = 3
   val C1: Int = 3
   val S1: Int = 4
-  /*
-  val G2: Int = 4
+}
+
+trait GNMFCS2Config {
+  val G2: Int = 1
   val N2: Int = 2
   val M2: Int = 4
   val F2: Int = 3
   val C2: Int = 3
   val S2: Int = 4
-   */
 }

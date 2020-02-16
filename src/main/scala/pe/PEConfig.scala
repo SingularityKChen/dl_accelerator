@@ -3,7 +3,7 @@ package dla.pe
 import scala.math.pow
 import chisel3.util.log2Ceil
 
-trait MCRENFConfig extends PESizeConfig { // contains some scala values
+trait MCRENFConfig extends NNShapeConfig { // contains some scala values
   protected val M0: Int = 4 // weights reuse M0 times
   protected val C0: Int = 2 // different input feature maps and their weights reuse
   protected val R: Int = weightHeight //
@@ -28,9 +28,12 @@ trait SPadSizeConfig extends PESizeConfig {
   protected val pSumDataIdxWidth: Int = log2Ceil(pSumDataSPadSize)
 }
 
-trait PESizeConfig {
+trait NNShapeConfig {
   protected val weightHeight: Int = 4
   protected val ofmapHeight: Int = 2
+}
+
+trait PESizeConfig extends NNShapeConfig {
   protected val inActDataWidth: Int = 12 // 8-bit data and 4-bit count
   protected val inActAdrWidth: Int = 4
   protected val weightDataWidth: Int = 12 // 24 if SIMD
