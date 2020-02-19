@@ -1,0 +1,99 @@
+$date
+2020-02-19T14:39+0000
+$end
+$version
+0.2
+$end
+$comment
+
+$end
+$timescale 1ns  $end
+$scope module PSumSRAMBank $end
+ $var wire 1 # io_ctrlPath_writeOrRead $end
+ $var wire 10 $ io_ctrlPath_startIdx $end
+ $var wire 20 & io_dataPath_inIOs_bits $end
+ $var wire 1 ( _T $end
+ $var wire 20 * io_dataPath_outIOs_bits $end
+ $var wire 1 / io_dataPath_outIOs_ready $end
+ $var wire 1 1 doIdxIncWire $end
+ $var wire 5 3 _GEN_1 $end
+ $var wire 1 4 io_dataPath_inIOs_valid $end
+ $var wire 10 5 readOutData $end
+ $var wire 1 6 io_ctrlPath_done $end
+ $var wire 1 7 clock $end
+ $var wire 1 8 io_ctrlPath_doEn $end
+ $var wire 10 9 io_debugIO_idx $end
+ $var wire 20 ; theSRAM $end
+ $var wire 10 > io_debugIO_idxCount $end
+ $var wire 5 ? _GEN_0 $end
+ $var wire 1 @ io_dataPath_inIOs_ready $end
+ $var wire 1 B doWriteWire $end
+ $var wire 1 C io_dataPath_outIOs_valid $end
+ $var wire 1 D reset $end
+ $var wire 1 E doReadWire $end
+ $var wire 1 F waitForRead $end
+ $var wire 1 G io_debugIO_idxInc $end
+  $scope module theSRAM $end
+    $scope module _T_13 $end
+     $var wire 1 ! clk $end
+     $var wire 10 " pipeline_addr_0 $end
+     $var wire 10 ' addr $end
+     $var wire 1 - valid $end
+     $var wire 1 . pipeline_valid_0 $end
+     $var wire 20 0 data $end
+     $var wire 20 2 pipeline_data_0 $end
+     $var wire 1 : en $end
+     $var wire 1 A mask $end
+    $upscope $end
+    $scope module _T_22 $end
+     $var wire 20 % data $end
+     $var wire 1 ) clk $end
+     $var wire 1 + pipeline_ren_0 $end
+     $var wire 1 , en $end
+     $var wire 10 < pipeline_raddr_0 $end
+     $var wire 10 = addr $end
+    $upscope $end
+  $upscope $end
+$upscope $end
+$enddefinitions $end
+$dumpvars
+0C
+b00000 3
+06
+0!
+b0000000000 '
+07
+b00000000000000000000 2
+08
+b0000000000 >
+0#
+b0000000000 "
+0:
+b00000 ?
+b0000000000 9
+b0000000000 $
+04
+b00000000000000000000 0
+0-
+1A
+b0000000000 <
+0.
+b0000000000 =
+0D
+0/
+b0000000000 5
+b00000000000000000000 *
+0E
+0(
+0F
+01
+0)
+0G
+b00000000000000000000 %
+0@
+0+
+b00000000000000000000 &
+b00000000000000000000 ;
+0,
+0B
+$end
