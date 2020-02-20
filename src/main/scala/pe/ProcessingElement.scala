@@ -5,8 +5,10 @@ import chisel3.util._
 // TODO: add reset signal for every module
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io: ProcessingElementIO = IO(new ProcessingElementIO)
-  private val peCtrl: ProcessingElementControl = Module(new ProcessingElementControl(debug = debug))
-  private val pePad: ProcessingElementPad = Module(new ProcessingElementPad(debug = debug))
+  private val peCtrl = Module(new ProcessingElementControl(debug = debug))
+  peCtrl.suggestName("peCtrl")
+  private val pePad = Module(new ProcessingElementPad(debug = debug))
+  pePad.suggestName("pePad")
   private val inActAndWeightIOs = Seq(pePad.io.padWF.inActWriteFin, pePad.io.padWF.weightWriteFin)
   if (fifoEn) {
     pePad.io.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true)
@@ -132,10 +134,14 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     psPadReadIdxCounter.value := 0.U
   }
   private val psDataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W)))) // reg, partial sum scratch pad
-  private val inActAdrSPad: SPadAdrModule = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
-  private val inActDataSPad: SPadDataModule = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
-  private val weightAdrSPad: SPadAdrModule = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth))
-  private val weightDataSPad: SPadDataModule = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true))
+  private val inActAdrSPad = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
+  inActAdrSPad.suggestName("inActAdrSPad")
+  private val inActDataSPad = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
+  inActDataSPad.suggestName("inActDataSPad")
+  private val weightAdrSPad = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth))
+  weightAdrSPad.suggestName("weightAdrSPad")
+  private val weightDataSPad = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true))
+  weightDataSPad.suggestName("weightDataSPad")
   // InActSPad
   private val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
   private val inActAdrDataWire: UInt = Wire(UInt(inActAdrWidth.W))

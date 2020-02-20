@@ -6,8 +6,8 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io: GLBClusterIO = IO(new GLBClusterIO)
-  private val iSRAMs: Vec[InActSRAMBankIO] = Vec(inActSRAMNum, Module(new InActSRAMBank(debug: Boolean)).io)
-  private val pSRAMs: Vec[PSumSRAMBankIO] = Vec(pSumSRAMNum, Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug)).io)
+  private val iSRAMs = VecInit(Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug)).io})
+  private val pSRAMs = VecInit(Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug)).io})
   // connections of data path
   io.dataPath.weightIO.foreach(x => x.inIOs <> x.outIOs)
   io.dataPath.inActIO.zip(iSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
@@ -148,17 +148,71 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
     io.debugIO <> DontCare
   }
 }
-
 class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
-  val io = new InActSRAMBankIO
-  private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug)).io
-  private val dataSRAM = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug)).io
+  val io: InActSRAMBankIO = IO(new InActSRAMBankIO)
+  private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug))
+  adrSRAM.suggestName("adrSRAM")
+  private val dataSRAM = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug))
+  private val bothDoneWire = Wire(Bool())
+  private val inActIdle :: inActDoing :: inActWaitAdr :: inActWaitData :: Nil = Enum(4)
+  private val inActState = RegInit(inActIdle)
+  private val currentDoingWire = Wire(Bool())
+  private val adrDoneWire = Wire(Bool())
+  private val dataDoneWire = Wire(Bool())
+  currentDoingWire := inActState === inActDoing
+  adrDoneWire := adrSRAM.io.ctrlPath.done
+  dataDoneWire := dataSRAM.io.ctrlPath.done
+  adrSRAM.io.ctrlPath.doEn := currentDoingWire || (inActState === inActWaitAdr)
+  dataSRAM.io.ctrlPath.doEn := currentDoingWire || (inActState === inActWaitData)
+  bothDoneWire := ((inActState === inActWaitData) && dataDoneWire) || ((inActState === inActWaitAdr) && adrDoneWire)
+  switch(inActState) {
+    is (inActIdle) {
+      when (io.ctrlPath.doEn) {
+        inActState := inActDoing
+      }
+    }
+    is (inActDoing) {
+      when (adrDoneWire) {
+        inActState := inActWaitData
+      }
+      when (dataDoneWire) {
+        inActState := inActWaitAdr
+      }
+    }
+    is (inActWaitData) {
+      when (dataDoneWire) {
+        inActState := inActIdle
+      }
+    }
+    is (inActWaitAdr) {
+      when (adrDoneWire) {
+        inActState := inActIdle
+      }
+    }
+  }
   // SRAM connections
-  adrSRAM.dataPath <> io.dataPath.inIOs.adrIOs
-  dataSRAM.dataPath <> io.dataPath.inIOs.dataIOs
-  io.ctrlPath.done := adrSRAM.ctrlPath.done && dataSRAM.ctrlPath.done
-  adrSRAM.ctrlPath.writeOrRead := io.ctrlPath.writeOrRead
-  dataSRAM.ctrlPath.writeOrRead := io.ctrlPath.writeOrRead
+  adrSRAM.io.dataPath.inIOs <> io.dataPath.inIOs.adrIOs
+  adrSRAM.io.dataPath.outIOs <> io.dataPath.outIOs.adrIOs
+  dataSRAM.io.dataPath.inIOs <> io.dataPath.inIOs.dataIOs
+  dataSRAM.io.dataPath.outIOs <> io.dataPath.outIOs.dataIOs
+  // control path
+  io.ctrlPath.done := bothDoneWire
+  Seq(adrSRAM.io.ctrlPath, dataSRAM.io.ctrlPath).foreach({ x =>
+    x.writeOrRead := io.ctrlPath.writeOrRead
+  })
+  if (debug) {
+    io.debugIO.theState := inActState
+    Seq(io.debugIO.adrDebug, io.debugIO.dataDebug).zip(Seq(adrSRAM.io, dataSRAM.io)).foreach({case (topIO, sram) =>
+      topIO.subDone := sram.ctrlPath.done
+      topIO.idx := sram.debugIO.idx
+      topIO.idxInc := sram.debugIO.idxInc
+      topIO.meetOneZero := sram.debugIO.meetOneZero
+      topIO.currentData := sram.debugIO.currentData
+      topIO.idxCount := DontCare
+    })
+  } else {
+    io.debugIO <> DontCare
+  }
 }
 
 class SRAMCommonCtrlIO extends Bundle {
@@ -175,25 +229,36 @@ class SRAMCommonDebugIO(private val theSRAMSize: Int, private val theDataWidth: 
   val meetOneZero: Bool = Output(Bool())
 }
 
+trait SubModuleDebugDone extends Bundle {
+  val subDone: Bool = Output(Bool())
+}
+
 trait WithStratIdxIO extends Bundle with ClusterSRAMConfig {
   val startIdx: UInt = Input(UInt(log2Ceil(pSumSRAMSize).W))
 }
 
 class InACTSRAMCommonIO(private val theSRAMSize: Int, private val theDataWidth: Int) extends Bundle {
-  val dataPath = new Bundle {
-    val inIOs: StreamBitsIO = Flipped(new StreamBitsIO(theDataWidth))
-    val outIOs = new StreamBitsIO(theDataWidth)
-  }
+  val dataPath = new StreamBitsInOutIO(theDataWidth)
   val ctrlPath = new SRAMCommonCtrlIO
   val debugIO = new SRAMCommonDebugIO(theSRAMSize, theDataWidth)
 }
 
 class InActSRAMBankIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new StreamBitsInOutIO(inActAdrWidth, inActDataWidth)
+  val dataPath = new CSCStreamInOutIO(inActAdrWidth, inActDataWidth)
   val ctrlPath = new SRAMCommonCtrlIO
+  val debugIO = new Bundle {
+    val theState: UInt = Output(UInt(2.W))
+    val adrDebug = new SRAMCommonDebugIO(inActAdrSRAMSize, inActAdrWidth) with SubModuleDebugDone
+    val dataDebug = new SRAMCommonDebugIO(inActDataSRAMSize, inActDataWidth) with SubModuleDebugDone
+  }
 }
 
-class StreamBitsInOutIO(private val adrWidth: Int, private val dataWidth: Int) extends Bundle {
+class StreamBitsInOutIO(private val theDataWidth: Int) extends Bundle {
+  val inIOs: StreamBitsIO = Flipped(new StreamBitsIO(theDataWidth))
+  val outIOs = new StreamBitsIO(theDataWidth)
+}
+
+class CSCStreamInOutIO(private val adrWidth: Int, private val dataWidth: Int) extends Bundle {
   val inIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth, dataWidth))
   val outIOs = new CSCStreamIO(adrWidth, dataWidth)
 }
@@ -215,7 +280,7 @@ class GLBClusterIO extends Bundle with ClusterSRAMConfig {
 }
 
 class WeightGLBIO extends Bundle with ClusterSRAMConfig {
-  val dataPath = new StreamBitsInOutIO(weightAdrWidth, weightDataWidth)
+  val dataPath = new CSCStreamInOutIO(weightAdrWidth, weightDataWidth)
 }
 
 class GLBClusterCtrlIO extends Bundle {
@@ -223,7 +288,7 @@ class GLBClusterCtrlIO extends Bundle {
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {
-  val inActIO: Vec[StreamBitsInOutIO] = Vec(inActSRAMNum, new StreamBitsInOutIO(inActAdrWidth, inActDataWidth))
-  val weightIO: Vec[StreamBitsInOutIO] = Vec(weightRouterNum, new StreamBitsInOutIO(weightAdrWidth, weightDataWidth))
+  val inActIO: Vec[CSCStreamInOutIO] = Vec(inActSRAMNum, new CSCStreamInOutIO(inActAdrWidth, inActDataWidth))
+  val weightIO: Vec[CSCStreamInOutIO] = Vec(weightRouterNum, new CSCStreamInOutIO(weightAdrWidth, weightDataWidth))
   val pSumIO: Vec[PSumSRAMDataIO] = Vec(pSumSRAMNum, new PSumSRAMDataIO(psDataWidth))
 }

@@ -8,7 +8,7 @@ class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   require(cgColNum == 2, "the default design is based on 2 columns, you need to change the connections now")
   //require(cgRowNum == 8)
   val io: EyerissIO = IO(new EyerissIO)
-  private val cgArray: Vec[Vec[ClusterGroupIO]] = Vec(cgRowNum, Vec(cgColNum, Module(new ClusterGroup(debug)).io))
+  private val cgArray = VecInit(Seq.fill(cgRowNum){VecInit(Seq.fill(cgColNum){Module(new ClusterGroup(debug)).io})})
   private val layerType = RegInit(0.U(2.W)) // 0: CONY layers, 1: depth-wise CONV layers, 2: fully-connected layers
   private val inActMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   private val weightMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal multi-cast, 2: broadcast

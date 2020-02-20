@@ -6,9 +6,9 @@ import dla.pe.CSCStreamIO
 
 class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   val io: RouterClusterIO = IO(new RouterClusterIO)
-  private val iRouters: Vec[CommonRouterIO[UInt, UInt]] = Vec(inActRouterNum, Module(new InActRouter).io)
-  private val wRouters: Vec[CommonRouterIO[Bool, Bool]] = Vec(weightRouterNum, Module(new WeightRouter).io)
-  private val pSRouters: Vec[PSumRouterIO] = Vec(pSumRouterNum, Module(new PSumRouter).io)
+  private val iRouters = VecInit(Seq.fill(inActRouterNum){ Module(new InActRouter).io })
+  private val wRouters = VecInit(Seq.fill(weightRouterNum){ Module(new WeightRouter).io })
+  private val pSRouters = VecInit(Seq.fill(pSumRouterNum){ Module(new PSumRouter).io })
   io.dataPath.routerData.iRIO.zip(iRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.wRIO.zip(wRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.pSumRIO.zip(pSRouters).foreach({case (x, y) => x <> y.dataPath})

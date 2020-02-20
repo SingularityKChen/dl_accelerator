@@ -11,20 +11,20 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
   // io.ctrlPath.inActCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
-  private val peArray: Vec[Vec[ProcessingElementIO]] = Vec(peRowNum, Vec(peColNum, Module(new ProcessingElement(debug = debug)).io))
-  private val muxInPSumWire: Vec[DecoupledIO[UInt]] = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
-  private val muxInActDataWire: Vec[Vec[CSCStreamIO]] = Vec(peColNum, Vec(peRowNum, Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))))
+  private val peArray = VecInit(Seq.fill(peRowNum){VecInit(Seq.fill(peColNum){Module(new ProcessingElement(debug = debug)).io})})
+  private val muxInPSumWire = Vec(peColNum, Wire(Decoupled(UInt(psDataWidth.W))))
+  private val muxInActDataWire = Vec(peColNum, Vec(peRowNum, Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))))
   // inActRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
-  private val inActRoutingMode: Bool = Wire(Bool())
+  private val inActRoutingMode = Wire(Bool())
   // inActMuxDiagnIdxWire: correspond to each diagonal, to choose data read in;
   // 0-2 to inActCluster dataPath's responding index, 3 means wait for a while
-  private val inActMuxDiagnIdxWire: Vec[UInt] = Vec(diagnNum, Wire(UInt(2.W)))
-  private val inActBroadCastIdxWire: UInt = Wire(UInt(2.W))
+  private val inActMuxDiagnIdxWire = Vec(diagnNum, Wire(UInt(2.W)))
+  private val inActBroadCastIdxWire = Wire(UInt(2.W))
   // inActFormerOrLater: correspond to each router data in, to see which part of PEs can read in data
-  private val inActFormerOrLater: Vec[Bool] = Vec(inActRouterNum, Wire(Bool())) // true for former, false for later readF
+  private val inActFormerOrLater = Vec(inActRouterNum, Wire(Bool())) // true for former, false for later readF
   // muxInPSumCtrlWire: true, then ; false, then
-  private val muxInPSumCtrlWire: Bool = Wire(Bool()) // TODO: whether each column needs one select signal?
+  private val muxInPSumCtrlWire = Wire(Bool()) // TODO: whether each column needs one select signal?
   private def inActWeightConnection(peIO: CSCStreamIO, connectIO: CSCStreamIO): Any = {
     Seq(peIO.adrIOs, peIO.dataIOs).zip(Seq(connectIO.adrIOs, connectIO.dataIOs)).foreach({
       case (x, y) =>
