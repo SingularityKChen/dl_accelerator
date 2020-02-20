@@ -10,6 +10,7 @@ import scala.math.pow
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
   val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
+  val printLogDetails = false // true to print more detailed logs
   def InActDataGen(n: Int, dataWidth: Int): List[Int] = {
     require(n <= pSumSRAMSize/oneSPadPSum, "maybe you should try a smaller 'n'")
     var resultList: List[Int] = Nil
@@ -17,7 +18,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       var temResultList: List[Int] = Nil
       val randomLen: Int = (new Random).nextInt(6) + 3 // the length of one adr SPad range(3, 8)
       while (temResultList.length < randomLen) {
-        val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt)
+        val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt - 1) + 1
         temResultList = temResultList:::List(randomNum)
       }
       temResultList = temResultList:::List(0) // one zero, that's the end of one SPad data
@@ -63,10 +64,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.dataPath.inIOs.valid.poke(true.B)
         theTopIO.debugIO.idx.expect((startIndex + i).U, s"startIdx = $startIndex")
         theTopIO.debugIO.idxInc.expect(true.B, s"$i, index should increase")
-        /*
-        println(s"--------       data = ${theData(i)} \n" +
-          s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
-          s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")*/
+        if (printLogDetails) {
+          println(s"--------       data = ${theData(i)} \n" +
+            s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
+            s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")
+        }
         theTopIO.dataPath.inIOs.ready.expect(true.B, s"$i, it should be ready now")
         theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B, s"i = $i, write should finish?")
         theClock.step(1)
@@ -81,17 +83,20 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.startIdx.poke(startIndex.U)
       for (i <- 0 until oneSPadPSum) {
         println(s"--------------- $i-th read cycle -----------")
-        /*
-        println(s"--------       data = ${theTopIO.dataPath.outIOs.bits.peek()} \n" +
-          s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
-          s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")*/
+        if (printLogDetails) {
+          println(s"--------       data = ${theData(i)} \n" +
+            s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
+            s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")
+        }
         theTopIO.dataPath.outIOs.ready.poke(true.B)
         theTopIO.debugIO.idxInc.expect(false.B, s"$i, index should not increase now")
+        theTopIO.dataPath.outIOs.valid.expect(false.B, "it should not valid now")
         theClock.step(1)
-        /*
-        println(s"--------       data = ${theTopIO.dataPath.outIOs.bits.peek()} \n" +
-          s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
-          s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")*/
+        if (printLogDetails) {
+          println(s"--------       data = ${theData(i)} \n" +
+            s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
+            s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")
+        }
         theTopIO.debugIO.idxInc.expect(true.B, s"index should increase")
         theTopIO.dataPath.outIOs.bits.expect(theData(i).U, s"$i, theData should be ${theData(i)}")
         theTopIO.dataPath.outIOs.valid.expect(true.B, "it should valid now")
@@ -120,11 +125,44 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.dataPath.inIOs.data.bits.poke(theData(i).U)
         theTopIO.dataPath.inIOs.data.valid.poke(true.B)
         theTopIO.dataPath.inIOs.data.ready.expect(true.B, s"$i, it should be ready now")
-        //theTopIO.ctrlPath.done.expect(((i > 2) && (theData(i-1) == 0) && (theData(i) == 0)).B, s"Data(i-1) = \${theData(i-1)}\n" +
-          s"Data(i) = ${theData(i)}")
+        theTopIO.ctrlPath.done.expect((i == theData.length - 1).B, s"Data(i) = ${theData(i)}, should it finish?")
+        if (printLogDetails) {
+          println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}\n--------  data = ${theData(i)}\n" +
+            s"-------- index = ${theTopIO.debugIO.idx.peek()}")
+        }
+        theClock.step(1)
+        println("-------- PASS")
       }
       println("--------------- write finish -----------------")
+      theTopIO.ctrlPath.doEn.poke(false.B)
+      theClock.step(1)
       println("--------------- begin to read ----------------")
+      theTopIO.ctrlPath.writeOrRead.poke(false.B)
+      theTopIO.ctrlPath.doEn.poke(true.B)
+      theTopIO.dataPath.outIOs.data.ready.poke(true.B)
+      theData.zipWithIndex.foreach({case (x,idx) =>
+        println(s"--------------- $idx-th read cycle --------------")
+        theTopIO.dataPath.outIOs.data.valid.expect(false.B, "it should not valid now")
+        theTopIO.debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
+        if (printLogDetails) println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}\n--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
+        theClock.step(1)
+        theTopIO.debugIO.idxInc.expect(true.B, s"$idx, index should increase now")
+        theTopIO.dataPath.outIOs.data.bits.expect(theData(idx).U,s"theData($idx) = ${theData(idx)}")
+        theTopIO.dataPath.outIOs.data.valid.expect(true.B, "it should valid now")
+        if (printLogDetails) {
+          println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}\n--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
+          println(s"--------  data = ${theTopIO.dataPath.outIOs.data.bits.peek()}\n" +
+            s"-------- index = ${theTopIO.debugIO.idx.peek()}")
+        }
+        if (x != 0) {
+          theTopIO.ctrlPath.done.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should be unfinished now")
+          theClock.step(1)
+        } else {
+          theTopIO.ctrlPath.done.expect(true.B, s"current data equals to ${theData(idx)}, should finish now")
+          theClock.step(1)
+        }
+        println("-------- PASS")
+      })
       println("---------------- read finish -----------------")
       println("---------------- test finish -----------------")
     }

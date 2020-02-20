@@ -43,6 +43,8 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   if (debug) {
     debugLogic(io.debugIO, doIdxWire)
     io.debugIO.idxCount := doIdxCount
+    io.debugIO.currentData := DontCare
+    io.debugIO.meetOneZero := DontCare
   } else {
     io.debugIO <> DontCare
   }
@@ -59,22 +61,25 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
   protected val doWriteWire: Bool = Wire(Bool())
   protected val writeInData: UInt = Wire(UInt(theDataWidth.W))
   protected val readOutData: UInt = Wire(UInt(theDataWidth.W))
-  protected val waitForRead: Bool = RegInit(true.B) // use for letting increase slower when read
+  // waitForRead: false, then ask for data;
+  //              true, then data comes.
+  protected val waitForRead: Bool = RegInit(false.B) // use for letting increase slower when read
   protected val doIdxIncWire: Bool = Wire(Bool()) // true, then the index increase
   protected val nextValid: Bool = Wire(Bool())
+  protected val nextValidReg: Bool = RegNext(nextValid) // one cycle after nextValid
   protected val doDoneReg: Bool = RegInit(false.B) // or combinational loop detected
   doIdxIncWire := Mux(writeOrRead, doWriteWire, doReadWire && waitForRead)
   def readLogic(readOutIO: DecoupledIO[UInt], doIdx: UInt): Any = {
-    nextValid := doEnWire
-    waitForRead := !waitForRead
-    readOutIO.valid := RegNext(nextValid) // reg next, so one cycle later, data will be read out with valid signal
-    doReadWire := readOutIO.ready && nextValid
+    nextValid := Mux(writeOrRead, false.B, doEnWire && !waitForRead)
+    waitForRead := Mux(writeOrRead, waitForRead, !waitForRead)
+    readOutIO.valid := nextValidReg // reg next, so one cycle later, data will be read out with valid signal
+    doReadWire := readOutIO.ready && nextValidReg
     readOutData := theSRAM.read(doIdx, doReadWire && !waitForRead)
-    readOutIO.bits := Mux(writeOrRead, 0.U, readOutData)
+    readOutIO.bits := Mux(waitForRead, readOutData, 0.U)
   }
 
   def writeLogic(writeInIO: DecoupledIO[UInt], doIdx: UInt): Any = {
-    writeInData := Mux(writeOrRead, writeInIO.bits, 0.U)
+    writeInData := writeInIO.bits
     doWriteWire := doEnWire && writeInIO.valid
     writeInIO.ready := doWriteWire
     when (doIdxIncWire) {
@@ -92,6 +97,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   val io: InACTSRAMCommonIO = IO(new InACTSRAMCommonIO(theSRAMSize, theDataWidth))
   private val doMeetZeroWire = Wire(Bool()) // current data equals to zero
   private val doMightFinishedReg = RegInit(false.B) // that's the end of one SPad's data
+  private val doMightFinishedWire = Wire(Bool())
   private val writeDoneWire = Wire(Bool())
   private val readDoneWire = Wire(Bool())
   private val doIdxReg: UInt = RegInit(0.U(log2Ceil(theSRAMSize).W))
@@ -100,29 +106,43 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // then continue reading
   private val currentData = Wire(UInt(log2Ceil(theSRAMSize).W))
   private val doDoneWire = Wire(Bool())
+  // if meet two continuous zeros, then the group of data finishes
+  private val meetTwoZerosWire = Wire(Bool())
+  private val idxWrap = Wire(Bool())
   // TODO: add some logic to check whether one SPad of data is a zero matrix, true then jump
   writeOrRead := io.ctrlPath.writeOrRead
   io.ctrlPath.done := doDoneWire
   doDoneReg := doDoneWire
-  doEnWire := !doDoneReg && io.ctrlPath.doEn // FIXME
+  doEnWire := (!writeOrRead || !doDoneReg) && io.ctrlPath.doEn // FIXME
   currentData := Mux(writeOrRead, writeInData, readOutData)
+  // index increase and wrap
   when (doIdxIncWire) {
     doIdxReg := doIdxReg + 1.U
+  }
+  when (idxWrap) {
+    doIdxReg := 0.U
+    doMightFinishedReg := false.B // reset it
   }
   // write logic
   writeLogic(io.dataPath.inIOs.data, doIdxReg)
   // read logic
   readLogic(io.dataPath.outIOs.data, doIdxReg)
   // do finish?
-  doMeetZeroWire := currentData === 0.U
-  doMightFinishedReg := doMeetZeroWire && doEnWire // meets one zero, that's the end of one SPad
-  // if meet two continuous zeros, then the group of data finishes
-  writeDoneWire := doMeetZeroWire && doEnWire && doMightFinishedReg
-  readDoneWire := doMightFinishedReg
+  private val meetZeroWire = Wire(Bool())
+  meetZeroWire := currentData === 0.U
+  doMeetZeroWire := Mux(writeOrRead, meetZeroWire, meetZeroWire && waitForRead)
+  doMightFinishedWire := doMeetZeroWire && doEnWire // meets one zero, that's the end of one SPad
+  doMightFinishedReg := doMightFinishedWire // reg it for indicating two zeros
+  meetTwoZerosWire := doMeetZeroWire && doEnWire && doMightFinishedReg // that's two zeros
+  writeDoneWire := meetTwoZerosWire
+  readDoneWire := doMightFinishedWire
   doDoneWire := Mux(writeOrRead, writeDoneWire, readDoneWire)
+  idxWrap := meetTwoZerosWire // wrap the index only after meeting two zeros
   // debug io
   if (debug) {
     debugLogic(io.debugIO, doIdxReg)
+    io.debugIO.currentData := currentData
+    io.debugIO.meetOneZero := doMightFinishedReg
     io.debugIO.idxCount := DontCare
   } else {
     io.debugIO <> DontCare
@@ -151,6 +171,8 @@ class SRAMCommonDebugIO(private val theSRAMSize: Int, private val theDataWidth: 
   val idx: UInt = Output(UInt(log2Ceil(theSRAMSize).W))
   val idxInc: Bool = Output(Bool())
   val idxCount: UInt = Output(UInt(log2Ceil(theSRAMSize).W))
+  val currentData: UInt = Output(UInt(theDataWidth.W))
+  val meetOneZero: Bool = Output(Bool())
 }
 
 trait WithStratIdxIO extends Bundle with ClusterSRAMConfig {

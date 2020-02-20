@@ -1,8 +1,18 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMCommon|InActSRAMCommon>io_dataPath_outIOs_data_bits",
+    "sink":"~InActSRAMCommon|InActSRAMCommon>io_debugIO_currentData",
     "sources":[
+      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead",
+      "~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_bits"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_ready",
+    "sources":[
+      "~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_valid",
+      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_doEn",
       "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead"
     ]
   },
@@ -22,14 +32,6 @@
       "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead",
       "~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_valid",
       "~InActSRAMCommon|InActSRAMCommon>io_dataPath_outIOs_data_ready",
-      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_doEn"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_ready",
-    "sources":[
-      "~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_valid",
       "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_doEn"
     ]
   },

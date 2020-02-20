@@ -19,13 +19,6 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~PSumSRAMBank|PSumSRAMBank>io_dataPath_outIOs_bits",
-    "sources":[
-      "~PSumSRAMBank|PSumSRAMBank>io_ctrlPath_writeOrRead"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~PSumSRAMBank|PSumSRAMBank>io_debugIO_idx",
     "sources":[
       "~PSumSRAMBank|PSumSRAMBank>io_ctrlPath_startIdx"
