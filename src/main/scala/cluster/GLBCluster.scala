@@ -166,6 +166,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
     io.debugIO <> DontCare
   }
 }
+
 class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io: InActSRAMBankIO = IO(new InActSRAMBankIO)
   private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug))

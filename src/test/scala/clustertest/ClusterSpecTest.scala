@@ -45,7 +45,50 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     }
     resultList
   }
-  private def writeInAct(inIo: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int], theClock: Clock, adrOrData: Boolean) : Any = {
+  private def readOutAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int], theClock: Clock, adrOrData: Boolean): Any = {
+    var currentType: String = "Default"
+    if (adrOrData) {
+      currentType = "adr"
+    } else {
+      currentType = "data"
+    }
+    theData.zipWithIndex.foreach({ case (x, idx) =>
+      println(s"--------------- $idx-th read $currentType cycle --------------")
+      outIO.data.valid.expect(false.B, s"$currentType should not valid now")
+      debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
+      if (printLogDetails) println(s"--------  currentData = ${debugIO.currentData.peek()}")
+      theClock.step(1)
+      debugIO.idxInc.expect(true.B, s"$idx, index should increase now")
+      outIO.data.bits.expect(theData(idx).U, s"theData($idx) = ${theData(idx)}")
+      outIO.data.valid.expect(true.B, s"$currentType should valid now")
+      if (printLogDetails) {
+        println(s"--------  currentData = ${debugIO.currentData.peek()}")
+        println(s"--------  data = ${outIO.data.bits.peek()}\n" +
+          s"-------- index = ${debugIO.idx.peek()}")
+      }
+      theClock.step(1)
+      if (x != 0) {
+        doneIO.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should $currentType be unfinished now")
+      } else {
+        doneIO.expect(true.B, s"current data equals to ${theData(idx)}, should $currentType finish now")
+      }
+      if (printLogDetails) {
+        println(s"--------  done = ${doneIO.peek()}")
+      }
+      println(s"-------- $currentType PASS $idx")
+    })
+  }
+  private def readOutActAdrAndData(theOutIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: List[Int], dataStream: List[Int], theClock: Clock): Any = {
+    fork {
+      readOutAct(theOutIO.dataIOs, theDebugIO.dataDebug, theDebugIO.dataDebug.subDone, dataStream, theClock, adrOrData = false)
+      println("------------- data read finish ---------------")
+    } .fork {
+      readOutAct(theOutIO.adrIOs, theDebugIO.adrDebug, theDebugIO.adrDebug.subDone, adrStream, theClock, adrOrData = true)
+      println("------------ adr read finish ---------------")
+    } .join()
+
+  }
+  private def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int], theClock: Clock, adrOrData: Boolean) : Any = {
     var currentType: String = "Default"
     if (adrOrData) {
       currentType = "adr"
@@ -54,9 +97,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     }
     for (i <- theData.indices) {
       println(s"------------- $i-th $currentType write cycle ----------")
-      inIo.data.bits.poke(theData(i).U)
-      inIo.data.valid.poke(true.B)
-      inIo.data.ready.expect(true.B, s"$i, $currentType should be ready now")
+      inIO.data.bits.poke(theData(i).U)
+      inIO.data.valid.poke(true.B)
+      inIO.data.ready.expect(true.B, s"$i, $currentType should be ready now")
       if (printLogDetails) {
         println(s"-------- $currentType done = ${doneIO.peek()}\n-------- $currentType data = ${theData(i)}\n" +
           s"-------- $currentType index = ${debugIO.idx.peek()}\n-------- $currentType theState = ${debugIO.theState.peek()}")
@@ -168,31 +211,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.ctrlPath.writeOrRead.poke(false.B)
         theTopIO.ctrlPath.doEn.poke(true.B)
         theTopIO.dataPath.outIOs.data.ready.poke(true.B)
-        theData.zipWithIndex.foreach({ case (x, idx) =>
-          println(s"--------------- $idx-th read cycle --------------")
-          theTopIO.dataPath.outIOs.data.valid.expect(false.B, "it should not valid now")
-          theTopIO.debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
-          if (printLogDetails) println(s"--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
-          theClock.step(1)
-          theTopIO.debugIO.idxInc.expect(true.B, s"$idx, index should increase now")
-          theTopIO.dataPath.outIOs.data.bits.expect(theData(idx).U, s"theData($idx) = ${theData(idx)}")
-          theTopIO.dataPath.outIOs.data.valid.expect(true.B, "it should valid now")
-          if (printLogDetails) {
-            println(s"--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
-            println(s"--------  data = ${theTopIO.dataPath.outIOs.data.bits.peek()}\n" +
-              s"-------- index = ${theTopIO.debugIO.idx.peek()}")
-          }
-          theClock.step(1)
-          if (x != 0) {
-            theTopIO.ctrlPath.done.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should be unfinished now")
-          } else {
-            theTopIO.ctrlPath.done.expect(true.B, s"current data equals to ${theData(idx)}, should finish now")
-          }
-          if (printLogDetails) {
-            println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}")
-          }
-          println("-------- PASS")
-        })
+        // begin to read out data
+        readOutAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, theData, theClock, adrOrData = true)
+        // read out finish
         println("---------------- read finish -----------------")
         println("---------------- test finish -----------------")
       }
@@ -227,6 +248,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("--------------- begin to read ----------------")
       theTopIO.ctrlPath.writeOrRead.poke(false.B)
       theTopIO.ctrlPath.doEn.poke(true.B)
+      theClock.step(1) // from idle to doing
+      // begin to read out streams into data sram and address sram
+      readOutActAdrAndData(theTopIO.dataPath.outIOs, theTopIO.debugIO, theAdrStream, theDataStream, theClock)
+      theClock.step(1)
+      theTopIO.debugIO.theState.expect(0.U, "after all read, the state should be idle now")
+      println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
+      println("-------------- all read finish ---------------")
+      println("---------------- test finish -----------------")
     }
   }
   //behavior of "work well on Processing Element Cluster"
