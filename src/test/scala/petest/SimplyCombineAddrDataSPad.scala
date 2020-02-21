@@ -2,9 +2,9 @@ package dla.test.petest
 
 import chisel3._
 import chisel3.util._
-import dla.pe.{CSCStreamIO, CSCWriteFinIO, SPadAdrModule, SPadDataModule, SPadSizeConfig}
+import dla.pe.{CSCStreamIO, CSCWriteFinIO, PESizeConfig, SPadAdrModule, SPadDataModule, SPadSizeConfig}
 
-class SimplyCombineAdrDataSPad extends Module with SPadSizeConfig {
+class SimplyCombineAdrDataSPad extends Module with SPadSizeConfig with PESizeConfig{
   val io: SimplyCombineAdrDataSPadIO = IO(new SimplyCombineAdrDataSPadIO)
   private val inActAdrSPad: SPadAdrModule = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
   private val inActDataSPad: SPadDataModule = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
@@ -107,8 +107,8 @@ class SimplyCombineAdrDataSPad extends Module with SPadSizeConfig {
   }
 }
 
-class SimplyCombineAdrDataSPadIO extends Bundle with SPadSizeConfig {
-  val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(inActDataWidth, inActAdrWidth))
+class SimplyCombineAdrDataSPadIO extends Bundle with SPadSizeConfig with PESizeConfig {
+  val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = inActAdrWidth, dataWidth = inActDataWidth))
   val inActWF = new CSCWriteFinIO
   val inActAdrWriteIdx: UInt = Output(UInt(inActAdrIdxWidth.W)) // use for test
   val inActDataReq: Bool = Input(Bool()) // control to read data vector

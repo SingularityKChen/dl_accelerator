@@ -61,11 +61,11 @@ class SPadCommonCtrlIO(private val padSize: Int) extends Bundle {
 class DataStreamIO extends Bundle with PESizeConfig {
   val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
   val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
-  val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(inActDataWidth, inActAdrWidth))
-  val weightIOs: CSCStreamIO = Flipped(new CSCStreamIO(weightDataWidth, weightAdrWidth))
+  val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = inActAdrWidth, dataWidth = inActDataWidth))
+  val weightIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = weightAdrWidth, dataWidth = weightDataWidth))
 }
 
-class CSCStreamIO(private val dataWidth: Int, private val adrWidth: Int) extends Bundle {
+class CSCStreamIO(private val adrWidth: Int, private val dataWidth: Int) extends Bundle {
   val adrIOs = new StreamBitsIO(adrWidth) // output bits and valid
   val dataIOs = new StreamBitsIO(dataWidth) // output bits and valid
 }

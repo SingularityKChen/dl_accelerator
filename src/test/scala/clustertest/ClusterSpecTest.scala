@@ -3,21 +3,24 @@ package dla.test.clustertest
 import chisel3._
 import chisel3.tester._
 import dla.cluster._
-import dla.pe.{MCRENFConfig, StreamBitsIO}
+import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import org.scalatest._
 
 import scala.util.Random
-import scala.math.pow
+import scala.math.{min, pow}
 
-class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
-  val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  val printLogDetails = false // true to print more detailed logs
-  def InActDataGen(n: Int, dataWidth: Int): List[Int] = {
-    require(n <= pSumSRAMSize/oneSPadPSum, "maybe you should try a smaller 'n'")
+class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
+  private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
+  private val printLogDetails = true // true to print more detailed logs
+  private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
+  private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
+  private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
+  private def InActDataGen(n: Int, dataWidth: Int, maxLen: Int, minLen: Int): List[Int] = {
+    require(maxLen > minLen, s"maxLen should larger than minLen, $maxLen should lg $minLen")
     var resultList: List[Int] = Nil
     for (i <- 0 until n) {
       var temResultList: List[Int] = Nil
-      val randomLen: Int = (new Random).nextInt(6) + 3 // the length of one adr SPad range(3, 8)
+      val randomLen: Int = (new Random).nextInt(maxLen-minLen) + minLen // the length of one SPad range(minLen, maxLen)
       while (temResultList.length < randomLen) {
         val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt - 1) + 1
         temResultList = temResultList:::List(randomNum)
@@ -28,7 +31,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     resultList = resultList:::List(0) // two zeros, that's the end of this stream data
     resultList
   }
-  def PSumDataGen(n:Int, dataWidth: Int): List[Int] = {
+  private def PSumDataGen(n:Int, dataWidth: Int): List[Int] = {
+    //require(n <= maxPSumStreamNum, s"you should assign a smaller 'n' oneSPadPSum = $oneSPadPSum, pSumSRAMSize = $pSumSRAMSize")
     var resultList: List[Int] = Nil
     while ( resultList.length < n ){
       val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt)
@@ -41,28 +45,44 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     }
     resultList
   }
-  behavior of "test the spec of cluster group"
-  it should "work well on GLB Cluster" in {
-    def writeInAct(inIo: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int], theClock: Clock) : Any = {
-      for (i <- theData.indices) {
-        println(s"--------------- $i-th write cycle -----------")
-        inIo.data.bits.poke(theData(i).U)
-        inIo.data.valid.poke(true.B)
-        inIo.data.ready.expect(true.B, s"$i, it should be ready now")
-        doneIO.expect((i == theData.length - 1).B, s"Data(i) = ${theData(i)}, should it finish?")
-        if (printLogDetails) {
-          println(s"--------  done = ${doneIO.peek()}\n--------  data = ${theData(i)}\n" +
-            s"-------- index = ${debugIO.idx.peek()}")
-        }
-        theClock.step(1)
-        println("-------- PASS")
-      }
+  private def writeInAct(inIo: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int], theClock: Clock, adrOrData: Boolean) : Any = {
+    var currentType: String = "Default"
+    if (adrOrData) {
+      currentType = "adr"
+    } else {
+      currentType = "data"
     }
+    for (i <- theData.indices) {
+      println(s"------------- $i-th $currentType write cycle ----------")
+      inIo.data.bits.poke(theData(i).U)
+      inIo.data.valid.poke(true.B)
+      inIo.data.ready.expect(true.B, s"$i, $currentType should be ready now")
+      if (printLogDetails) {
+        println(s"-------- $currentType done = ${doneIO.peek()}\n-------- $currentType data = ${theData(i)}\n" +
+          s"-------- $currentType index = ${debugIO.idx.peek()}\n-------- $currentType theState = ${debugIO.theState.peek()}")
+      }
+      theClock.step(1)
+      doneIO.expect((i == theData.length - 1).B, s"$currentType Data($i) = ${theData(i)}, $currentType theState = ${debugIO.theState.peek()},should $currentType finish?")
+      println(s"-------- $currentType PASS $i")
+    }
+  }
+  private def writeInActAdrAndData(theInIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: List[Int], dataStream: List[Int], theClock: Clock): Any = {
+    fork {
+      writeInAct(theInIO.dataIOs, theDebugIO.dataDebug, theDebugIO.dataDebug.subDone, dataStream, theClock, adrOrData = false)
+      println("------------- data write finish ---------------")
+    } .fork {
+      writeInAct(theInIO.adrIOs, theDebugIO.adrDebug, theDebugIO.adrDebug.subDone, adrStream, theClock, adrOrData = true)
+      println("------------ adr write finish ---------------")
+    } .join()
+  }
+  // test GLB Cluster
+  behavior of "test the spec of GLB Cluster"
+  it should "work well on PSumSRAMBank" in {
     test(new PSumSRAMBank(pSumSRAMSize, psDataWidth, true)) { thePSumBank =>
       val theTopIO = thePSumBank.io
       val theClock = thePSumBank.clock
-      val theData =  PSumDataGen(pSumSRAMSize, psDataWidth)
-      val startIndex = (new Random).nextInt(pSumSRAMSize/oneSPadPSum - 1)*oneSPadPSum
+      val theData = PSumDataGen(pSumSRAMSize, psDataWidth)
+      val startIndex = (new Random).nextInt(maxPSumStreamNum - 1) * oneSPadPSum
       println("----------------- test begin -----------------")
       println("----------- Partial Sum SRAM Bank ------------")
       println("----------- test basic functions -------------")
@@ -86,8 +106,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
             s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")
         }
         theTopIO.dataPath.inIOs.ready.expect(true.B, s"$i, it should be ready now")
-        theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B, s"i = $i, write should finish?")
         theClock.step(1)
+        theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B, s"i = $i, write should finish?")
         println("-------- PASS")
       }
       println("---------------- write finish ----------------")
@@ -116,68 +136,76 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.debugIO.idxInc.expect(true.B, s"index should increase")
         theTopIO.dataPath.outIOs.bits.expect(theData(i).U, s"$i, theData should be ${theData(i)}")
         theTopIO.dataPath.outIOs.valid.expect(true.B, "it should valid now")
-        theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B)
         theClock.step(1)
+        theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B)
         println("-------- PASS")
       }
       println("---------------- read finish -----------------")
       println("---------------- test finish -----------------")
     }
+  }
 
-    test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
-      val theTopIO = theAdrSRAM.io
-      val theClock = theAdrSRAM.clock
-      val theData =  InActDataGen(5, inActAdrWidth)
-      println("----------------- test begin -----------------")
-      println("----------- InputActAdr SRAM Bank ------------")
-      println("----------- test basic functions -------------")
-      theAdrSRAM.reset.poke(true.B)
-      theClock.step(1)
-      theAdrSRAM.reset.poke(false.B)
-      println("--------------- begin to write ---------------")
-      theTopIO.ctrlPath.writeOrRead.poke(true.B)
-      theTopIO.ctrlPath.doEn.poke(true.B)
-      writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, theData, theClock)
-      println("--------------- write finish -----------------")
-      theTopIO.ctrlPath.doEn.poke(false.B)
-      theClock.step(1)
-      println("--------------- begin to read ----------------")
-      theTopIO.ctrlPath.writeOrRead.poke(false.B)
-      theTopIO.ctrlPath.doEn.poke(true.B)
-      theTopIO.dataPath.outIOs.data.ready.poke(true.B)
-      theData.zipWithIndex.foreach({case (x,idx) =>
-        println(s"--------------- $idx-th read cycle --------------")
-        theTopIO.dataPath.outIOs.data.valid.expect(false.B, "it should not valid now")
-        theTopIO.debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
-        if (printLogDetails) println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}\n--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
+  it should "work well on InActSRAMCommon" in {
+      test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
+        val theTopIO = theAdrSRAM.io
+        val theClock = theAdrSRAM.clock
+        val theData = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
+        println("----------------- test begin -----------------")
+        println("----------- InputActAdr SRAM Bank ------------")
+        println("----------- test basic functions -------------")
+        theAdrSRAM.reset.poke(true.B)
         theClock.step(1)
-        theTopIO.debugIO.idxInc.expect(true.B, s"$idx, index should increase now")
-        theTopIO.dataPath.outIOs.data.bits.expect(theData(idx).U,s"theData($idx) = ${theData(idx)}")
-        theTopIO.dataPath.outIOs.data.valid.expect(true.B, "it should valid now")
-        if (printLogDetails) {
-          println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}\n--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
-          println(s"--------  data = ${theTopIO.dataPath.outIOs.data.bits.peek()}\n" +
-            s"-------- index = ${theTopIO.debugIO.idx.peek()}")
-        }
-        if (x != 0) {
-          theTopIO.ctrlPath.done.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should be unfinished now")
+        theAdrSRAM.reset.poke(false.B)
+        println("--------------- begin to write ---------------")
+        theTopIO.ctrlPath.writeOrRead.poke(true.B)
+        theTopIO.ctrlPath.doEn.poke(true.B)
+        // begin to write in data
+        writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, theData, theClock, adrOrData = true)
+        println("--------------- write finish -----------------")
+        theTopIO.ctrlPath.doEn.poke(false.B)
+        theClock.step(1)
+        println("--------------- begin to read ----------------")
+        theTopIO.ctrlPath.writeOrRead.poke(false.B)
+        theTopIO.ctrlPath.doEn.poke(true.B)
+        theTopIO.dataPath.outIOs.data.ready.poke(true.B)
+        theData.zipWithIndex.foreach({ case (x, idx) =>
+          println(s"--------------- $idx-th read cycle --------------")
+          theTopIO.dataPath.outIOs.data.valid.expect(false.B, "it should not valid now")
+          theTopIO.debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
+          if (printLogDetails) println(s"--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
           theClock.step(1)
-        } else {
-          theTopIO.ctrlPath.done.expect(true.B, s"current data equals to ${theData(idx)}, should finish now")
+          theTopIO.debugIO.idxInc.expect(true.B, s"$idx, index should increase now")
+          theTopIO.dataPath.outIOs.data.bits.expect(theData(idx).U, s"theData($idx) = ${theData(idx)}")
+          theTopIO.dataPath.outIOs.data.valid.expect(true.B, "it should valid now")
+          if (printLogDetails) {
+            println(s"--------  currentData = ${theTopIO.debugIO.currentData.peek()}")
+            println(s"--------  data = ${theTopIO.dataPath.outIOs.data.bits.peek()}\n" +
+              s"-------- index = ${theTopIO.debugIO.idx.peek()}")
+          }
           theClock.step(1)
-        }
-        println("-------- PASS")
-      })
-      println("---------------- read finish -----------------")
-      println("---------------- test finish -----------------")
-    }
+          if (x != 0) {
+            theTopIO.ctrlPath.done.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should be unfinished now")
+          } else {
+            theTopIO.ctrlPath.done.expect(true.B, s"current data equals to ${theData(idx)}, should finish now")
+          }
+          if (printLogDetails) {
+            println(s"--------  done = ${theTopIO.ctrlPath.done.peek()}")
+          }
+          println("-------- PASS")
+        })
+        println("---------------- read finish -----------------")
+        println("---------------- test finish -----------------")
+      }
+  }
 
+  it should "work well on InActSRAMBank" in {
     test(new InActSRAMBank(true)) { theInAct =>
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
-      val theAdrStream = InActDataGen(5, inActAdrWidth)
-      val theDataStream = InActDataGen(5, inActDataWidth)
+      val theAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
+      val theDataStream = InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)
       println("----------------- test begin -----------------")
+      println(s"--------  ")
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theInAct.reset.poke(true.B)
@@ -187,13 +215,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.writeOrRead.poke(true.B)
       theTopIO.ctrlPath.doEn.poke(true.B)
       theClock.step(1) // from idle to doing
-      fork {
-        writeInAct(theTopIO.dataPath.inIOs.adrIOs, theTopIO.debugIO.adrDebug, theTopIO.debugIO.adrDebug.subDone, theAdrStream, theClock)
-        println("------------- adr write finish ---------------")
-      } .fork {
-        writeInAct(theTopIO.dataPath.inIOs.dataIOs, theTopIO.debugIO.dataDebug, theTopIO.debugIO.dataDebug.subDone, theDataStream, theClock)
-        println("------------ data write finish ---------------")
-      } .join()
+      // begin to write streams into data sram and address sram
+      writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, theAdrStream, theDataStream, theClock)
+      // write finish
+      theClock.step(1)
       theTopIO.debugIO.theState.expect(0.U, "after all write, the state should be idle now")
       println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
       println("------------- all write finish ---------------")
@@ -204,7 +229,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.doEn.poke(true.B)
     }
   }
-  //it should "work well on Router Cluster" in {}
-  //it should "work well on Processing Element Cluster" in {}
-  //it should "work well on Cluster Group" in {}
+  //behavior of "work well on Processing Element Cluster"
+  //behavior of "work well on Cluster Group"
+  /*behavior of "test the spec of Router Cluster"
+  it should "work well on Router Cluster" in {
+
+  }*/
 }

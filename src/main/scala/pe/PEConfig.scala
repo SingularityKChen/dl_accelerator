@@ -15,7 +15,7 @@ trait MCRENFConfig extends NNShapeConfig { // contains some scala values
   // C0*R0*E0*N0*F0 <
 }
 
-trait SPadSizeConfig extends PESizeConfig {
+trait SPadSizeConfig {
   protected val pSumDataSPadSize: Int = 32
   protected val inActDataSPadSize: Int = 16
   protected val inActAdrSPadSize: Int = 9

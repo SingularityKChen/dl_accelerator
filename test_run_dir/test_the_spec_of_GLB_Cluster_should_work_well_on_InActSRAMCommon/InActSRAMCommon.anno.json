@@ -18,15 +18,6 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_done",
-    "sources":[
-      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead",
-      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_doEn",
-      "~InActSRAMCommon|InActSRAMCommon>io_dataPath_inIOs_data_bits"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~InActSRAMCommon|InActSRAMCommon>io_debugIO_idxInc",
     "sources":[
       "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead",
@@ -36,12 +27,19 @@
     ]
   },
   {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_done",
+    "sources":[
+      "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead"
+    ]
+  },
+  {
     "class":"firrtl.EmitCircuitAnnotation",
     "emitter":"firrtl.LowFirrtlEmitter"
   },
   {
     "class":"firrtl.options.TargetDirAnnotation",
-    "directory":"test_run_dir/test_the_spec_of_cluster_group_should_work_well_on_GLB_Cluster"
+    "directory":"test_run_dir/test_the_spec_of_GLB_Cluster_should_work_well_on_InActSRAMCommon"
   },
   {
     "class":"firrtl.options.OutputAnnotationFileAnnotation",
@@ -49,6 +47,6 @@
   },
   {
     "class":"firrtl.transforms.BlackBoxTargetDirAnno",
-    "targetDir":"test_run_dir/test_the_spec_of_cluster_group_should_work_well_on_GLB_Cluster"
+    "targetDir":"test_run_dir/test_the_spec_of_GLB_Cluster_should_work_well_on_InActSRAMCommon"
   }
 ]

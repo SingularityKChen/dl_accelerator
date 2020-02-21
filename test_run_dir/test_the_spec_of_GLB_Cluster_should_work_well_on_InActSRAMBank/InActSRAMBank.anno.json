@@ -9,11 +9,9 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_ctrlPath_done",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_subDone",
     "sources":[
-      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_bits",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_bits"
+      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead"
     ]
   },
   {
@@ -36,10 +34,9 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_subDone",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_subDone",
     "sources":[
-      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_bits"
+      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead"
     ]
   },
   {
@@ -60,7 +57,7 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_subDone",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_currentData",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
       "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_bits"
@@ -68,10 +65,9 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_currentData",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_ctrlPath_done",
     "sources":[
-      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_bits"
+      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead"
     ]
   },
   {
@@ -80,7 +76,7 @@
   },
   {
     "class":"firrtl.options.TargetDirAnnotation",
-    "directory":"test_run_dir/test_the_spec_of_cluster_group_should_work_well_on_GLB_Cluster"
+    "directory":"test_run_dir/test_the_spec_of_GLB_Cluster_should_work_well_on_InActSRAMBank"
   },
   {
     "class":"firrtl.options.OutputAnnotationFileAnnotation",
@@ -88,6 +84,6 @@
   },
   {
     "class":"firrtl.transforms.BlackBoxTargetDirAnno",
-    "targetDir":"test_run_dir/test_the_spec_of_cluster_group_should_work_well_on_GLB_Cluster"
+    "targetDir":"test_run_dir/test_the_spec_of_GLB_Cluster_should_work_well_on_InActSRAMBank"
   }
 ]

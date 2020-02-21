@@ -90,7 +90,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   }
 }
 
-class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with SPadSizeConfig {
+class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with SPadSizeConfig with PESizeConfig {
   val io: ProcessingElementPadIO = IO(new ProcessingElementPadIO)
   private def nextSPadInActAdr(): Unit = {
     sPad := padInActAdr
