@@ -7,12 +7,72 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io: GLBClusterIO = IO(new GLBClusterIO)
   private val iSRAMs = VecInit(Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug)).io})
+  iSRAMs.suggestName("inActSRAMs")
   private val pSRAMs = VecInit(Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug)).io})
+  pSRAMs.suggestName("pSumSRAMs")
+  private val oneSRAMIdle :: oneSRAMDoing :: Nil = Enum(2)
+  private val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
+  private val theSRAMsCtrl = Seq(iSRAMs.map(x => x.ctrlPath), pSRAMs.map(x => x.ctrlPath))
+  private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
+  private val theSRAMsEnWire = Wire(Vec(2, Bool()))
+  theSRAMsEnWire.head.suggestName("inActSRAMEnWire")
+  theSRAMsEnWire.last.suggestName("pSumSRAMEnWire")
+  private val theSRAMsState = VecInit(Seq.fill(2){RegInit(oneSRAMIdle)})
+  theSRAMsState.head.suggestName("inActSRAMState")
+  theSRAMsState.last.suggestName("pSumSRAMState")
+  private val theSRAMsDoneRegVec = Seq(VecInit(Seq.fill(inActSRAMNum){RegInit(false.B)}), VecInit(Seq.fill(pSumSRAMNum){RegInit(false.B)}))
+  theSRAMsDoneRegVec.head.suggestName("inActSRAMDoneRegVec")
+  theSRAMsDoneRegVec.last.suggestName("pSumSRAMDoneRegVec")
+  private val theSRAMsAllDoneWire = Wire(Vec(2, Bool()))
+  theSRAMsAllDoneWire.head.suggestName("inActSRAMAllDoneWire")
+  theSRAMsAllDoneWire.last.suggestName("pSumSRAMAllDoneWire")
+  private val theSRAMsDoingWire = Wire(Vec(2, Bool()))
+  theSRAMsDoingWire.head.suggestName("inActSRAMDoingWire")
+  theSRAMsDoingWire.last.suggestName("pSumSRAMDoingWire")
+  private val pSumSRAMStrIdx = VecInit(Seq.fill(pSumSRAMNum){RegInit(0.U)})
+  private def OneSRAMState(stateReg: UInt, enable: Bool, done: Bool): Unit = {
+    switch (stateReg) {
+      is (oneSRAMIdle) {
+        when (enable) {
+          stateReg := oneSRAMDoing
+        }
+      }
+      is (oneSRAMDoing) {
+        when (done) {
+          stateReg := oneSRAMIdle
+        }
+      }
+    }
+  }
+  // connections of inAct and PSum
+  for (i <- 0 until 2) {
+    // connections of control path
+    theTopCtrls(i).done := theSRAMsAllDoneWire(i)
+    theTopCtrls(i).busy := theSRAMsDoingWire(i)
+    theSRAMsEnWire(i) := theTopCtrls(i).doEn
+    // inner logic
+    theSRAMsAllDoneWire(i) := theSRAMsDoneRegVec(i).reduce(_ && _) // when they all become true, then inActSRAMs are all done
+    theSRAMsDoingWire(i) := theSRAMsState(i) === oneSRAMDoing
+    // inner connections
+    for (j <- 0 until theSRAMsNum(i)) {
+      theSRAMsCtrl(i)(j).doEn := theSRAMsDoingWire(i) && !theSRAMsDoneRegVec(i)(j)
+      // if one received done signal, then its signal flips, from false to true, then disable its enable signal
+      // if inAct is not doing, then it's idle. so assign done reg to false.
+      theSRAMsDoneRegVec(i)(j) := Mux(!theSRAMsDoingWire(i), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
+      theSRAMsCtrl(i)(j).writeOrRead := io.ctrlPath.inActIO.writeOrRead
+    }
+    OneSRAMState(theSRAMsState(i), theSRAMsEnWire(i), theSRAMsAllDoneWire(i))
+  }
   // connections of data path
   io.dataPath.weightIO.foreach(x => x.inIOs <> x.outIOs)
-  io.dataPath.inActIO.zip(iSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
-  io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (topIO, sramIO) => topIO <> sramIO.dataPath})
-  // connections of control path
+  io.dataPath.inActIO.zip(iSRAMs).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
+  io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
+  pSRAMs.zipWithIndex.foreach({ case (pSumIO, idx) =>
+    pSumIO.dataPath <> io.dataPath.pSumIO(idx)
+    pSumIO.ctrlPath.startIdx := pSumSRAMStrIdx(idx) // start index
+  })
+  // connections of debugIO
+  // TODO: pSum's start index
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
@@ -299,7 +359,7 @@ class PSumSRAMBankIO extends Bundle with ClusterSRAMConfig {
   val debugIO = new SRAMCommonDebugIO(pSumSRAMSize, psDataWidth)
 }
 
-class PSumSRAMDataIO(dataWidth: Int) extends Bundle {
+class PSumSRAMDataIO(private val dataWidth: Int) extends Bundle {
   val inIOs: DecoupledIO[UInt] = Flipped(Decoupled(UInt(dataWidth.W)))
   val outIOs: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W))
 }
@@ -313,8 +373,9 @@ class WeightGLBIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new CSCStreamInOutIO(weightAdrWidth, weightDataWidth)
 }
 
-class GLBClusterCtrlIO extends Bundle {
-
+class GLBClusterCtrlIO extends Bundle with ClusterSRAMConfig {
+  val inActIO = new SRAMCommonCtrlIO with BusySignal
+  val pSumIO =  new SRAMCommonCtrlIO with BusySignal
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {

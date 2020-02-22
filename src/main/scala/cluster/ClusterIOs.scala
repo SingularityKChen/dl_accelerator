@@ -104,3 +104,7 @@ class CommonClusterCtrlIO[T1<: Data, T2<: Data](dataType1: T1, dataType2: T2) ex
   val inDataSel: T1 = Input(dataType1)
   val outDataSel: T2 = Input(dataType2)
 }
+
+trait BusySignal extends Bundle {
+  val busy: Bool = Output(Bool())
+}

@@ -294,6 +294,21 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("---------------- test finish -----------------")
     }
   }
+
+  it should "work well on GLBCluster" in {
+    test (new GLBCluster(true)) { theGLB =>
+      val theTopIO = theGLB.io
+      val theClock = theGLB.clock
+      println("----------------- test begin -----------------")
+      println(s"--------  ")
+      println("----------- InputActAdr SRAM Bank ------------")
+      println("----------- test basic functions -------------")
+      theGLB.reset.poke(true.B)
+      theClock.step(1)
+      theGLB.reset.poke(false.B)
+      println("--------------- begin to write ---------------")
+    }
+  }
   //behavior of "work well on Processing Element Cluster"
   //behavior of "work well on Cluster Group"
   /*behavior of "test the spec of Router Cluster"
