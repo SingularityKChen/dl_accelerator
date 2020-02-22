@@ -25,6 +25,13 @@
     ]
   },
   {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~PSumSRAMBank|PSumSRAMBank>io_debugIO_doReadWire",
+    "sources":[
+      "~PSumSRAMBank|PSumSRAMBank>io_dataPath_outIOs_ready"
+    ]
+  },
+  {
     "class":"firrtl.EmitCircuitAnnotation",
     "emitter":"firrtl.LowFirrtlEmitter"
   },

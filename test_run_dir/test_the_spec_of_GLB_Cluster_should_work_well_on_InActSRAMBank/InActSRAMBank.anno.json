@@ -1,6 +1,13 @@
 [
   {
     "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_commonDebug_doReadWire",
+    "sources":[
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_outIOs_adrIOs_data_ready"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_ready",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_valid",
@@ -16,7 +23,7 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_idxInc",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_commonDebug_idxInc",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
       "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_valid",
@@ -25,11 +32,17 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_idxInc",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_commonDebug_currentData",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_valid",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_outIOs_adrIOs_data_ready"
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_bits"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_commonDebug_doReadWire",
+    "sources":[
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_outIOs_dataIOs_data_ready"
     ]
   },
   {
@@ -37,6 +50,14 @@
     "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_subDone",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_commonDebug_currentData",
+    "sources":[
+      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_bits"
     ]
   },
   {
@@ -49,18 +70,11 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_currentData",
+    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_adrDebug_commonDebug_idxInc",
     "sources":[
       "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_bits"
-    ]
-  },
-  {
-    "class":"firrtl.transforms.CombinationalPath",
-    "sink":"~InActSRAMBank|InActSRAMBank>io_debugIO_dataDebug_currentData",
-    "sources":[
-      "~InActSRAMBank|InActSRAMBank>io_ctrlPath_writeOrRead",
-      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_dataIOs_data_bits"
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_inIOs_adrIOs_data_valid",
+      "~InActSRAMBank|InActSRAMBank>io_dataPath_outIOs_adrIOs_data_ready"
     ]
   },
   {

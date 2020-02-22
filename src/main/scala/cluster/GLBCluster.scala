@@ -38,7 +38,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   // write logic
   writeLogic(io.dataPath.inIOs, doIdxWire)
   // read logic
-  readLogic(io.dataPath.outIOs, doIdxWire)
+  readLogic(io.dataPath.outIOs, doIdxWire, doDoneWire)
   // debug io
   if (debug) {
     debugLogic(io.debugIO, doIdxWire)
@@ -67,12 +67,16 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
   protected val waitForRead: Bool = RegInit(false.B) // use for letting increase slower when read
   protected val doIdxIncWire: Bool = Wire(Bool()) // true, then the index increase
   protected val nextValid: Bool = Wire(Bool())
-  protected val nextValidReg: Bool = RegNext(nextValid) // one cycle after nextValid
-  protected val doDoneReg: Bool = RegInit(false.B) // or combinational loop detected
+  protected val nextValidReg: Bool = RegInit(false.B) // one cycle after nextValid
+  protected val doDoneReg: Bool = RegInit(false.B) // or combination loop detected
   doIdxIncWire := Mux(writeOrRead, doWriteWire, doReadWire && waitForRead)
-  def readLogic(readOutIO: DecoupledIO[UInt], doIdx: UInt): Any = {
+
+  def readLogic(readOutIO: DecoupledIO[UInt], doIdx: UInt, doDoneWire: Bool): Any = {
     nextValid := Mux(writeOrRead, false.B, doEnWire && !waitForRead)
-    waitForRead := Mux(writeOrRead, waitForRead, !waitForRead)
+    nextValidReg := nextValid && readOutIO.ready
+    // when write, waitForRead keeps be false;
+    // when read, only enable signal becomes true, then waitForRead signal began to flip
+    waitForRead := Mux(!doDoneWire, Mux(writeOrRead || !doEnWire, waitForRead, !waitForRead), false.B)
     readOutIO.valid := nextValidReg // reg next, so one cycle later, data will be read out with valid signal
     doReadWire := readOutIO.ready && nextValidReg
     readOutData := theSRAM.read(doIdx, doReadWire && !waitForRead)
@@ -83,7 +87,7 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
     writeInData := writeInIO.bits
     doWriteWire := doEnWire && writeInIO.valid
     writeInIO.ready := doWriteWire
-    when (doIdxIncWire) {
+    when(doIdxIncWire) {
       theSRAM.write(doIdx, writeInData)
     }
   }
@@ -91,6 +95,8 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
   def debugLogic(debugIO: SRAMCommonDebugIO, doIdx: UInt): Any = {
     debugIO.idx := doIdx
     debugIO.idxInc := doIdxIncWire
+    debugIO.waitForRead := waitForRead
+    debugIO.doReadWire := doReadWire
   }
 }
 
@@ -112,7 +118,6 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // TODO: add some logic to check whether one SPad of data is a zero matrix, true then jump
   writeOrRead := io.ctrlPath.writeOrRead
   io.ctrlPath.done := doDoneWire
-  doDoneReg := doDoneWire
   doEnWire := (!writeOrRead || !doDoneReg) && io.ctrlPath.doEn // FIXME
   currentData := Mux(writeOrRead, writeInData, readOutData)
   // index increase and wrap
@@ -125,7 +130,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // write logic
   writeLogic(io.dataPath.inIOs.data, doIdxReg)
   // read logic
-  readLogic(io.dataPath.outIOs.data, doIdxReg)
+  readLogic(io.dataPath.outIOs.data, doIdxReg, doDoneWire)
   // do finish?
   private val noZero :: oneZero :: twoZeros :: Nil = Enum(3)
   private val zeroState = RegInit(noZero)
@@ -135,6 +140,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   doMightFinishedWire := doMeetZeroWire && doEnWire // meets one zero, that's the end of one SPad
   switch(zeroState) {
     is (noZero) {
+      doDoneReg := false.B
       when (doMightFinishedWire) {
         zeroState := oneZero
       }
@@ -154,6 +160,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   readDoneWire := zeroState === oneZero // or meet one zero
   writeDoneWire := meetTwoZerosWire
   doDoneWire := Mux(writeOrRead, writeDoneWire, readDoneWire)
+  doDoneReg := doDoneWire
   idxWrap := meetTwoZerosWire // wrap the index only after meeting two zeros
   // debug io
   if (debug) {
@@ -194,9 +201,10 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
     is (inActDoing) {
       when (adrDoneWire) {
         inActState := inActWaitData
-      }
-      when (dataDoneWire) {
+      } .elsewhen (dataDoneWire) {
         inActState := inActWaitAdr
+      } .otherwise {
+        inActState := inActDoing
       }
     }
     is (inActWaitData) {
@@ -224,12 +232,7 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
     io.debugIO.theState := inActState
     Seq(io.debugIO.adrDebug, io.debugIO.dataDebug).zip(Seq(adrSRAM.io, dataSRAM.io)).foreach({case (topIO, sram) =>
       topIO.subDone := sram.ctrlPath.done
-      topIO.idx := sram.debugIO.idx
-      topIO.idxInc := sram.debugIO.idxInc
-      topIO.meetOneZero := sram.debugIO.meetOneZero
-      topIO.currentData := sram.debugIO.currentData
-      topIO.theState := sram.debugIO.theState
-      topIO.idxCount := DontCare
+      topIO.commonDebug <> sram.debugIO
     })
   } else {
     io.debugIO <> DontCare
@@ -249,9 +252,12 @@ class SRAMCommonDebugIO(private val theSRAMSize: Int, private val theDataWidth: 
   val currentData: UInt = Output(UInt(theDataWidth.W))
   val meetOneZero: Bool = Output(Bool())
   val theState: UInt = Output(UInt(2.W))
+  val waitForRead: Bool = Output(Bool())
+  val doReadWire: Bool = Output(Bool())
 }
 
-trait SubModuleDebugDone extends Bundle {
+class InActSRAMBankDebugSubIO(private val theSRAMSize: Int, private val theDataWidth: Int) extends Bundle {
+  val commonDebug = new SRAMCommonDebugIO(theSRAMSize, theDataWidth)
   val subDone: Bool = Output(Bool())
 }
 
@@ -267,8 +273,8 @@ class InACTSRAMCommonIO(private val theSRAMSize: Int, private val theDataWidth: 
 
 class InActSRAMBankDebugIO extends Bundle with ClusterSRAMConfig {
   val theState: UInt = Output(UInt(2.W))
-  val adrDebug = new SRAMCommonDebugIO(inActAdrSRAMSize, inActAdrWidth) with SubModuleDebugDone
-  val dataDebug = new SRAMCommonDebugIO(inActDataSRAMSize, inActDataWidth) with SubModuleDebugDone
+  val adrDebug =  new InActSRAMBankDebugSubIO(inActAdrSRAMSize, inActAdrWidth)
+  val dataDebug = new InActSRAMBankDebugSubIO(inActDataSRAMSize, inActDataWidth)
 }
 
 class InActSRAMBankIO extends Bundle with ClusterSRAMConfig {

@@ -18,6 +18,13 @@
   },
   {
     "class":"firrtl.transforms.CombinationalPath",
+    "sink":"~InActSRAMCommon|InActSRAMCommon>io_debugIO_doReadWire",
+    "sources":[
+      "~InActSRAMCommon|InActSRAMCommon>io_dataPath_outIOs_data_ready"
+    ]
+  },
+  {
+    "class":"firrtl.transforms.CombinationalPath",
     "sink":"~InActSRAMCommon|InActSRAMCommon>io_debugIO_idxInc",
     "sources":[
       "~InActSRAMCommon|InActSRAMCommon>io_ctrlPath_writeOrRead",
