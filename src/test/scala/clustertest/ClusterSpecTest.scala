@@ -2,6 +2,7 @@ package dla.test.clustertest
 
 import chisel3._
 import chisel3.tester._
+import chiseltest.internal.{AbstractTesterThread, TesterThreadList}
 import dla.cluster._
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import org.scalatest._
@@ -217,7 +218,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
         val theTopIO = theAdrSRAM.io
         val theClock = theAdrSRAM.clock
-        val theData = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
+        val InActAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
         println("----------------- test begin -----------------")
         println("----------- InputActAdr SRAM Bank ------------")
         println("----------- test basic functions -------------")
@@ -228,7 +229,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.ctrlPath.writeOrRead.poke(true.B)
         theTopIO.ctrlPath.doEn.poke(true.B)
         // begin to write in data
-        writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, theData, theClock, adrOrData = true)
+        writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, InActAdrStream, theClock, adrOrData = true)
         println("--------------- write finish -----------------")
         theTopIO.ctrlPath.doEn.poke(false.B)
         theClock.step(cycles = (new Random).nextInt(5) + 1)
@@ -240,7 +241,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
           while (!theTopIO.ctrlPath.done.peek().litToBoolean) {
             theTopIO.ctrlPath.doEn.poke(true.B)
             theTopIO.dataPath.outIOs.data.ready.poke(true.B)
-            readOutAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, theData, theRdIdx, theClock, adrOrData = true)
+            readOutAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.done, InActAdrStream, theRdIdx, theClock, adrOrData = true)
             theRdIdx = theRdIdx + 1
           }
           theTopIO.ctrlPath.doEn.poke(false.B)
@@ -259,10 +260,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     test(new InActSRAMBank(true)) { theInAct =>
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
-      val theAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
-      val theDataStream = InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)
+      val InActAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
+      val InActDataStream = InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)
       println("----------------- test begin -----------------")
-      println(s"--------  ")
+      println(s"--------  theInActStreamNum = $theInActStreamNum")
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theInAct.reset.poke(true.B)
@@ -273,7 +274,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.doEn.poke(true.B)
       theClock.step(1) // from idle to doing
       // begin to write streams into data sram and address sram
-      writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, theAdrStream, theDataStream, theClock)
+      writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
       // write finish
       theClock.step(1)
       theTopIO.debugIO.theState.expect(0.U, "after all write, the state should be idle now")
@@ -285,7 +286,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.writeOrRead.poke(false.B)
       theTopIO.ctrlPath.doEn.poke(true.B)
       // begin to read out streams into data sram and address sram
-      readOutActAdrAndData(theTopIO, theTopIO.debugIO, theAdrStream, theDataStream, theClock)
+      readOutActAdrAndData(theTopIO, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
       theClock.step(1)
       theTopIO.debugIO.theState.expect(0.U, "after all read, the state should be idle now")
       println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
@@ -299,14 +300,77 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     test (new GLBCluster(true)) { theGLB =>
       val theTopIO = theGLB.io
       val theClock = theGLB.clock
+      val theInActAdrStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)}
+      val theInActDataStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)}
       println("----------------- test begin -----------------")
-      println(s"--------  ")
+      println(s"-------- theInActStreamNum = $theInActStreamNum")
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theGLB.reset.poke(true.B)
       theClock.step(1)
       theGLB.reset.poke(false.B)
       println("--------------- begin to write ---------------")
+      theTopIO.ctrlPath.inActIO.doEn.poke(true.B)
+      theTopIO.ctrlPath.inActIO.writeOrRead.poke(true.B)
+      theClock.step(2) // top from idle to doing, sub from idle to doing;
+      /*// TODO: use for loop to create fork
+      val inActW = theTopIO.dataPath.inActIO.zipWithIndex.map({ case (o, i) =>
+        fork(writeInActAdrAndData(theTopIO.dataPath.inActIO(i).inIOs, theTopIO.debugIO.inActDebugIO(i), theInActAdrStreams(i), theInActDataStreams(i), theClock)).join()
+      })
+      val inActWriteThread = new TesterThreadList()
+      val initTh = Seq[AbstractTesterThread]()
+      inActW.foldLeft{case (a, b) =>
+        fork{
+          fork(a).join()
+          b
+        }
+      }
+      inActW
+      */
+      require(inActSRAMNum == 3, "if you have more or less inActSRAM, please adjust the fork thread")
+      fork {
+        writeInActAdrAndData(theTopIO.dataPath.inActIO(0).inIOs, theTopIO.debugIO.inActDebugIO(0), theInActAdrStreams(0), theInActDataStreams(0), theClock)
+        println(s"-------- 0 finish")
+        println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      } .fork {
+        writeInActAdrAndData(theTopIO.dataPath.inActIO(1).inIOs, theTopIO.debugIO.inActDebugIO(1), theInActAdrStreams(1), theInActDataStreams(1), theClock)
+        println(s"-------- 1 finish")
+        println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      } .fork {
+        writeInActAdrAndData(theTopIO.dataPath.inActIO(2).inIOs, theTopIO.debugIO.inActDebugIO(2), theInActAdrStreams(2), theInActDataStreams(2), theClock)
+        println(s"-------- 2 finish")
+        println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      } .join()
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      theClock.step(1)
+      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
+      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
     }
   }
   //behavior of "work well on Processing Element Cluster"
