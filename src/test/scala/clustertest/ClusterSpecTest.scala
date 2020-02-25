@@ -12,7 +12,7 @@ import scala.math.{min, pow}
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  private val printLogDetails = false // true to print more detailed logs
+  private val printLogDetails = true // true to print more detailed logs
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
   private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
   private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
@@ -332,45 +332,75 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         writeInActAdrAndData(theTopIO.dataPath.inActIO(0).inIOs, theTopIO.debugIO.inActDebugIO(0), theInActAdrStreams(0), theInActDataStreams(0), theClock)
         println(s"-------- 0 finish")
         println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+        timescope{
+          theClock.step(1)
+          theTopIO.debugIO.inActDebugIO(0).theState.expect(0.U, "inActSRAMBank 0 should be idle one cycle later")
+        }
       } .fork {
         writeInActAdrAndData(theTopIO.dataPath.inActIO(1).inIOs, theTopIO.debugIO.inActDebugIO(1), theInActAdrStreams(1), theInActDataStreams(1), theClock)
         println(s"-------- 1 finish")
         println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
+        timescope{
+          theClock.step(1)
+          theTopIO.debugIO.inActDebugIO(1).theState.expect(0.U, "inActSRAMBank 1 should be idle one cycle later")
+        }
       } .fork {
         writeInActAdrAndData(theTopIO.dataPath.inActIO(2).inIOs, theTopIO.debugIO.inActDebugIO(2), theInActAdrStreams(2), theInActDataStreams(2), theClock)
         println(s"-------- 2 finish")
         println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+        timescope{
+          theClock.step(1)
+          theTopIO.debugIO.inActDebugIO(2).theState.expect(0.U, "inActSRAMBank 2 should be idle one cycle later")
+        }
       } .join()
+      println("------------- all write finish ---------------")
+      theTopIO.debugIO.inActDebugIO.foreach({ x =>
+        x.adrDebug.commonDebug.theState.expect(0.U, "every address SRAM should be idle now")
+        x.dataDebug.commonDebug.theState.expect(0.U, "every data SRAM should be idle now")
+        if (printLogDetails) {
+          println(s"-------- inActBankState =  ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+          println(s"-------- adrSRAMState   =  ${theTopIO.debugIO.inActDebugIO(0).adrDebug.commonDebug.theState.peek()}")
+          println(s"-------- dataSRAMState  =  ${theTopIO.debugIO.inActDebugIO(0).dataDebug.commonDebug.theState.peek()}")
+        }
+      })
       theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      println("----------- one cycle later ----------")
+      theTopIO.debugIO.inActDebugIO.foreach(_.theState.expect(0.U, "every inActSRAMBank should be idle now"))
+      theTopIO.ctrlPath.inActIO.doEn.poke(false.B)
+      theTopIO.debugIO.theState(0).expect(0.U, "after all write, the state should be idle now")
+      theTopIO.debugIO.allDone(0).expect(true.B, "it should all done now")
+      theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(true.B,"should be true now to generate done signal"))
+      if (printLogDetails) {
+        println(s"-------- topInActState ${theTopIO.debugIO.theState(0).peek()} ")
+        println(s"-------- allDone ${theTopIO.debugIO.allDone(0).peek()}")
+        theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
+      }
       theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
-      theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
-      theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
-      theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
-      theClock.step(1)
-      println(s"-------- TopInActState ${theTopIO.debugIO.theState(0).peek()}")
-      println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-      println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-      println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
+      println("----------- one cycle later ----------")
+      if (printLogDetails) {
+        println(s"-------- topInActState ${theTopIO.debugIO.theState(0).peek()} ")
+        println(s"-------- allDone ${theTopIO.debugIO.allDone(0).peek()}")
+        theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
+      }
+      theClock.step(cycles = (new Random).nextInt(5) + 1)
+      theTopIO.debugIO.inActDebugIO.foreach({ x =>
+        x.theState.expect(0.U, "every inActSRAMBank still needs to be idle")
+        x.adrDebug.commonDebug.theState.expect(0.U, "every address SRAM still needs to be idle")
+        x.dataDebug.commonDebug.theState.expect(0.U, "every data SRAM still needs to be idle")
+        if (printLogDetails) {
+          println(s"-------- inActBankState =  ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+          println(s"-------- adrSRAMState   =  ${theTopIO.debugIO.inActDebugIO(0).adrDebug.commonDebug.theState.peek()}")
+          println(s"-------- dataSRAMState  =  ${theTopIO.debugIO.inActDebugIO(0).dataDebug.commonDebug.theState.peek()}")
+        }
+      })
+      theTopIO.debugIO.allDone(0).expect(false.B, "after several cycles, inActTop done signal should be false as initial state")
+      theTopIO.debugIO.theState(0).expect(0.U, "Without enable signal, the inActTop state should be idle")
+      theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(false.B,"after several cycles, every Vec Reg should be false as initial state"))
+      if (printLogDetails) {
+        println(s"-------- topInActState ${theTopIO.debugIO.theState(0).peek()} ")
+        println(s"-------- allDone ${theTopIO.debugIO.allDone(0).peek()}")
+        theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
+      }
     }
   }
   //behavior of "work well on Processing Element Cluster"
