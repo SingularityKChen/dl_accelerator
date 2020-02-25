@@ -10,7 +10,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   iSRAMs.suggestName("inActSRAMs")
   private val pSRAMs = VecInit(Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug)).io})
   pSRAMs.suggestName("pSumSRAMs")
-  private val oneSRAMIdle :: oneSRAMDoing :: Nil = Enum(2)
+  private val oneSRAMIdle :: oneSRAMDoing :: oneSRAMWaiting :: Nil = Enum(3)
   private val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
   private val theSRAMsCtrl = Seq(iSRAMs.map(x => x.ctrlPath), pSRAMs.map(x => x.ctrlPath))
   private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
@@ -36,6 +36,15 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
       is (oneSRAMDoing) {
         when (done) {
           stateReg := oneSRAMIdle
+        } .elsewhen (!enable) {
+          stateReg := oneSRAMWaiting
+        } .otherwise {
+          stateReg := oneSRAMDoing
+        }
+      }
+      is (oneSRAMWaiting) { // waiting for enable signal, but keep the done information
+        when (enable) {
+          stateReg := oneSRAMDoing
         }
       }
     }
@@ -53,8 +62,8 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
     for (j <- 0 until theSRAMsNum(i)) {
       theSRAMsCtrl(i)(j).doEn := theSRAMsDoingWire(i) && !theSRAMsDoneRegVec(i)(j)
       // if one received done signal, then its signal flips, from false to true, then disable its enable signal
-      // if inAct is not doing, then it's idle. so assign done reg to false.
-      theSRAMsDoneRegVec(i)(j) := Mux(theSRAMsDoingWire(i), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
+      // if inAct state is idle, then assign done reg to false.
+      theSRAMsDoneRegVec(i)(j) := Mux(!(theSRAMsState(i) === oneSRAMIdle), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
       theSRAMsCtrl(i)(j).writeOrRead := theTopCtrls(i).writeOrRead
     }
     OneSRAMState(theSRAMsState(i), theSRAMsEnWire(i), theSRAMsAllDoneWire(i))
@@ -73,7 +82,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
     io.debugIO.pSumDebugIO.zip(pSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
     io.debugIO.theState <> theSRAMsState
     io.debugIO.allDone <> theSRAMsAllDoneWire
-    io.debugIO.oneInActSRAMDone <> theSRAMsDoneRegVec(0)
+    io.debugIO.oneInActSRAMDone <> theSRAMsDoneRegVec.head
     io.debugIO.onePSumSRAMDone <> theSRAMsDoneRegVec(1)
   } else {
     io.debugIO <> DontCare
@@ -397,7 +406,7 @@ class GLBClusterDebugIO extends Bundle with ClusterSRAMConfig {
   val oneInActSRAMDone: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
   val onePSumSRAMDone: Vec[Bool] = Output(Vec(pSumSRAMNum, Bool()))
   val allDone: Vec[Bool] = Output(Vec(2, Bool()))
-  val theState: Vec[UInt] = Output(Vec(2, UInt(1.W)))
+  val theState: Vec[UInt] = Output(Vec(2, UInt(2.W)))
   val inActDebugIO: Vec[InActSRAMBankDebugIO] = Vec(inActSRAMNum, new InActSRAMBankDebugIO)
   val pSumDebugIO: Vec[SRAMCommonDebugIO] = Vec(pSumSRAMNum, new SRAMCommonDebugIO(pSumSRAMSize, psDataWidth))
 }
