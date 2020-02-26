@@ -383,20 +383,21 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.ctrlPath.inActIO.doEn.poke(true.B)
       theTopIO.ctrlPath.inActIO.writeOrRead.poke(true.B)
       theClock.step(2) // top from idle to doing, sub from idle to doing;
-      /*// TODO: use for loop to create fork
-      val inActW = theTopIO.dataPath.inActIO.zipWithIndex.map({ case (o, i) =>
-        fork(writeInActAdrAndData(theTopIO.dataPath.inActIO(i).inIOs, theTopIO.debugIO.inActDebugIO(i), theInActAdrStreams(i), theInActDataStreams(i), theClock)).join()
-      })
-      val inActWriteThread = new TesterThreadList()
-      val initTh = Seq[AbstractTesterThread]()
-      inActW.foldLeft{case (a, b) =>
-        fork{
-          fork(a).join()
-          b
+
+      def helper(index: Int) = {
+        writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index), theInActAdrStreams.head, theInActDataStreams.head, theClock)
+        println(s"-------- $index finish")
+        println(s"-------- $index ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
+        timescope{
+          theClock.step()
+          theTopIO.debugIO.inActDebugIO(index).theState.expect(0.U, s"inActSRAMBank $index should be idle one cycle later")
         }
       }
-      inActW
-      */
+
+      (1 to theTopIO.dataPath.inActIO.length).foldLeft(fork(helper(0))) {
+          case (left, right) => left.fork(helper(right))
+      }.join()
+
       require(inActSRAMNum == 3, "if you have more or less inActSRAM, please adjust the fork thread")
       fork {
         writeInActAdrAndData(theTopIO.dataPath.inActIO(0).inIOs, theTopIO.debugIO.inActDebugIO(0), theInActAdrStreams.head, theInActDataStreams.head, theClock)
