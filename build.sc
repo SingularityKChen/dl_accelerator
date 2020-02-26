@@ -79,8 +79,11 @@ object dla extends ScalaModule with ScalafmtModule {
   )
 
   object tests extends Tests {
-    def ivyDeps = Agg(ivy"com.lihaoyi::utest:latest.integration")
+    def ivyDeps = Agg(
+      ivy"org.scalatest::scalatest:latest.integration",
+      ivy"org.scalacheck::scalacheck:latest.integration",
+    )
 
-    def testFrameworks = Seq("utest.runner.Framework")
+    def testFrameworks = Seq("org.scalatest.tools.Framework")
   }
 }

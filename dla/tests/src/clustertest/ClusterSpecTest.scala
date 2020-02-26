@@ -1,4 +1,4 @@
-package dla.test.clustertest
+package dla.tests
 
 import chisel3._
 import chisel3.tester._
