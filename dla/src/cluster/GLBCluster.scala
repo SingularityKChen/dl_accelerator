@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
-class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
+class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMFCS1Config {
   val io: GLBClusterIO = IO(new GLBClusterIO)
   private val iSRAMs = VecInit(Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug)).io})
   iSRAMs.suggestName("inActSRAMs")
@@ -26,6 +26,15 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   private val theSRAMsDoingWire = Wire(Vec(2, Bool()))
   theSRAMsDoingWire.suggestName("theSRAMsDoingWire")
   private val pSumSRAMStrIdx = VecInit(Seq.fill(pSumSRAMNum){RegInit(0.U)})
+  /*
+  private val gReg = RegInit(0.U(log2Ceil(G1)))
+  gReg := io.ctrlPath.gnmfcs1IO.g1
+  private val nReg = RegNext(io.ctrlPath.gnmfcs1IO.n1)
+  private val mReg = RegNext(io.ctrlPath.gnmfcs1IO.m1)
+  private val fReg = RegNext(io.ctrlPath.gnmfcs1IO.f1)
+  private val cReg = RegNext(io.ctrlPath.gnmfcs1IO.c1)
+  private val sReg = RegNext(io.ctrlPath.gnmfcs1IO.s1)
+  */
   private def OneSRAMState(stateReg: UInt, enable: Bool, done: Bool): Unit = {
     switch (stateReg) {
       is (oneSRAMIdle) {
@@ -87,7 +96,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig {
   } else {
     io.debugIO <> DontCare
   }
-  // TODO: pSum's start index
+  //pSumSRAMStrIdx.foreach(_ := gReg*N1.U*M1.U*F1.U + nReg*M1.U*F1.U + mReg*F1.U + fReg) // FIXME: check the start index of partial sum
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
@@ -391,9 +400,19 @@ class WeightGLBIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new CSCStreamInOutIO(weightAdrWidth, weightDataWidth)
 }
 
+class GNMFCS1ConfigIO extends Bundle with GNMFCS1Config {
+  val g1: UInt = Input(UInt(log2Ceil(G1).W))
+  val n1: UInt = Input(UInt(log2Ceil(N1).W))
+  val m1: UInt = Input(UInt(log2Ceil(M1).W))
+  val f1: UInt = Input(UInt(log2Ceil(F1).W))
+  val c1: UInt = Input(UInt(log2Ceil(C1).W))
+  val s1: UInt = Input(UInt(log2Ceil(S1).W))
+}
+
 class GLBClusterCtrlIO extends Bundle {
   val inActIO = new SRAMCommonCtrlIO with BusySignal
   val pSumIO =  new SRAMCommonCtrlIO with BusySignal
+  //val gnmfcs1IO = new GNMFCS1ConfigIO
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {
