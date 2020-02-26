@@ -61,7 +61,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       s"-------- $idx.0 $currentType doRd = ${debugIO.doReadWire.peek()}\n" +
       s"-------- $idx.0 $currentType idIc = ${debugIO.idxInc.peek()}"
     )
-    theClock.step(1)
+    theClock.step()
     debugIO.idxInc.expect(true.B, s"$idx, $currentType index should increase now")
     outIO.data.bits.expect(theData(idx).U, s"theData($idx) = ${theData(idx)}")
     outIO.data.valid.expect(true.B, s"$currentType should valid now")
@@ -73,7 +73,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       s"-------- $idx.5 $currentType data = ${outIO.data.bits.peek()}\n" +
       s"-------- $idx.5 $currentType idx  = ${debugIO.idx.peek()}"
     )
-    theClock.step(1)
+    theClock.step()
     if (theData(idx) != 0) {
       doneIO.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, should $currentType be unfinished now")
     }
@@ -129,9 +129,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     for (_ <- 0 until theInActStreamNum) {
       println("------------- begin SRAMs read -------------")
       theCtrlIO.doEn.poke(true.B)
-      theClock.step(1) // topInAct from idle/wait to doing
+      theClock.step() // topInAct from idle/wait to doing
       if (printLogDetails) println(s"-------- topInActState  = ${theTopIO.debugIO.theState(0).peek()} ")
-      theClock.step(1) // subInAct from idle to doing
+      theClock.step() // subInAct from idle to doing
       if (printLogDetails) println(s"-------- topInActState  = ${theTopIO.debugIO.theState(0).peek()} ")
       fork {
         val (adrRdIdxTmp: Int, dataRdIdxTmp: Int) = forkReadAdrAndData(theOutIOs(0), theDebugIOs(0), adrStreams.head, dataStreams.head, adrRdIdx_0, dataRdIdx_0, theClock)
@@ -139,7 +139,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         dataRdIdx_0 = dataRdIdxTmp
         println("------------- SRAM0 finish -------------")
         timescope {
-          theClock.step(1)
+          theClock.step()
           theTopIO.debugIO.inActDebugIO(0).theState.expect(0.U, "the SRAMBank 0 should be idle after one clock")
         }
       } .fork {
@@ -148,7 +148,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         dataRdIdx_1 = dataRdIdxTmp
         println("------------- SRAM1 finish -------------")
         timescope {
-          theClock.step(1)
+          theClock.step()
           theTopIO.debugIO.inActDebugIO(1).theState.expect(0.U, "the SRAMBank 1 should be idle after one clock")
         }
       } .fork {
@@ -157,13 +157,13 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         dataRdIdx_2 = dataRdIdxTmp
         println("------------- SRAM2 finish -------------")
         timescope {
-          theClock.step(1)
+          theClock.step()
           theTopIO.debugIO.inActDebugIO(2).theState.expect(0.U, "the SRAMBank 2 should be idle after one clock")
         }
       } .join()
       if (printLogDetails) theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
       println("------------- three SRAMs finish -------------")
-      theClock.step(1)
+      theClock.step()
       theCtrlIO.doEn.poke(false.B)
       theClock.step(cycles = (new Random).nextInt(50) + 50)
       theTopIO.debugIO.theState(0).expect(0.U, "the topInActState should be idle when done one stream")
@@ -178,7 +178,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     for (_ <- 0 until theInActStreamNum) {
       theCtrlIO.doEn.poke(true.B)
       theCtrlIO.writeOrRead.poke(false.B)
-      theClock.step(1) // from idle to doing
+      theClock.step() // from idle to doing
       val (adrRdIdxTmp: Int, dataRdIdxTmp: Int) = forkReadAdrAndData(theOutIO, theDebugIO, adrStream, dataStream, adrRdIdx, dataRdIdx, theClock)
       adrRdIdx = adrRdIdxTmp
       dataRdIdx = dataRdIdxTmp
@@ -202,7 +202,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         println(s"-------- $currentType done = ${doneIO.peek()}\n-------- $currentType data = ${theData(i)}\n" +
           s"-------- $currentType index = ${debugIO.idx.peek()}\n-------- $currentType theState = ${debugIO.theState.peek()}")
       }
-      theClock.step(1)
+      theClock.step()
       doneIO.expect((i == theData.length - 1).B, s"$currentType Data($i) = ${theData(i)}, $currentType theState = ${debugIO.theState.peek()},should $currentType finish?")
       println(s"-------- $currentType PASS $i")
     }
@@ -229,7 +229,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("----------- test basic functions -------------")
       println(s"-------- startIndex = $startIndex")
       thePSumBank.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       thePSumBank.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.ctrlPath.writeOrRead.poke(true.B)
@@ -247,7 +247,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
             s"-------- whetherInc = ${theTopIO.debugIO.idxInc.peek()}")
         }
         theTopIO.dataPath.inIOs.ready.expect(true.B, s"$i, it should be ready now")
-        theClock.step(1)
+        theClock.step()
         theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B, s"i = $i, write should finish?")
         println("-------- PASS")
       }
@@ -268,7 +268,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.dataPath.outIOs.ready.poke(true.B)
         theTopIO.debugIO.idxInc.expect(false.B, s"$i, index should not increase now")
         theTopIO.dataPath.outIOs.valid.expect(false.B, "it should not valid now")
-        theClock.step(1)
+        theClock.step()
         if (printLogDetails) {
           println(s"--------       data = ${theData(i)} \n" +
             s"--------      index = ${theTopIO.debugIO.idx.peek()} \n" +
@@ -277,7 +277,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theTopIO.debugIO.idxInc.expect(true.B, s"index should increase")
         theTopIO.dataPath.outIOs.bits.expect(theData(i).U, s"$i, theData should be ${theData(i)}")
         theTopIO.dataPath.outIOs.valid.expect(true.B, "it should valid now")
-        theClock.step(1)
+        theClock.step()
         theTopIO.ctrlPath.done.expect((i == oneSPadPSum - 1).B)
         println("-------- PASS")
       }
@@ -295,7 +295,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         println("----------- InputActAdr SRAM Bank ------------")
         println("----------- test basic functions -------------")
         theAdrSRAM.reset.poke(true.B)
-        theClock.step(1)
+        theClock.step()
         theAdrSRAM.reset.poke(false.B)
         println("--------------- begin to write ---------------")
         theTopIO.ctrlPath.writeOrRead.poke(true.B)
@@ -339,16 +339,16 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theInAct.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       theInAct.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.ctrlPath.writeOrRead.poke(true.B)
       theTopIO.ctrlPath.doEn.poke(true.B)
-      theClock.step(1) // from idle to doing
+      theClock.step() // from idle to doing
       // begin to write streams into data sram and address sram
       writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
       // write finish
-      theClock.step(1)
+      theClock.step()
       theTopIO.debugIO.theState.expect(0.U, "after all write, the state should be idle now")
       println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
       println("------------- all write finish ---------------")
@@ -357,7 +357,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("--------------- begin to read ----------------")
       // begin to read out streams into data sram and address sram
       readOutActAdrAndData(theTopIO.dataPath.outIOs, theTopIO.ctrlPath, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
-      theClock.step(1)
+      theClock.step()
       theTopIO.debugIO.theState.expect(0.U, "after all read, the state should be idle now")
       println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
       println("-------------- all read finish ---------------")
@@ -377,15 +377,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theGLB.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       theGLB.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.ctrlPath.inActIO.doEn.poke(true.B)
       theTopIO.ctrlPath.inActIO.writeOrRead.poke(true.B)
       theClock.step(2) // top from idle to doing, sub from idle to doing;
-
-      def helper(index: Int) = {
-        writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index), theInActAdrStreams.head, theInActDataStreams.head, theClock)
+      def forkInActWriteHelper(index: Int): Unit = {
+        writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index), theInActAdrStreams(index), theInActDataStreams(index), theClock)
         println(s"-------- $index finish")
         println(s"-------- $index ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
         timescope{
@@ -393,42 +392,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
           theTopIO.debugIO.inActDebugIO(index).theState.expect(0.U, s"inActSRAMBank $index should be idle one cycle later")
         }
       }
-
-      (1 to theTopIO.dataPath.inActIO.length).foldLeft(fork(helper(0))) {
-          case (left, right) => left.fork(helper(right))
+      (1 until inActSRAMNum).foldLeft(fork(forkInActWriteHelper(0))) {
+          case (left, right) => left.fork(forkInActWriteHelper(right))
       }.join()
-
-      require(inActSRAMNum == 3, "if you have more or less inActSRAM, please adjust the fork thread")
-      fork {
-        writeInActAdrAndData(theTopIO.dataPath.inActIO(0).inIOs, theTopIO.debugIO.inActDebugIO(0), theInActAdrStreams.head, theInActDataStreams.head, theClock)
-        println(s"-------- 0 finish")
-        println(s"-------- 0 ${theTopIO.debugIO.inActDebugIO(0).theState.peek()}")
-        timescope{
-          theClock.step(1)
-          theTopIO.debugIO.inActDebugIO(0).theState.expect(0.U, "inActSRAMBank 0 should be idle one cycle later")
-        }
-      } .fork {
-        writeInActAdrAndData(theTopIO.dataPath.inActIO(1).inIOs, theTopIO.debugIO.inActDebugIO(1), theInActAdrStreams(1), theInActDataStreams(1), theClock)
-        println(s"-------- 1 finish")
-        println(s"-------- 1 ${theTopIO.debugIO.inActDebugIO(1).theState.peek()}")
-        timescope{
-          theClock.step(1)
-          theTopIO.debugIO.inActDebugIO(1).theState.expect(0.U, "inActSRAMBank 1 should be idle one cycle later")
-        }
-      } .fork {
-        writeInActAdrAndData(theTopIO.dataPath.inActIO(2).inIOs, theTopIO.debugIO.inActDebugIO(2), theInActAdrStreams(2), theInActDataStreams(2), theClock)
-        println(s"-------- 2 finish")
-        println(s"-------- 2 ${theTopIO.debugIO.inActDebugIO(2).theState.peek()}")
-        timescope{
-          theClock.step(1)
-          theTopIO.debugIO.inActDebugIO(2).theState.expect(0.U, "inActSRAMBank 2 should be idle one cycle later")
-        }
-      } .join()
       println("------------- all write finish ---------------")
       println(s"-------- topInActState ${theTopIO.debugIO.theState(0).peek()} ")
       theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(true.B,"should be true now to generate done signal"))
       stateBeZero(theTopIO)
-      theClock.step(1)
+      theClock.step()
       println("----------- one cycle later ----------")
       theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(true.B,"should be true now to generate done signal"))
       if (printLogDetails) {
@@ -441,7 +412,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theTopIO.debugIO.allDone(0).expect(true.B, "it should all done now")
       theTopIO.ctrlPath.inActIO.doEn.poke(false.B)
       theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(true.B,"should be true now to generate done signal"))
-      theClock.step(1)
+      theClock.step()
       println("----------- one cycle later ----------")
       if (printLogDetails) {
         println(s"-------- topInActState ${theTopIO.debugIO.theState(0).peek()} ")
@@ -464,7 +435,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("--------------- begin to read ----------------")
       // begin to read out streams into data sram and address sram
       topReadOutActAdrAndData(theTopIO, theInActAdrStreams, theInActDataStreams, theClock)
-      theClock.step(1)
+      theClock.step()
       if (printLogDetails) theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
       theTopIO.debugIO.theState(0).expect(0.U, "after all read, the state should be idle now")
       println("-------------- all read finish ---------------")

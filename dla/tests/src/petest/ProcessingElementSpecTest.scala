@@ -56,7 +56,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       readInIO.data.bits.poke(readInData(i).U)
       theWF.expect((i == readInData.length - 1).B, s"[write cycle $i @ $readInIO] should it finish writing?")
       readInIO.data.ready.expect(true.B, s"[write cycle $i @ $readInIO] write valid, after receive the data, it should be ready")
-      theClock.step(1)
+      theClock.step()
     }
     readInIO.data.valid.poke(false.B)
   }
@@ -107,7 +107,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println(s"--- meets a zero column at $cycle read cycle ---")
       println(s"adrReadEn = ${topModule.io.inActAdrReadEn.peek()}, adrReadData = ${topModule.io.inActAdrReadData.peek()}, dataReadIndex = ${topModule.io.inActDataReadIndex.peek()}")
       println(s"data = ${topModule.io.inActMatrixData.peek()}, row = ${topModule.io.inActMatrixRow.peek()}, column = ${topModule.io.inActMatrixColumn.peek()}")
-      topModule.clock.step(1) // from address SPad to next address SPad read
+      topModule.clock.step() // from address SPad to next address SPad read
     case 1 =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a data read only cycle at $cycle read cycle ---")
@@ -115,17 +115,17 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       topModule.io.inActMatrixRow.expect(readInRow(readDataTimes).U, s"read out data should be ${readInRow(readDataTimes)} at $readDataTimes-th read cycle $cycle")
       topModule.io.inActMatrixColumn.expect(readInColumn(readDataTimes).U, s"read out data should be ${readInColumn(readDataTimes)} at $readDataTimes-th read cycle $cycle")
       println(s"data = ${topModule.io.inActMatrixData.peek()}, row = ${topModule.io.inActMatrixRow.peek()}, column = ${topModule.io.inActMatrixColumn.peek()}")
-      topModule.clock.step(1) // goto next one
+      topModule.clock.step() // goto next one
     case 2 =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a common read cycle at $cycle read cycle ---")
       println(s"adrReadEn = ${topModule.io.inActAdrReadEn.peek()}, adrReadData = ${topModule.io.inActAdrReadData.peek()}, dataReadIndex = ${topModule.io.inActDataReadIndex.peek()}")
-      topModule.clock.step(1) // from address SPad read to data SPad read
+      topModule.clock.step() // from address SPad read to data SPad read
       topModule.io.inActMatrixData.expect(readInData(readDataTimes).U, s"read out data should be ${readInData(readDataTimes)} at $readDataTimes-th read cycle $cycle")
       topModule.io.inActMatrixRow.expect(readInRow(readDataTimes).U, s"read out data should be ${readInRow(readDataTimes)} at $readDataTimes-th read cycle $cycle")
       topModule.io.inActMatrixColumn.expect(readInColumn(readDataTimes).U, s"read out data should be ${readInColumn(readDataTimes)} at $readDataTimes-th read cycle $cycle")
       println(s"data = ${topModule.io.inActMatrixData.peek()}, row = ${topModule.io.inActMatrixRow.peek()}, column = ${topModule.io.inActMatrixColumn.peek()}")
-      topModule.clock.step(1) // goto next one
+      topModule.clock.step() // goto next one
   }
 
   def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outInActCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outInActCycleType(cycle)) match {
@@ -133,10 +133,10 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a zero weight column at $cycle read cycle ---")
       topModule.io.debugIO.sPadState.expect(2.U, s"the SPad state should be 2, inAct data read at $cycle")
-      topModule.clock.step(1)
+      topModule.clock.step()
       topModule.io.debugIO.sPadState.expect(3.U, s"the SPad state should be 3 after one clock, weight address read at $cycle")
       topModule.io.debugIO.weightAdrSPadReadOut.expect(weightZeroColumnCode.U, s"the weight address read out should be $weightZeroColumnCode, weight data read at $cycle")
-      topModule.clock.step(1)
+      topModule.clock.step()
     case (1, _) =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a weight data read only cycle at $cycle read cycle ---")
@@ -152,21 +152,21 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("----------------- test begin -----------------")
       println("----------- Processing Element Module ------------")
       thePE.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       thePE.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.topCtrl.doLoadEn.poke(true.B)
       inActAndWeightReadInFuc(inInActAdr, inInActDataCountDec, inWeightAdr, inWeightDataCountDec, theTopIO.dataStream, theClock, theTopIO.padWF)
       theTopIO.debugIO.peControlDebugIO.peState.expect(1.U, "wait it jump from load to cal")
       theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(false.B, s"now it should be load")
-      theClock.step(1)
+      theClock.step()
       theTopIO.topCtrl.writeFinish.expect(true.B, s"after write in all data, write should finish")
       theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(true.B, s"now it should be calculating state")
       theTopIO.debugIO.peControlDebugIO.peState.expect(2.U, "now it should be calculating state")
       theTopIO.topCtrl.doLoadEn.poke(false.B)
       theTopIO.topCtrl.pSumEnqOrProduct.bits.poke(false.B)
       theTopIO.topCtrl.pSumEnqOrProduct.valid.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       for (i<- 0 until 133) {
         println(s"--------------- $i-th read cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.peSPadDebugIO.sPadState.peek()}")
@@ -179,7 +179,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- product      =  ${theTopIO.debugIO.peSPadDebugIO.productResult.peek()}")
         println(s"----- pSumResult   =  ${theTopIO.debugIO.peSPadDebugIO.pSumResult.peek()}")
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.peSPadDebugIO.pSumLoad.peek()}")
-        theClock.step(1)
+        theClock.step()
       }
       println("-------------- MAC now finish ----------------")
       println(s"----- peState      =  ${theTopIO.debugIO.peControlDebugIO.peState.peek()}")
@@ -193,7 +193,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println(s"----- doMACEn      =  ${theTopIO.debugIO.peControlDebugIO.doMACEnDebug.peek()}")
       println(s"whether MAC finish =  ${theTopIO.topCtrl.calFinish.peek()}")
       println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
-      theClock.step(1)
+      theClock.step()
       theTopIO.dataStream.opsIO.ready.poke(true.B)
       theClock.step(fifoSize) // wait for fifo size clock cycle to let data flow out
       for (i <- 0 until M0*E*N0*F0) {
@@ -202,7 +202,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theTopIO.debugIO.peSPadDebugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
         theTopIO.dataStream.opsIO.bits.expect(outPSum(i).U, s"the out partial sum should be ${outPSum(i)} at $i-th index")
-        theClock.step(1)
+        theClock.step()
       }
     }
   }
@@ -214,7 +214,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("----------------- test begin -----------------")
       println("----------- PE Scratch Pad Module ------------")
       thePESPad.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       thePESPad.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.padCtrl.fromTopIO.doLoadEn.poke(true.B)
@@ -223,7 +223,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("--------------- begin to read ----------------")
       theTopIO.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
       theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
-      theClock.step(1) // from idle to address SPad read
+      theClock.step() // from idle to address SPad read
       theTopIO.padCtrl.doMACEn.poke(false.B) // end the state machine
       for (i<- 0 until 133) {
         println(s"--------------- $i-th read cycle -----------")
@@ -237,7 +237,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- product      =  ${theTopIO.debugIO.productResult.peek()}")
         println(s"----- pSumResult   =  ${theTopIO.debugIO.pSumResult.peek()}")
         println(s"----- pSumLoad     =  ${theTopIO.debugIO.pSumLoad.peek()}")
-        theClock.step(1)
+        theClock.step()
       }
       theClock.step(2)
       println("-------------- read partial sum ---------------")
@@ -249,7 +249,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
         theTopIO.dataStream.opsIO.bits.expect(outPSum(i).U, s"the out partial sum should be ${outPSum(i)} at $i-th index")
         //assertResult(outpSum(i).asUInt(psDataWidth.W))(theTopIO.dataStream.opsIO.bits.peek())
-        theClock.step(1)
+        theClock.step()
       }
     }
   }
@@ -261,13 +261,13 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("---------- begin to test the read ----------")
       println("------ and write address in InAct SPad ------")
       inActSPad.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       inActSPad.reset.poke(false.B)
       println("-------------- begin to write --------------")
       simplyWriteInDataAndAdr(inInActTestAdr, inWeightDataCountDec, inActSPad)
       println("-------------- begin to read ---------------")
       theTopIO.inActDataReq.poke(true.B) // start the state machine
-      theClock.step(1) // from idle to address SPad read
+      theClock.step() // from idle to address SPad read
       var j: Int = 0
       for (i <- outWeightCycleType.indices) {
         simplyCheckSignal(i, inActSPad, outWeightCycleType, j, inWeightData, inWeightCount, outWeightColumn)
@@ -286,13 +286,13 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("------ and write address in InAct SPad ------")
       println("-------- with continued zero columns -------")
       inActSPad.reset.poke(true.B)
-      theClock.step(1)
+      theClock.step()
       inActSPad.reset.poke(false.B)
       println("------------- begin to write ---------------")
       simplyWriteInDataAndAdr(inInActTestAdr2, inWeightDataCountDec, inActSPad)
       println("------------- begin to read ----------------")
       theTopIO.inActDataReq.poke(true.B) // start the state machine
-      theClock.step(1) // from idle to address SPad read
+      theClock.step() // from idle to address SPad read
       var j: Int = 0
       for (i <- outWeightCycleType2.indices) {
         simplyCheckSignal(i, inActSPad, outWeightCycleType2, j, inWeightData, inWeightCount, outWeightColumn2)
@@ -319,7 +319,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theCtrlPath.writeIdx.expect(i.U, s"i = $i")
         theCtrlPath.writeFin.expect((i == inInActTestAdr.length - 1).B, s"i = $i")
         theDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
-        theClock.step(1)
+        theClock.step()
       }
       println("----------- begin to read -----------")
       theDataIO.valid.poke(false.B)
@@ -332,7 +332,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theDataPath.readOutData.expect(inInActTestAdr(i).U, s"readOutData = inWeightData($i) = ${inInActTestAdr(i)}")
         println(s"theCtrlPath.columnNum = $i")
         println(s"theCtrlPath.readOutData = ${inInActTestAdr(i)}")
-        theClock.step(1)
+        theClock.step()
       }
       theDataPath.readOutData.expect(inInActTestAdr.last.U, s"readOutData = inWeightData(${inInActTestAdr.length - 1}) = ${inInActTestAdr.last}")
     }
@@ -354,7 +354,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
         theCtrlPath.writeFin.expect((i == inWeightDataCountDec.length - 1).B, s"i = $i")
         theCtrlPath.writeIdx.expect(i.U, s"i = $i")
-        theClock.step(1)
+        theClock.step()
       }
       println("----------- begin to read -----------")
       theDataIO.valid.poke(false.B)
@@ -367,7 +367,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theDataPath.readOutData.expect(inWeightDataCountDec(i).U, s"readOutData = inWeightDataCountDec($i) = ${inWeightDataCountDec(i)}")
         println(s"theCtrlPath.columnNum = $i")
         println(s"theCtrlPath.readOutData = ${inWeightDataCountDec(i)}")
-        theClock.step(1)
+        theClock.step()
       }
       theDataPath.columnNum.expect(0.U, s"new read turn begins, columnNum = 0")
       theDataPath.readOutData.expect(inWeightDataCountDec.head.U, s"new read turn begins, readOutData = ${inWeightDataCountDec.head}")
