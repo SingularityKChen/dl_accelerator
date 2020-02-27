@@ -90,9 +90,8 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
     io.debugIO.inActDebugIO.zip(iSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
     io.debugIO.pSumDebugIO.zip(pSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
     io.debugIO.theState <> theSRAMsState
-    io.debugIO.allDone <> theSRAMsAllDoneWire
     io.debugIO.oneInActSRAMDone <> theSRAMsDoneRegVec.head
-    io.debugIO.onePSumSRAMDone <> theSRAMsDoneRegVec(1)
+    io.debugIO.onePSumSRAMDone <> theSRAMsCtrl(1).map(x => x.done) // so that's the wire not reg done
   } else {
     io.debugIO <> DontCare
   }
@@ -424,7 +423,6 @@ class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {
 class GLBClusterDebugIO extends Bundle with ClusterSRAMConfig {
   val oneInActSRAMDone: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
   val onePSumSRAMDone: Vec[Bool] = Output(Vec(pSumSRAMNum, Bool()))
-  val allDone: Vec[Bool] = Output(Vec(2, Bool()))
   val theState: Vec[UInt] = Output(Vec(2, UInt(2.W)))
   val inActDebugIO: Vec[InActSRAMBankDebugIO] = Vec(inActSRAMNum, new InActSRAMBankDebugIO)
   val pSumDebugIO: Vec[SRAMCommonDebugIO] = Vec(pSumSRAMNum, new SRAMCommonDebugIO(pSumSRAMSize, psDataWidth))
