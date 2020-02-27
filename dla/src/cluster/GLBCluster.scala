@@ -25,16 +25,9 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   theSRAMsAllDoneWire.suggestName("theSRAMsAllDoneWire")
   private val theSRAMsDoingWire = Wire(Vec(2, Bool()))
   theSRAMsDoingWire.suggestName("theSRAMsDoingWire")
-  private val pSumSRAMStrIdx = VecInit(Seq.fill(pSumSRAMNum){RegInit(0.U)})
-  /*
-  private val gReg = RegInit(0.U(log2Ceil(G1)))
-  gReg := io.ctrlPath.gnmfcs1IO.g1
-  private val nReg = RegNext(io.ctrlPath.gnmfcs1IO.n1)
-  private val mReg = RegNext(io.ctrlPath.gnmfcs1IO.m1)
-  private val fReg = RegNext(io.ctrlPath.gnmfcs1IO.f1)
-  private val cReg = RegNext(io.ctrlPath.gnmfcs1IO.c1)
-  private val sReg = RegNext(io.ctrlPath.gnmfcs1IO.s1)
-  */
+  private val pSumSRAMStrIdx = Wire(Vec(pSumSRAMNum, UInt(log2Ceil(pSumSRAMSize).W)))
+  private val configRegVec = VecInit(Seq.fill(io.ctrlPath.configIOs.length){RegInit(0.U)}) // 0g, 1n, 2m, 3f, 4c, 5s
+  configRegVec <> io.ctrlPath.configIOs
   private def OneSRAMState(stateReg: UInt, enable: Bool, done: Bool): Unit = {
     switch (stateReg) {
       is (oneSRAMIdle) {
@@ -95,7 +88,8 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   } else {
     io.debugIO <> DontCare
   }
-  //pSumSRAMStrIdx.foreach(_ := gReg*N1.U*M1.U*F1.U + nReg*M1.U*F1.U + mReg*F1.U + fReg) // FIXME: check the start index of partial sum
+  pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N1.U*M1.U*F1.U + configRegVec(1)*M1.U*F1.U + configRegVec(2)*F1.U + configRegVec(3))
+  // FIXME: check the start index of partial sum
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
@@ -113,7 +107,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   // when finish, doDone = true.B
   private val (doIdxCount, doDoneWire) = Counter(doIdxIncWire, oneSPadPSum)
   startIdx := io.ctrlPath.startIdx
-  writeOrRead := io.ctrlPath.writeOrRead
+  writeOrReadWire := io.ctrlPath.writeOrRead
   io.ctrlPath.done := doDoneReg
   doDoneReg := doDoneWire
   //doEnWire := !doDoneReg && io.ctrlPath.doEn
@@ -138,7 +132,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
 abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth: Int) extends Module {
   protected val theSRAM: SyncReadMem[UInt] = SyncReadMem(theSRAMSize, UInt(theDataWidth.W))
   // SRAM read write logic
-  protected val writeOrRead: Bool = Wire(Bool()) // true then "do" means write, false then "do" means read
+  protected val writeOrReadWire: Bool = Wire(Bool()) // true then "do" means write, false then "do" means read
   // because it will not read and write at the same time
   // so we just need one pair of regs to record process
   protected val doEnWire: Bool = Wire(Bool())
@@ -153,14 +147,14 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
   protected val nextValid: Bool = Wire(Bool())
   protected val nextValidReg: Bool = RegInit(false.B) // one cycle after nextValid
   protected val doDoneReg: Bool = RegInit(false.B) // or combination loop detected
-  doIdxIncWire := Mux(writeOrRead, doWriteWire, doReadWire && waitForRead)
+  doIdxIncWire := Mux(writeOrReadWire, doWriteWire, doReadWire && waitForRead)
 
   def readLogic(readOutIO: DecoupledIO[UInt], doIdx: UInt, doDoneWire: Bool): Any = {
-    nextValid := Mux(writeOrRead, false.B, doEnWire && !waitForRead)
+    nextValid := Mux(writeOrReadWire, false.B, doEnWire && !waitForRead)
     nextValidReg := nextValid && readOutIO.ready
     // when write, waitForRead keeps be false;
     // when read, only enable signal becomes true, then waitForRead signal began to flip
-    waitForRead := Mux(!doDoneWire && readOutIO.ready, Mux(writeOrRead || !doEnWire, waitForRead, !waitForRead), false.B)
+    waitForRead := Mux(!doDoneWire && readOutIO.ready, Mux(writeOrReadWire || !doEnWire, waitForRead, !waitForRead), false.B)
     // TODO: check whether ready signal will influence the results
     readOutIO.valid := nextValidReg // reg next, so one cycle later, data will be read out with valid signal
     doReadWire := readOutIO.ready && nextValidReg
@@ -202,10 +196,10 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   private val meetTwoZerosWire = Wire(Bool())
   private val idxWrap = Wire(Bool())
   // TODO: add some logic to check whether one SPad of data is a zero matrix, true then jump
-  writeOrRead := io.ctrlPath.writeOrRead
+  writeOrReadWire := io.ctrlPath.writeOrRead
   io.ctrlPath.done := doDoneWire
-  doEnWire := (!writeOrRead || !doDoneReg) && io.ctrlPath.doEn // FIXME
-  currentData := Mux(writeOrRead, writeInData, readOutData)
+  doEnWire := (!writeOrReadWire || !doDoneReg) && io.ctrlPath.doEn // FIXME
+  currentData := Mux(writeOrReadWire, writeInData, readOutData)
   // index increase and wrap
   when (doIdxIncWire) {
     doIdxReg := doIdxReg + 1.U
@@ -222,7 +216,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   private val zeroState = RegInit(noZero)
   private val meetZeroWire = Wire(Bool())
   meetZeroWire := currentData === 0.U
-  doMeetZeroWire := Mux(writeOrRead, meetZeroWire, meetZeroWire && waitForRead)
+  doMeetZeroWire := Mux(writeOrReadWire, meetZeroWire, meetZeroWire && waitForRead)
   doMightFinishedWire := doMeetZeroWire && doEnWire // meets one zero, that's the end of one SPad
   switch(zeroState) {
     is (noZero) {
@@ -245,7 +239,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   meetTwoZerosWire := zeroState === twoZeros // that's two zeros
   readDoneWire := zeroState === oneZero // or meet one zero
   writeDoneWire := meetTwoZerosWire
-  doDoneWire := Mux(writeOrRead, writeDoneWire, readDoneWire)
+  doDoneWire := Mux(writeOrReadWire, writeDoneWire, readDoneWire)
   doDoneReg := doDoneWire
   idxWrap := meetTwoZerosWire // wrap the index only after meeting two zeros
   // debug io
@@ -400,19 +394,10 @@ class WeightGLBIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new CSCStreamInOutIO(weightAdrWidth, weightDataWidth)
 }
 
-class GNMFCS1ConfigIO extends Bundle with GNMFCS1Config {
-  val g1: UInt = Input(UInt(log2Ceil(G1).W))
-  val n1: UInt = Input(UInt(log2Ceil(N1).W))
-  val m1: UInt = Input(UInt(log2Ceil(M1).W))
-  val f1: UInt = Input(UInt(log2Ceil(F1).W))
-  val c1: UInt = Input(UInt(log2Ceil(C1).W))
-  val s1: UInt = Input(UInt(log2Ceil(S1).W))
-}
-
-class GLBClusterCtrlIO extends Bundle {
+class GLBClusterCtrlIO extends Bundle with GNMFCS1Config {
   val inActIO = new SRAMCommonCtrlIO with BusySignal
   val pSumIO =  new SRAMCommonCtrlIO with BusySignal
-  //val gnmfcs1IO = new GNMFCS1ConfigIO
+  val configIOs: Vec[UInt] = Input(Vec(6, UInt(3.W))) // that's GNMFCS
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {

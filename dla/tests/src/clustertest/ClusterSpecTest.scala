@@ -12,7 +12,7 @@ import scala.math.{min, pow}
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS1Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  private val printLogDetails = false // true to print more detailed logs
+  private val printLogDetails = true // true to print more detailed logs
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
   private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
   private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
@@ -150,7 +150,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       }
     }
     // read begin
-    theTopIO.debugIO.pSumDebugIO.foreach( _.idx.expect(0.U, "when pSum begins to read, the index should be zero"))
+    thePSumDebugIOs.zip(startIndexes).foreach({ case (strIO, str) => strIO.idx.expect(str.U, "the start index should be start index")})
     theCtrlIO.doEn.poke(true.B)
     theCtrlIO.writeOrRead.poke(false.B)
     theClock.step() // the topPSum from idle to oneSRAMDoing
@@ -456,12 +456,13 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       val theClock = theGLB.clock
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
-      //val gnmfcs1IO = theTopIO.ctrlPath.gnmfcs1IO
+      val gnmfcs1IOs = theTopIO.ctrlPath.configIOs
       val theInActAdrStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)}
       val theInActDataStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)}
       val thePSumDataStreams = Seq.fill(pSumSRAMNum){PSumDataGen(pSumSRAMSize, psDataWidth)}
-      val gnmfcs1Stream = Seq.fill(6){1}
-      val pSumStartIdx = gnmfcs1Stream.head*N1*M1*F1 + gnmfcs1Stream(1)*M1*F1 + gnmfcs1Stream(2)*F1 + gnmfcs1Stream(5) // FIXME
+      val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
+      val pSumStartIdx = gnmfcs1Stream.head*N1*M1*F1 + gnmfcs1Stream(1)*M1*F1 + gnmfcs1Stream(2)*F1 + gnmfcs1Stream(3) // FIXME
+      require(pSumStartIdx + oneSPadPSum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
       def forkWriteInPSumHelper(index: Int, startIndex: Int): Unit = {
         writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),
           doneIO = theTopIO.debugIO.onePSumSRAMDone(index), theData = thePSumDataStreams(index), startIndex = startIndex, theClock = theClock)
@@ -500,12 +501,13 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         thePSumCtrl.doEn.poke(true.B)
         thePSumCtrl.writeOrRead.poke(true.B)
+        gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
         println("--------------- Enable PSum Now ---------------")
         theClock.step(2) // top from idle to doing, sub from idle to doing;
         theTopIO.debugIO.theState(1).expect(1.U, s"the PSumTopState should be oneSRAMDoing now")
         if (printLogDetails) println(s"-------- PSumTop State = ${theTopIO.debugIO.theState(1).peek()}")
-        (1 until pSumSRAMNum).foldLeft(fork(forkWriteInPSumHelper(0, 0))) {
-          case (left, right) => left.fork(forkWriteInPSumHelper(right, 0)) // FIXME: check the start index
+        (1 until pSumSRAMNum).foldLeft(fork(forkWriteInPSumHelper(0, startIndex = pSumStartIdx))) {
+          case (left, right) => left.fork(forkWriteInPSumHelper(right, startIndex = pSumStartIdx)) // FIXME: check the start index
         } .join()
         thePSumCtrl.done.expect(true.B, "after all pSumSRAMs done, top PSum should done now")
         println("---------- all pSumSRAMs are written ------------")
@@ -588,7 +590,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("--------------- begin to read ----------------")
       fork {
         theClock.step(cycles = (new Random).nextInt(5) + 1)
-        topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams, startIndexes = Seq.fill(pSumSRAMNum){0}, theClock = theClock)
+        theTopIO.debugIO.pSumDebugIO.foreach( _.idx.expect(0.U, "when pSum begins to read, the index should be zero"))
+        theClock.step()
+        gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
+        topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams, startIndexes = Seq.fill(pSumSRAMNum){pSumStartIdx}, theClock = theClock)
         theClock.step()
         theTopIO.debugIO.theState(1).expect(0.U, "after all read, the PSumState should be idle now")
         println("------------ all pSum read finish --------------")
