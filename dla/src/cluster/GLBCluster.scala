@@ -117,7 +117,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   io.ctrlPath.done := doDoneReg
   doDoneReg := doDoneWire
   //doEnWire := !doDoneReg && io.ctrlPath.doEn
-  doEnWire := io.ctrlPath.doEn // FIXME
+  doEnWire := io.ctrlPath.doEn && !doDoneReg// FIXME
   doIdxWire := startIdx + doIdxCount
   // write logic
   writeLogic(io.dataPath.inIOs, doIdxWire)
@@ -160,7 +160,8 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
     nextValidReg := nextValid && readOutIO.ready
     // when write, waitForRead keeps be false;
     // when read, only enable signal becomes true, then waitForRead signal began to flip
-    waitForRead := Mux(!doDoneWire, Mux(writeOrRead || !doEnWire, waitForRead, !waitForRead), false.B)
+    waitForRead := Mux(!doDoneWire && readOutIO.ready, Mux(writeOrRead || !doEnWire, waitForRead, !waitForRead), false.B)
+    // TODO: check whether ready signal will influence the results
     readOutIO.valid := nextValidReg // reg next, so one cycle later, data will be read out with valid signal
     doReadWire := readOutIO.ready && nextValidReg
     readOutData := theSRAM.read(doIdx, doReadWire && !waitForRead)

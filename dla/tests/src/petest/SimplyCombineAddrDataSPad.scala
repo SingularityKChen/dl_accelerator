@@ -1,4 +1,4 @@
-package dla.tests
+package dla.tests.petest
 
 import chisel3._
 import chisel3.util._
