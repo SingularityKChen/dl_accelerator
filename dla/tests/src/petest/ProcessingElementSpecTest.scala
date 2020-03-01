@@ -9,33 +9,34 @@ import scala.math.pow
 
 class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig with MCRENFConfig with PESizeConfig {
   // def some common parameters and functions
+  private val randOrNot = true // for debug, true then use random inAct and weight
   private val genHp = new GenTestData
   private val pSumMax = pow(2, psDataWidth).toInt
   private val inActAdrMax = pow(2, inActAdrWidth).toInt
   private val weightAdrMax = pow(2, weightAdrWidth)
   private val scsDataMax = pow(2, cscDataWidth).toInt
-  val inActList: List[List[Int]] = genHp.genSparse(8, 6, max = scsDataMax, 0.845)
-  val weightList: List[List[Int]] = genHp.genSparse(4, 8, max = scsDataMax, 0.6)
-  val (inInActAdrRand, inInActCountRand, inInActDataRand) = genHp.genAdrCountData(inActList, inActOrWeight = true)
-  val (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genHp.genAdrCountData(weightList, inActOrWeight = false)
-  require(inInActAdrRand.head != inActZeroColumnCode, "the head of inAct should not be zero column")
+  private val inActList: List[List[Int]] = genHp.genSparse(8, 6, max = scsDataMax, 0.845)
+  private val weightList: List[List[Int]] = genHp.genSparse(4, 8, max = scsDataMax, 0.6)
+  private val (inInActAdrRand, inInActCountRand, inInActDataRand) = genHp.genAdrCountData(inActList, inActOrWeight = true)
+  private val (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genHp.genAdrCountData(weightList, inActOrWeight = false)
+  require(inInActAdrRand.head != inActZeroColumnCode, "the head of inAct should not be zero column") // TODO: remove this requirement
   inInActAdrRand.foreach(x => require(x <= inActAdrMax, s"inActAdr value should less than max, do $x < $inActAdrMax ?"))
-  require(inWeightAdrRand.head != weightZeroColumnCode, "the head of weight should not be zero column")
+  require(inWeightAdrRand.head != weightZeroColumnCode, "the head of weight should not be zero column") // TODO: remove this requirement
   inWeightAdrRand.foreach(x => require(x <= weightAdrMax, s"weightAdr value should less than max, do $x < $weightAdrMax ?"))
-  val outPSumRand: List[Int] = genHp.goldenFlatResult(weightList, inActList)
+  private val outPSumRand: List[Int] = genHp.goldenFlatResult(weightList, inActList)
   outPSumRand.foreach(x => require(x <= pSumMax, s"pSum should less than max, do $x < $pSumMax ?"))
-  val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0) // weightZeroColumnCode means it is a zero column, don't record the first number
-  val inWeightData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 0) // zero column between 15 & 18, 24 & 27
-  val inWeightCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2, 0)
-  val inInActAdr = Seq(5, 9, inActZeroColumnCode, 11, 14, 0)
-  val inInActData = Seq(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 0)
-  val inInActCount = Seq(1, 3, 4, 6, 7, 2, 5, 6, 7, 0, 5, 0, 1, 3, 5, 0)
-  val outPSum = Seq(282, 318, 330, 132, 486, 834, 774, 336, 0, 482, 60, 528, 0, 0, 0, 0, 156, 258, 72, 312, 0, 630, 0, 720)
+  private val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0) // weightZeroColumnCode means it is a zero column, don't record the first number
+  private val inWeightData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 0) // zero column between 15 & 18, 24 & 27
+  private val inWeightCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2, 0)
+  private val inInActAdr = Seq(5, 9, inActZeroColumnCode, 11, 14, 0)
+  private val inInActData = Seq(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 0)
+  private val inInActCount = Seq(1, 3, 4, 6, 7, 2, 5, 6, 7, 0, 5, 0, 1, 3, 5, 0)
+  private val outPSum = Seq(282, 318, 330, 132, 486, 834, 774, 336, 0, 482, 60, 528, 0, 0, 0, 0, 156, 258, 72, 312, 0, 630, 0, 720)
   // for basically write and read test
-  val inInActTestAdr = Seq(2, 5, inActZeroColumnCode, 6, 7, inActZeroColumnCode, 9, 12, 0) // 15 means it is a zero column, don't record the first number
-  val inInActTestAdr2 = Seq(2, 5, 7, 8, inActZeroColumnCode, inActZeroColumnCode, inActZeroColumnCode, 9, 0)
-  val outWeightColumn = Seq(0, 0, 1, 1, 1, 2, 4, 5, 5, 7, 7, 7) // 3, 6 are zero column
-  val outWeightColumn2 = Seq(0, 0, 1, 1, 1, 2, 2, 3, 4, 8, 8, 8)
+  private val inInActTestAdr = Seq(2, 5, inActZeroColumnCode, 6, 7, inActZeroColumnCode, 9, 12, 0) // 15 means it is a zero column, don't record the first number
+  private val inInActTestAdr2 = Seq(2, 5, 7, 8, inActZeroColumnCode, inActZeroColumnCode, inActZeroColumnCode, 9, 0)
+  private val outWeightColumn = Seq(0, 0, 1, 1, 1, 2, 4, 5, 5, 7, 7, 7) // 3, 6 are zero column
+  private val outWeightColumn2 = Seq(0, 0, 1, 1, 1, 2, 2, 3, 4, 8, 8, 8)
   val outWeightCycleType = Seq(2, 1, 2, 1, 1, 0, 2, 2, 0, 2, 1, 2, 1, 1) // 0 for zero column, 1 for data read only read cycle,
                     // 2 for read cycle which contains both address and data read
   val outWeightCycleType2 = Seq(2, 1, 2, 1, 1, 2, 1, 2, 0, 0, 0, 2, 2, 1, 1) // read the zero numbers after the column then read data
@@ -56,9 +57,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   * |  30  |  1  |  7  |          |  30  |  1  |  8  |
   * |  33  |  2  |  7  |          |  33  |  2  |  8  |
   */
-  def toBinary(i: Int, digits: Int = 8): String =
+  private def toBinary(i: Int, digits: Int = 8): String =
     String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
-  def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = { // input data and count, and combine them together
+  private def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = { // input data and count, and combine them together
     val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
     val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
     val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
@@ -68,7 +69,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   val inInActDataCountDec: Seq[Int] = combineDataAndCount(inInActData, inInActCount)
   val inWeightDataCountDecRand: Seq[Int] = combineDataAndCount(inWeightDataRand, inWeightCountRand)
   val inInActDataCountDecRand: Seq[Int] = combineDataAndCount(inInActDataRand, inInActCountRand)
-  def signalReadInFuc(readInData: Seq[Int], readInIO: StreamBitsIO, theClock: Clock, theWF: Bool): Any = {
+  private def signalReadInFuc(readInData: Seq[Int], readInIO: StreamBitsIO, theClock: Clock, theWF: Bool): Any = {
     readInIO.data.valid.poke(true.B)
     for (i <- readInData.indices) {
       readInIO.data.bits.poke(readInData(i).U)
@@ -79,7 +80,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     readInIO.data.valid.poke(false.B)
   }
 
-  def inActAndWeightReadInFuc(IAData: Seq[Int], IDData: Seq[Int], WAData: Seq[Int], WDData: Seq[Int], theSPadIO: DataStreamIO, theClock: Clock, theWF: PEPadWriteFinIO): Any = {
+  private def inActAndWeightReadInFuc(IAData: Seq[Int], IDData: Seq[Int], WAData: Seq[Int], WDData: Seq[Int], theSPadIO: DataStreamIO, theClock: Clock, theWF: PEPadWriteFinIO): Any = {
     require(IAData.length <= inActAdrSPadSize, s"input address data has ${IAData.length} elements, which exceeds the size of InActAdrSPad size $inActAdrSPadSize")
     require(IDData.length <= inActDataSPadSize, s"input address data has ${IDData.length} elements, which exceeds the size of InActDataSPad size $inActDataSPadSize")
     require(WAData.length <= weightAdrSPadSize, s"input address data has ${WAData.length} elements, which exceeds the size of WeightAdrSPad size $weightAdrSPadSize")
@@ -95,7 +96,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     } .join()
   }
 
-  def PEScratchPadWriteIn(inInActAdr: Seq[Int], inInActData: Seq[Int], inWeightAdr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
+  private def PEScratchPadWriteIn(inInActAdr: Seq[Int], inInActData: Seq[Int], inWeightAdr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
     val theTopSPadIO = topModule.io.dataStream
     val theClock = topModule.clock
     topModule.io.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
@@ -103,7 +104,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     inActAndWeightReadInFuc(inInActAdr, inInActData, inWeightAdr, inWeightData, theTopSPadIO, theClock, topModule.io.padWF)
   }
 
-  def simplyWriteInDataAndAdr(inAddress: Seq[Int], inData: Seq[Int], topModule: SimplyCombineAdrDataSPad): Any = {
+  private def simplyWriteInDataAndAdr(inAddress: Seq[Int], inData: Seq[Int], topModule: SimplyCombineAdrDataSPad): Any = {
     require(inAddress.length <= inActAdrSPadSize, s"input address data has ${inAddress.length} elements, which exceeds the size of SPad size $inActAdrSPadSize")
     require(inData.length <= inActDataSPadSize, s"input address data has ${inData.length} elements, which exceeds the size of SPad size $inActDataSPadSize")
     val theTopIO = topModule.io.inActIOs
@@ -119,7 +120,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     topModule.io.writeEn.poke(false.B)
   }
 
-  def simplyCheckSignal(cycle: Int, topModule: SimplyCombineAdrDataSPad, outWeightCycleType: Seq[Int], readDataTimes: Int, readInData: Seq[Int], readInRow: Seq[Int], readInColumn: Seq[Int]): Any = outWeightCycleType(cycle) match {
+  private def simplyCheckSignal(cycle: Int, topModule: SimplyCombineAdrDataSPad, outWeightCycleType: Seq[Int], readDataTimes: Int, readInData: Seq[Int], readInRow: Seq[Int], readInColumn: Seq[Int]): Any = outWeightCycleType(cycle) match {
     case 0 =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a zero column at $cycle read cycle ---")
@@ -146,7 +147,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       topModule.clock.step() // goto next one
   }
 
-  def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outInActCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outInActCycleType(cycle)) match {
+  private def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outInActCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outInActCycleType(cycle)) match {
     case (0, _) =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a zero weight column at $cycle read cycle ---")
@@ -165,7 +166,6 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
 
   it should "try to run PE with control and CSC SPad module" in {
     test(new ProcessingElement(true)) { thePE =>
-      val randOrNot = true // for debug, true then use random inAct and weight
       val theTopIO = thePE.io
       val theClock = thePE.clock
       println("----------------- test begin -----------------")
@@ -255,7 +255,11 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       thePESPad.reset.poke(false.B)
       println("--------------- begin to write ---------------")
       theTopIO.padCtrl.fromTopIO.doLoadEn.poke(true.B)
-      PEScratchPadWriteIn(inInActAdr, inInActDataCountDec, inWeightAdr, inWeightDataCountDec, thePESPad)
+      if (randOrNot) {
+        PEScratchPadWriteIn(inInActAdrRand, inInActDataCountDecRand, inWeightAdrRand, inWeightDataCountDecRand, thePESPad)
+      } else {
+        PEScratchPadWriteIn(inInActAdr, inInActDataCountDec, inWeightAdr, inWeightDataCountDec, thePESPad)
+      }
       theTopIO.padCtrl.fromTopIO.doLoadEn.poke(false.B)
       println("--------------- begin to read ----------------")
       theTopIO.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
@@ -284,8 +288,11 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       for (i <- 0 until M0*E*N0*F0) {
         println(s"--------- $i-th pSumSPad read cycle --------")
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
-        theTopIO.dataStream.opsIO.bits.expect(outPSum(i).U, s"the out partial sum should be ${outPSum(i)} at $i-th index")
-        //assertResult(outpSum(i).asUInt(psDataWidth.W))(theTopIO.dataStream.opsIO.bits.peek())
+        if (randOrNot) {
+          theTopIO.dataStream.opsIO.bits.expect(outPSumRand(i).U, s"the out partial sum should be ${outPSumRand(i)} at $i-th index")
+        } else {
+          theTopIO.dataStream.opsIO.bits.expect(outPSum(i).U, s"the out partial sum should be ${outPSum(i)} at $i-th index")
+        }
         theClock.step()
       }
     }
@@ -381,15 +388,16 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       val theCtrlPath = dataSPad.io.ctrlPath
       val theDataIO = theDataPath.writeInData.data
       val theClock = dataSPad.clock
+      val theData = if (randOrNot) inWeightDataCountDecRand else inWeightDataCountDec
       println("--- begin to test the read and write data in InAct SPad ---")
       println("----------- begin to write -----------")
       theDataIO.valid.poke(true.B)
       theCtrlPath.writeEn.poke(true.B)
       theCtrlPath.readEn.poke(false.B)
-      for (i <- inWeightDataCountDec.indices) {
-        theDataIO.bits.poke(inWeightDataCountDec(i).U)
+      for (i <- theData.indices) {
+        theDataIO.bits.poke(theData(i).U)
         theDataIO.ready.expect(true.B, "write valid, after receive the data, it should be ready")
-        theCtrlPath.writeFin.expect((i == inWeightDataCountDec.length - 1).B, s"i = $i")
+        theCtrlPath.writeFin.expect((i == theData.length - 1).B, s"i = $i")
         theCtrlPath.writeIdx.expect(i.U, s"i = $i")
         theClock.step()
       }
@@ -398,16 +406,16 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theCtrlPath.writeEn.poke(false.B)
       theCtrlPath.readEn.poke(true.B)
       theCtrlPath.indexInc.poke(true.B) // INCREASE ALL THE TIME
-      for (i <- inWeightDataCountDec.indices) {
+      for (i <- theData.indices) {
         println(s"----------- read clock $i -----------")
         theDataPath.columnNum.expect(i.U, s"columnNum = $i in read clock $i")
-        theDataPath.readOutData.expect(inWeightDataCountDec(i).U, s"readOutData = inWeightDataCountDec($i) = ${inWeightDataCountDec(i)}")
+        theDataPath.readOutData.expect(theData(i).U, s"readOutData = inWeightDataCountDec($i) = ${theData(i)}")
         println(s"theCtrlPath.columnNum = $i")
-        println(s"theCtrlPath.readOutData = ${inWeightDataCountDec(i)}")
+        println(s"theCtrlPath.readOutData = ${theData(i)}")
         theClock.step()
       }
       theDataPath.columnNum.expect(0.U, s"new read turn begins, columnNum = 0")
-      theDataPath.readOutData.expect(inWeightDataCountDec.head.U, s"new read turn begins, readOutData = ${inWeightDataCountDec.head}")
+      theDataPath.readOutData.expect(theData.head.U, s"new read turn begins, readOutData = ${theData.head}")
     }
   }
 }

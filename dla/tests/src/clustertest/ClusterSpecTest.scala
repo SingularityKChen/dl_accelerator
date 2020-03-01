@@ -10,7 +10,7 @@ import org.scalatest._
 import scala.util.Random
 import scala.math.{min, pow}
 
-class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS1Config {
+class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
   private val printLogDetails = true // true to print more detailed logs
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
@@ -461,7 +461,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       val theInActDataStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)}
       val thePSumDataStreams = Seq.fill(pSumSRAMNum){PSumDataGen(pSumSRAMSize, psDataWidth)}
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
-      val pSumStartIdx = gnmfcs1Stream.head*N1*M1*F1 + gnmfcs1Stream(1)*M1*F1 + gnmfcs1Stream(2)*F1 + gnmfcs1Stream(3) // FIXME
+      val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
       require(pSumStartIdx + oneSPadPSum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
       def forkWriteInPSumHelper(index: Int, startIndex: Int): Unit = {
         writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),

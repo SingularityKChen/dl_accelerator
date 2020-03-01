@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
-class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMFCS1Config {
+class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMFCS2Config {
   val io: GLBClusterIO = IO(new GLBClusterIO)
   private val iSRAMs = VecInit(Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug)).io})
   iSRAMs.suggestName("inActSRAMs")
@@ -88,7 +88,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   } else {
     io.debugIO <> DontCare
   }
-  pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N1.U*M1.U*F1.U + configRegVec(1)*M1.U*F1.U + configRegVec(2)*F1.U + configRegVec(3))
+  pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N2.U*M2.U*F2.U + configRegVec(1)*M2.U*F2.U + configRegVec(2)*F2.U + configRegVec(3))
   // FIXME: check the start index of partial sum
 }
 
