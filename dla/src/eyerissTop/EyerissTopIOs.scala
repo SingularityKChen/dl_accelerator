@@ -2,7 +2,9 @@ package dla.eyerissTop
 
 import chisel3._
 import chisel3.util._
-import dla.cluster.{ClusterGroup, ClusterGroupIO, CommonClusterCtrlIO, GLBClusterDataIO}
+import dla.cluster.{ClusterGroup, ClusterGroupIO, ClusterSRAMConfig, CommonClusterCtrlIO, GLBClusterDataIO, GNMFCS1Config, GNMFCS2Config}
+import dla.pe.MCRENFConfig
+import org.scalatest.FlatSpec
 
 class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   require(cgColNum == 2, "the default design is based on 2 columns, you need to change the connections now")
@@ -101,4 +103,13 @@ class EyerissCtrlIO extends Bundle with EyerissTopConfig {
 trait EyerissTopConfig { // if the column number or row number changes, then groups connections will change
   val cgColNum: Int = 2
   val cgRowNum: Int = 8
+}
+
+class CheckConfigs extends FlatSpec with EyerissTopConfig with GNMFCS1Config with GNMFCS2Config with MCRENFConfig with ClusterSRAMConfig {
+  private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
+  assert(C1 < cgRowNum, "C1 should smaller than cgRowNum to accumulate tiling partial sums together")
+  assert(G1*N1*M1 < cgColNum*cgRowNum, "should have enough ClusterGroups to be mapped with tiling matrix multiplication")
+  assert(oneSPadPSum*N2*M2*F2 < pSumSRAMSize, "pSumSRAM should contain one group of data")
+  assert(F1 == 1, "maybe you need to change the logic design")
+  assert(S1 == 1, "maybe you need to change the logic design")
 }

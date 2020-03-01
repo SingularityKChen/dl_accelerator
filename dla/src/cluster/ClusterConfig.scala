@@ -24,10 +24,10 @@ trait ClusterSRAMConfig extends ClusterConfig {
 trait GNMFCS1Config {
   val G1: Int = 1
   val N1: Int = 2
-  val M1: Int = 4
-  val F1: Int = 3
-  val C1: Int = 3
-  val S1: Int = 4
+  val M1: Int = 2
+  val F1: Int = 1
+  val C1: Int = 4
+  val S1: Int = 1
 }
 
 trait GNMFCS2Config {

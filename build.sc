@@ -62,7 +62,8 @@ object dla extends ScalaModule with ScalafmtModule {
   override def ivyDeps = Agg(
     ivy"com.lihaoyi::os-lib:0.2.7",
     ivy"com.lihaoyi::upickle:0.8.0",
-    ivy"com.lihaoyi::ammonite-ops:1.7.1"
+    ivy"com.lihaoyi::ammonite-ops:1.7.1",
+    ivy"org.scalanlp::breeze:1.0"
   )
 
   def publishVersion = "0.1.0"

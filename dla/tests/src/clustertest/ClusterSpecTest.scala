@@ -489,14 +489,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theClock.step(cycles = (new Random).nextInt(5) + 1)
       theGLB.reset.poke(false.B)
       println("--------------- begin to write ---------------")
-      /*
-      theTopIO.ctrlPath.gnmfcs1IO.g1.poke(gnmfcs1Stream.head.U) // input GNMFCS1
-      gnmfcs1IO.n1.poke(gnmfcs1Stream(1).U) // input GNMFCS1
-      gnmfcs1IO.m1.poke(gnmfcs1Stream(2).U) // input GNMFCS1
-      gnmfcs1IO.f1.poke(gnmfcs1Stream(3).U) // input GNMFCS1
-      gnmfcs1IO.c1.poke(gnmfcs1Stream(4).U) // input GNMFCS1
-      gnmfcs1IO.s1.poke(gnmfcs1Stream(5).U) // input GNMFCS1
-      */
       fork {
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         thePSumCtrl.doEn.poke(true.B)
