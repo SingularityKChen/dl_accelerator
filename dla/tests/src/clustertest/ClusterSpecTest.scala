@@ -602,7 +602,18 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       println("---------------- test finish -----------------")
     }
   }
-  //behavior of "work well on Processing Element Cluster"
+
+  behavior of "work well on Processing Element Cluster"
+  it should "work well on the PECluster" in {
+    test (new PECluster(true)) { thePECluster =>
+      val theTopIO = thePECluster.io
+      val theClock = thePECluster.clock
+      //val
+      thePECluster.reset.poke(true.B)
+      theClock.step()
+      thePECluster.reset.poke(false.B)
+    }
+  }
   //behavior of "work well on Cluster Group"
   /*behavior of "test the spec of Router Cluster"
   it should "work well on Router Cluster" in {

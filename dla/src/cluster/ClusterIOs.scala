@@ -98,6 +98,8 @@ class PEClusterCtrlIO extends Bundle { // output only
   // pSumCtrlSel.inDataSel: true, then receive data from PSumRouter, false then receive data from its southern PE Array
   // pSumCtrlSel.outDataSel: unused
   val pSumCtrlSel = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool())
+  val doEn: Bool = Output(Bool())
+  val configIOs: Vec[UInt] = Input(Vec(6, UInt(3.W))) // that's GNMFCS
 }
 
 class CommonClusterCtrlIO[T1<: Data, T2<: Data](dataType1: T1, dataType2: T2) extends Bundle {

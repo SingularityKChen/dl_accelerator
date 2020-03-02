@@ -9,18 +9,18 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   peCtrl.suggestName("peCtrl")
   private val pePad = Module(new ProcessingElementPad(debug = debug))
   pePad.suggestName("pePad")
-  private val inActAndWeightIOs = Seq(pePad.io.padWF.inActWriteFin, pePad.io.padWF.weightWriteFin)
   if (fifoEn) {
     pePad.io.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true)
     pePad.io.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true)
     pePad.io.dataStream.weightIOs.adrIOs.data <> Queue(io.dataStream.weightIOs.adrIOs.data, fifoSize, flow = true)
     pePad.io.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true)
-    val inActAndWeightTopIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
-    inActAndWeightIOs.zip(inActAndWeightTopIOs).foreach{case (x, y) => y <> x}
   } else {
     pePad.io.dataStream.inActIOs <> io.dataStream.inActIOs
     pePad.io.dataStream.weightIOs <> io.dataStream.weightIOs
  }
+  private val inActAndWeightIOs = Seq(pePad.io.padWF.inActWriteFin, pePad.io.padWF.weightWriteFin)
+  val inActAndWeightTopIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
+  inActAndWeightIOs.zip(inActAndWeightTopIOs).foreach{case (x, y) => y <> x}
   peCtrl.io.ctrlPad <> pePad.io.padCtrl
   io.topCtrl.pSumEnqOrProduct <> peCtrl.io.ctrlTop.pSumEnqOrProduct
   io.topCtrl.calFinish := peCtrl.io.ctrlTop.calFinish
@@ -214,7 +214,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // Input activation Data Scratch Pad
   inActDataSPad.io.dataPath.writeInData <> io.dataStream.inActIOs.dataIOs
   inActDataIndexWire := inActDataSPad.io.dataPath.columnNum
-  private val inActDataCountVec: Seq[Bool] = inActDataSPad.io.dataPath.readOutData.asBools
+  private val inActDataCountVec: Seq[Bool] = inActDataSPad.io.dataPath.readOutData.asBools()
   inActMatrixDataWire := Cat(inActDataCountVec.reverse.take(cscDataWidth)).asUInt // TODO: figure out why it need reverse
   inActMatrixRowWire := Cat(inActDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
   io.padWF.inActWriteFin.dataWriteFin := inActDataSPad.io.ctrlPath.writeFin
@@ -236,7 +236,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // Weight Data Scratch Pad
   weightDataSPad.io.dataPath.writeInData <> io.dataStream.weightIOs.dataIOs
   weightDataIndexWire := weightDataSPad.io.dataPath.columnNum
-  private val weightDataCountVec: Seq[Bool] = weightDataSPad.io.dataPath.readOutData.asBools
+  private val weightDataCountVec: Seq[Bool] = weightDataSPad.io.dataPath.readOutData.asBools()
   weightMatrixDataReg := Cat(weightDataCountVec.reverse.take(cscDataWidth)).asUInt
   weightMatrixRowReg := Cat(weightDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
   io.padWF.weightWriteFin.dataWriteFin := weightDataSPad.io.ctrlPath.writeFin
