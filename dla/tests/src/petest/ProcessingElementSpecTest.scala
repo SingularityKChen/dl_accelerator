@@ -4,19 +4,19 @@ import chisel3._
 import chisel3.tester._
 import dla.pe._
 import org.scalatest._
-import dla.tests.GenTestData
+import dla.tests.GenOnePETestData
 import scala.math.pow
 
 class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig with MCRENFConfig with PESizeConfig {
   // def some common parameters and functions
   private val randOrNot = true // for debug, true then use random inAct and weight
-  private val genHp = new GenTestData
+  private val genHp = new GenOnePETestData
   private val pSumMax = pow(2, psDataWidth).toInt
   private val inActAdrMax = pow(2, inActAdrWidth).toInt
   private val weightAdrMax = pow(2, weightAdrWidth)
   private val scsDataMax = pow(2, cscDataWidth).toInt
-  private val inActList: List[List[Int]] = genHp.genSparse(8, 6, max = scsDataMax, 0.845)
-  private val weightList: List[List[Int]] = genHp.genSparse(4, 8, max = scsDataMax, 0.6)
+  private val inActList: List[List[Int]] = genHp.inActList
+  private val weightList: List[List[Int]] = genHp.weightList
   private val (inInActAdrRand, inInActCountRand, inInActDataRand) = genHp.genAdrCountData(inActList, inActOrWeight = true)
   private val (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genHp.genAdrCountData(weightList, inActOrWeight = false)
   require(inInActAdrRand.head != inActZeroColumnCode, "the head of inAct should not be zero column") // TODO: remove this requirement
@@ -147,7 +147,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       topModule.clock.step() // goto next one
   }
 
-  private def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outInActCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outInActCycleType(cycle)) match {
+  /*private def peSpecSignalCheck(cycle: Int, topModule: ProcessingElementPad, outWeightCycleType: Seq[Int], outInActCycleType: Seq[Int]): Any = (outWeightCycleType(cycle), outInActCycleType(cycle)) match {
     case (0, _) =>
       println(s"---------------- read cycle $cycle --------------")
       println(s"--- meets a zero weight column at $cycle read cycle ---")
@@ -161,6 +161,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println(s"--- meets a weight data read only cycle at $cycle read cycle ---")
 
   }
+  */
 
   behavior of "test the spec of Processing Element Module with CSC format data"
 
