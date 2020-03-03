@@ -16,8 +16,8 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
   private val theSRAMsEnWire = Wire(Vec(2, Bool()))
   theSRAMsEnWire.suggestName("theSRAMsEnWire")
-  private val theSRAMsState = RegInit(VecInit(Seq.fill(2){oneSRAMIdle}))
-  theSRAMsState.suggestName("theSRAMsState")
+  private val theSRAMsStateRegVec = RegInit(VecInit(Seq.fill(2){oneSRAMIdle}))
+  theSRAMsStateRegVec.suggestName("theSRAMsStateRegVec")
   private val theSRAMsDoneRegVec = Seq(RegInit(VecInit(Seq.fill(inActSRAMNum){false.B})), RegInit(VecInit(Seq.fill(pSumSRAMNum){false.B})))
   theSRAMsDoneRegVec.head.suggestName("inActSRAMDoneRegVec")
   theSRAMsDoneRegVec.last.suggestName("pSumSRAMDoneRegVec")
@@ -59,16 +59,16 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
     theSRAMsEnWire(i) := theTopCtrls(i).doEn
     // inner logic
     theSRAMsAllDoneWire(i) := theSRAMsDoneRegVec(i).reduce(_ && _) // when they all become true, then inActSRAMs are all done
-    theSRAMsDoingWire(i) := theSRAMsState(i) === oneSRAMDoing
+    theSRAMsDoingWire(i) := theSRAMsStateRegVec(i) === oneSRAMDoing
     // inner connections
     for (j <- 0 until theSRAMsNum(i)) {
       theSRAMsCtrl(i)(j).doEn := theSRAMsDoingWire(i) && !theSRAMsDoneRegVec(i)(j)
       // if one received done signal, then its signal flips, from false to true, then disable its enable signal
       // if inAct state is idle, then assign done reg to false.
-      theSRAMsDoneRegVec(i)(j) := Mux(!(theSRAMsState(i) === oneSRAMIdle), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
+      theSRAMsDoneRegVec(i)(j) := Mux(!(theSRAMsStateRegVec(i) === oneSRAMIdle), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
       theSRAMsCtrl(i)(j).writeOrRead := theTopCtrls(i).writeOrRead
     }
-    OneSRAMState(theSRAMsState(i), theSRAMsEnWire(i), theSRAMsAllDoneWire(i))
+    OneSRAMState(theSRAMsStateRegVec(i), theSRAMsEnWire(i), theSRAMsAllDoneWire(i))
   }
   // connections of data path
   io.dataPath.weightIO.foreach(x => x.inIOs <> x.outIOs)
@@ -82,7 +82,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   if (debug) {
     io.debugIO.inActDebugIO.zip(iSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
     io.debugIO.pSumDebugIO.zip(pSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
-    io.debugIO.theState <> theSRAMsState
+    io.debugIO.theState <> theSRAMsStateRegVec
     io.debugIO.oneInActSRAMDone <> theSRAMsDoneRegVec.head
     io.debugIO.onePSumSRAMDone <> theSRAMsCtrl(1).map(x => x.done) // so that's the wire not reg done
   } else {

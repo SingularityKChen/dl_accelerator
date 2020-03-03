@@ -17,12 +17,12 @@ class ClusterDataIO extends Bundle with ClusterConfig {
 }
 
 class ClusterGroupCtrlIO extends Bundle {
-  val peClusterCtrl = new CommonClusterCtrlIO[Bool, UInt](Bool(), UInt(2.W)) // input select signals to PE Cluster
+  val peClusterCtrl: CommonClusterCtrlIO[Bool, UInt] = Input(new CommonClusterCtrlIO[Bool, UInt](Bool(), UInt(2.W))) // input select signals to PE Cluster
   val routerClusterCtrl: RouterClusterCtrlIO = Flipped(new RouterClusterCtrlIO) // input select signals to Router Cluster
 }
 
 class RouterClusterIO extends Bundle {
-  val ctrlPath = new RouterCtrlIO
+  val ctrlPath: RouterCtrlIO = Input(new RouterCtrlIO)
   val dataPath = new RouterClusterDataIO
 }
 
@@ -33,12 +33,12 @@ class RouterClusterDataIO extends Bundle with ClusterConfig {
 
 class CommonRouterIO[T1<: Data, T2<:Data](dataType1: T1, dataType2: T2, portNum: Int, adrWidth: Int, dataWidth: Int) extends Bundle {
   val dataPath = new CommonRouterDataIO(portNum, adrWidth, dataWidth)
-  val ctrlPath = new CommonClusterCtrlIO[T1, T2](dataType1, dataType2)
+  val ctrlPath: CommonClusterCtrlIO[T1, T2] = Input(new CommonClusterCtrlIO[T1, T2](dataType1, dataType2))
 }
 
 class PSumRouterIO extends Bundle with ClusterConfig {
   val dataPath = new PSumRouterDataIO(pSumPortNum, psDataWidth)
-  val ctrlPath = new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))
+  val ctrlPath: CommonClusterCtrlIO[UInt, UInt] = Input(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
 }
 
 class RouterDataIO extends Bundle with ClusterConfig {
@@ -68,14 +68,14 @@ class RouterClusterCtrlIO extends Bundle { // output only
   // uni-cast, horizontal, vertical, broad-cast
   // inActCtrlSel.inDataSel: 0 for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   // inActCtrlSel.outDataSel 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
-  val inActCtrlSel: CommonClusterCtrlIO[UInt, UInt] = new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))
+  val inActCtrlSel: CommonClusterCtrlIO[UInt, UInt] = Output(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
   // Weight Models: broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
   // weightCtrlSel.inDataSel: true for broad-cast and multi-cast, false for uni-cast
   // weightCtrlSel.outDataSel: 0, send the data to PE Cluster; 1, send it to its neighboring WeightRouter and PE Cluster
-  val weightCtrlSel: CommonClusterCtrlIO[Bool, Bool] = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool())
+  val weightCtrlSel: CommonClusterCtrlIO[Bool, Bool] = Output(new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()))
   // pSumCtrlSel.inDataSel: 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
   // pSumCtrlSel.outDataSel: 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
-  val pSumCtrlSel: CommonClusterCtrlIO[UInt, UInt] = Flipped(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
+  val pSumCtrlSel: CommonClusterCtrlIO[UInt, UInt] = Output(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
 }
 
 class PEClusterIO extends Bundle with ClusterConfig {
@@ -87,22 +87,22 @@ class PEClusterDataIO extends Bundle with ClusterConfig {
   val inActIO: Vec[CSCStreamIO] = Vec(inActRouterNum, Flipped(new CSCStreamIO(inActAdrWidth, inActDataWidth))) // input only
   val weightIO: Vec[CSCStreamIO] = Vec(weightRouterNum, Flipped(new CSCStreamIO(weightAdrWidth, weightDataWidth)))
   val pSumIO = new PSumRouterDataIO(pSumRouterNum, psDataWidth) // input and output
-  val routerInPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(Decoupled(UInt(psDataWidth.W)))) // input only
+  val routerInPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(DecoupledIO(UInt(psDataWidth.W)))) // input only
 }
 
 class PEClusterCtrlIO extends Bundle { // output only
   // inActCtrlSel.inDataSel: true for broad-cast, false for others
   // inActCtrlSel.outDataSel: the value indicates the index of router
-  val inActCtrlSel = new CommonClusterCtrlIO[Bool, UInt](Bool(), UInt(2.W))
+  val inActCtrlSel: CommonClusterCtrlIO[Bool, UInt] = Output(new CommonClusterCtrlIO[Bool, UInt](Bool(), UInt(2.W)))
   // val weightCtrlSel = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()) // do not need this
   // pSumCtrlSel.inDataSel: true, then receive data from PSumRouter, false then receive data from its southern PE Array
   // pSumCtrlSel.outDataSel: unused
-  val pSumCtrlSel = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool())
+  val pSumCtrlSel: CommonClusterCtrlIO[Bool, Bool] = Output(new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()))
   val doEn: Bool = Output(Bool())
-  val configIOs: Vec[UInt] = Input(Vec(6, UInt(3.W))) // that's GNMFCS
+  val configIOs: Vec[UInt] = Output(Vec(6, UInt(3.W))) // that's GNMFCS
 }
 
-class CommonClusterCtrlIO[T1<: Data, T2<: Data](dataType1: T1, dataType2: T2) extends Bundle {
+class CommonClusterCtrlIO[T1<: Data, T2<: Data](val dataType1: T1, val dataType2: T2) extends Bundle {
   val inDataSel: T1 = Input(dataType1)
   val outDataSel: T2 = Input(dataType2)
 }

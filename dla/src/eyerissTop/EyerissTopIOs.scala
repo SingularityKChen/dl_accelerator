@@ -10,7 +10,7 @@ class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   require(cgColNum == 2, "the default design is based on 2 columns, you need to change the connections now")
   //require(cgRowNum == 8)
   val io: EyerissIO = IO(new EyerissIO)
-  private val cgArray = VecInit(Seq.fill(cgRowNum){VecInit(Seq.fill(cgColNum){Module(new ClusterGroup(debug)).io})})
+  private val cgArray = Seq.fill(cgRowNum, cgColNum){Module(new ClusterGroup(debug)).io}
   private val layerType = RegInit(0.U(2.W)) // 0: CONY layers, 1: depth-wise CONV layers, 2: fully-connected layers
   private val inActMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   private val weightMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal multi-cast, 2: broadcast
@@ -32,11 +32,11 @@ class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
       cgArray(i)(j).dataPath.cgDataPath.iRIO.foreach(_.inIOs.head <> DontCare)
     }
     // Input Activation Horizontal Connections
-    cgArray(i)(0).dataPath.cgDataPath.iRIO.zipWithIndex.foreach({ case (o, idx) =>
+    cgArray(i).head.dataPath.cgDataPath.iRIO.zipWithIndex.foreach({ case (o, idx) =>
       o.inIOs(3) <> cgArray(i)(1).dataPath.cgDataPath.iRIO(idx).outIOs(3)
     })
     // Weight
-    cgArray(i)(0).dataPath.cgDataPath.wRIO.zipWithIndex.foreach({ case (o, idx) =>
+    cgArray(i).head.dataPath.cgDataPath.wRIO.zipWithIndex.foreach({ case (o, idx) =>
       o.inIOs.last <> cgArray(i)(1).dataPath.cgDataPath.wRIO(idx).outIOs.last
       cgArray(i)(1).dataPath.cgDataPath.wRIO(idx).inIOs.last <> o.outIOs.last
     })
@@ -92,10 +92,10 @@ class EyerissDataIO extends Bundle with EyerissTopConfig {
 class EyerissCtrlIO extends Bundle with EyerissTopConfig {
   val inActCtrlSel: Vec[Vec[CommonClusterCtrlIO[UInt, UInt]]] = Vec(cgRowNum, Vec(cgColNum, new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))))
   //
-  val weightCtrlSel: Vec[CommonClusterCtrlIO[Bool, Bool]] = Vec(cgRowNum, new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()))
+  val weightCtrlSel: Vec[CommonClusterCtrlIO[Bool, Bool]] = Vec(cgRowNum, Input(new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool())))
   // weightCtrlSel.inSel indicates whether the cluster group need to translate the data to other side;
   // weightCtrlSel.outSel true, then left one send data to right one;
-  val pSumCtrlSel: Vec[CommonClusterCtrlIO[UInt, UInt]] = Vec(cgColNum, new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W)))
+  val pSumCtrlSel: Vec[CommonClusterCtrlIO[UInt, UInt]] = Vec(cgColNum, Input(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))))
   // pSumCtrlSel.inSel
   // pSumCtrlSel.OutSel
 }
@@ -103,13 +103,4 @@ class EyerissCtrlIO extends Bundle with EyerissTopConfig {
 trait EyerissTopConfig { // if the column number or row number changes, then groups connections will change
   val cgColNum: Int = 2
   val cgRowNum: Int = 8
-}
-
-class CheckConfigs extends FlatSpec with EyerissTopConfig with GNMFCS1Config with GNMFCS2Config with MCRENFConfig with ClusterSRAMConfig {
-  private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  assert(C1 < cgRowNum, "C1 should smaller than cgRowNum to accumulate tiling partial sums together")
-  assert(G1*N1*M1 < cgColNum*cgRowNum, "should have enough ClusterGroups to be mapped with tiling matrix multiplication")
-  assert(oneSPadPSum*N2*M2*F2 < pSumSRAMSize, "pSumSRAM should contain one group of data")
-  assert(F1 == 1, "maybe you need to change the logic design")
-  assert(S1 == 1, "maybe you need to change the logic design")
 }
