@@ -6,9 +6,9 @@ import dla.pe.CSCStreamIO
 
 class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   val io: RouterClusterIO = IO(new RouterClusterIO)
-  private val iRouters = VecInit(Seq.fill(inActRouterNum){ Module(new InActRouter).io })
-  private val wRouters = VecInit(Seq.fill(weightRouterNum){ Module(new WeightRouter).io })
-  private val pSRouters = VecInit(Seq.fill(pSumRouterNum){ Module(new PSumRouter).io })
+  private val iRouters = Seq.fill(inActRouterNum){ Module(new InActRouter).io }
+  private val wRouters = Seq.fill(weightRouterNum){ Module(new WeightRouter).io }
+  private val pSRouters = Seq.fill(pSumRouterNum){ Module(new PSumRouter).io }
   io.dataPath.routerData.iRIO.zip(iRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.wRIO.zip(wRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.pSumRIO.zip(pSRouters).foreach({case (x, y) => x <> y.dataPath})
@@ -22,71 +22,140 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   })
 }
 
-class InActRouter extends Module with ClusterConfig {
-  val io: CommonRouterIO[UInt, UInt] = IO(new CommonRouterIO[UInt, UInt](UInt(2.W), UInt(2.W), inActPortNum, inActAdrWidth, inActDataWidth))
+class InActRouter extends CSCRouter with ClusterConfig {
+  val io: CommonRouterUIntIO = IO(new CommonRouterUIntIO(inActPortNum, inActAdrWidth, inActDataWidth))
   private val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   // outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   private val outSelWire: UInt = Wire(UInt(2.W))
-  private val inDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
-  private val outDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
-  inDataWire <> outDataWire
-  inDataWire <> MuxLookup(inSelWire, 0.U, io.dataPath.inIOs.zipWithIndex.map({
-    case (o, i) =>
-      i.asUInt -> o
-  }))
-  switch (outSelWire) {
-    is (0.U) { // uni-cast
-      io.dataPath.outIOs(0) <> outDataWire // 0 to PE array
-      io.dataPath.outIOs.takeRight(3).foreach(_ <> DontCare)
-    }
-    is (1.U) { // horizontal
-      io.dataPath.outIOs(0) <> outDataWire
-      io.dataPath.outIOs(1) <> DontCare // not send this time
-      io.dataPath.outIOs(2) <> DontCare // not send this time
-      io.dataPath.outIOs(3) <> outDataWire
-    }
-    is (2.U) { // vertical
-      io.dataPath.outIOs.take(3).foreach(_ <> outDataWire)
-      io.dataPath.outIOs(3) <> DontCare// not send this time
-    }
-    is (3.U) { // broad-cast
-      io.dataPath.outIOs.foreach(_ <> outDataWire)
-    }
+  private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
+  internalDataWire.suggestName("inActInternalDataWire")
+  private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
+  inSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
+    bool.suggestName(s"inActInSelEq${i}Wire")
+    bool := inSelWire === i.asUInt
+  })
+  private val outSelEqWires = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
+  outSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
+    bool.suggestName(s"inActOutSelEq${i}Wire")
+    bool := inSelWire === i.asUInt
+  })
+  when (inSelEqWires.head) {
+    internalDataWire <> io.dataPath.inIOs(0)
+    io.dataPath.inIOs.takeRight(3).foreach({x =>
+      disableAdrDataReady(x)
+    })
+  } .elsewhen (inSelEqWires(1)) {
+    disableAdrDataReady(io.dataPath.inIOs(0))
+    internalDataWire <> io.dataPath.inIOs(1)
+    io.dataPath.inIOs.takeRight(2).foreach({x =>
+      disableAdrDataReady(x)
+    })
+  } .elsewhen (inSelEqWires(2)) {
+    io.dataPath.inIOs.take(2).foreach({x =>
+      disableAdrDataReady(x)
+    })
+    internalDataWire <> io.dataPath.inIOs(2)
+    disableAdrDataReady(io.dataPath.inIOs(3))
+  } .otherwise {
+    io.dataPath.inIOs.take(3).foreach({x =>
+      disableAdrDataReady(x)
+    })
+    internalDataWire <> io.dataPath.inIOs(3)
+  }
+  when (outSelEqWires.head) { // uni-cast
+    io.dataPath.outIOs(0) <> internalDataWire // 0 to PE array
+    io.dataPath.outIOs.takeRight(3).foreach(_ <> DontCare)
+  } .elsewhen (outSelEqWires(1)) { // horizontal
+    io.dataPath.outIOs(0) <> internalDataWire
+    io.dataPath.outIOs(1) <> DontCare // not send this time
+    io.dataPath.outIOs(2) <> DontCare // not send this time
+    io.dataPath.outIOs(3) <> internalDataWire
+  } .elsewhen (outSelEqWires(2)) { // vertical
+    io.dataPath.outIOs.take(3).foreach(_ <> internalDataWire)
+    io.dataPath.outIOs(3) <> DontCare// not send this time
+  } .otherwise { // broad-cast
+    io.dataPath.outIOs.foreach(_ <> internalDataWire)
   }
   // control path
   inSelWire := io.ctrlPath.inDataSel
   outSelWire := io.ctrlPath.outDataSel
 }
 
-class WeightRouter extends Module with ClusterConfig {
-  val io: CommonRouterIO[Bool, Bool] = IO(new CommonRouterIO[Bool, Bool](Bool(), Bool(), weightPortNum, weightAdrWidth, weightDataWidth))
+class WeightRouter extends CSCRouter with ClusterConfig {
+  val io: CommonRouterBoolIO = IO(new CommonRouterBoolIO(weightPortNum, weightAdrWidth, weightDataWidth))
   // inSelWire: 0, receive the data come from GLB Cluster; 1, receive it come from its neighborhood WeightRouter
   private val inSelWire: Bool = Wire(Bool())
   // outSelWire: 0, send the data to PE Cluster; 1, send it to its neighborhood WeightRouter and PE Cluster
   private val outSelWire: Bool = Wire(Bool())
-  private val inDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
-  private val outDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
-  inDataWire <> outDataWire
-  inDataWire <> Mux(inSelWire, io.dataPath.inIOs(1), io.dataPath.inIOs.head)
-  io.dataPath.outIOs.head <> outDataWire
-  io.dataPath.outIOs(1) <> Mux(outSelWire, outDataWire, DontCare)
+  private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
+  internalDataWire.suggestName("weightInternalDataWire")
+  when (inSelWire) {
+    internalDataWire <> io.dataPath.inIOs(1)
+    disableAdrDataReady(io.dataPath.inIOs.head)
+  } .otherwise {
+    internalDataWire <> io.dataPath.inIOs.head
+    disableAdrDataReady(io.dataPath.inIOs(1))
+  }
+  io.dataPath.outIOs.head <> internalDataWire
+  when (outSelWire) {
+    io.dataPath.outIOs(1) <> internalDataWire
+  } .otherwise {
+    io.dataPath.outIOs(1) <> DontCare
+  }
   // control path
   inSelWire := io.ctrlPath.inDataSel
   outSelWire := io.ctrlPath.outDataSel
+}
+
+abstract class CSCRouter extends Module {
+  protected def disableAdrDataReady(disabledIO: CSCStreamIO): Unit = {
+    disabledIO.adrIOs.data.ready := false.B
+    disabledIO.dataIOs.data.ready := false.B
+  }
 }
 
 class PSumRouter extends Module with ClusterConfig {
   val io: PSumRouterIO = IO(new PSumRouterIO)
   private val inSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
   private val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
-  private val inDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
-  private val outDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
-  inDataWire <> outDataWire
-  inDataWire <> MuxLookup(inSelWire, 0.U, io.dataPath.inIOs.zipWithIndex.map({
-    case (value, i) =>
-      i.asUInt -> value
-  }))
-  io.dataPath.outIOs.zipWithIndex.foreach({ case (value, i) => value <> Mux(outSelWire === i.asUInt, outDataWire, DontCare)})
+  private val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
+  internalDataWire.suggestName("pSumInternalDataWire")
+  private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
+  inSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
+    bool.suggestName(s"pSumInSelEq${i}Wire")
+    bool := inSelWire === i.asUInt
+  })
+  private val outSelEqWires = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
+  outSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
+    bool.suggestName(s"pSumOutSelEq${i}Wire")
+    bool := inSelWire === i.asUInt
+  })
+  when (inSelEqWires.head) {
+    internalDataWire <> io.dataPath.inIOs(0)
+    io.dataPath.inIOs(1).ready := false.B
+    io.dataPath.inIOs(2).ready := false.B
+  } .elsewhen (inSelEqWires(1)) {
+    internalDataWire <> io.dataPath.inIOs(1)
+    io.dataPath.inIOs(0).ready := false.B
+    io.dataPath.inIOs(2).ready := false.B
+  } .otherwise {
+    internalDataWire <> io.dataPath.inIOs(2)
+    io.dataPath.inIOs(0).ready := false.B
+    io.dataPath.inIOs(1).ready := false.B
+  }
+  when (outSelEqWires.head) {
+    io.dataPath.outIOs(0) <> internalDataWire
+    io.dataPath.outIOs(1) <> DontCare
+    io.dataPath.outIOs(2) <> DontCare
+  } .elsewhen (outSelEqWires(1)) {
+    io.dataPath.outIOs(0) <> DontCare
+    io.dataPath.outIOs(1) <> internalDataWire
+    io.dataPath.outIOs(2) <> DontCare
+  } .otherwise {
+    io.dataPath.outIOs(0) <> DontCare
+    io.dataPath.outIOs(1) <> DontCare
+    io.dataPath.outIOs(2) <> internalDataWire
+  }
   // control path
   inSelWire := io.ctrlPath.inDataSel
   outSelWire := io.ctrlPath.outDataSel

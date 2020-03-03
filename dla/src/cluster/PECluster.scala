@@ -146,6 +146,13 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   inActWriteDoneWireVec.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActWriteDoneWireVec($i)($j)")
     })})
+  private val inActStateEqWires = Seq.fill(3){Wire(Bool())}
+  inActStateEqWires.zipWithIndex.foreach({ case (bool, i) =>
+    bool.suggestName(s"inActStateEqWire${i}Wire")
+  })
+  inActStateEqWires.head := inActStateReg === inActZero
+  inActStateEqWires(1) := inActStateReg === inActOne
+  inActStateEqWires(2) := inActStateReg === inActTwo
   // connections of enWires and inActData path
   for (i <- thePEStateRegs.indices) {
     for (j <- thePEStateRegs.head.indices) {
@@ -174,42 +181,30 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
         }
       }
       def colZeroConnection[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        switch(inActStateReg) {
-          is (inActZero) {
-            iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActOne) {
-            iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActTwo) {
-            iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
+        when (inActStateEqWires.head) {
+          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } .elsewhen (inActStateEqWires(1)) {
+          iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } otherwise {
+          iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
         }
       }
       def colOneConnection[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        switch(inActStateReg) {
-          is (inActZero) {
-            iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActOne) {
-            iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActTwo) {
-            iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
+        when (inActStateEqWires.head) {
+          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } .elsewhen (inActStateEqWires(1)) {
+          iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } otherwise {
+          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
         }
       }
       def colTwoConnection[DataType <: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        switch(inActStateReg) {
-          is (inActZero) {
-            iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActOne) {
-            iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
-          is (inActTwo) {
-            iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-          }
+        when (inActStateEqWires.head) {
+          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } .elsewhen (inActStateEqWires(1)) {
+          iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+        } otherwise {
+          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
         }
       }
       if (i == 0) {

@@ -2,7 +2,7 @@ package dla.eyerissTop
 
 import chisel3._
 import chisel3.util._
-import dla.cluster.{ClusterGroup, ClusterGroupIO, ClusterSRAMConfig, CommonClusterCtrlIO, GLBClusterDataIO, GNMFCS1Config, GNMFCS2Config}
+import dla.cluster.{ClusterGroup, ClusterGroupIO, ClusterSRAMConfig, CommonClusterCtrlTwoBoolIO, CommonClusterCtrlTwoUIntIO, GLBClusterDataIO, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.MCRENFConfig
 import org.scalatest.FlatSpec
 
@@ -90,12 +90,12 @@ class EyerissDataIO extends Bundle with EyerissTopConfig {
 }
 
 class EyerissCtrlIO extends Bundle with EyerissTopConfig {
-  val inActCtrlSel: Vec[Vec[CommonClusterCtrlIO[UInt, UInt]]] = Vec(cgRowNum, Vec(cgColNum, new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))))
+  val inActCtrlSel: Vec[Vec[CommonClusterCtrlTwoUIntIO]] = Vec(cgRowNum, Vec(cgColNum, Flipped(new CommonClusterCtrlTwoUIntIO)))
   //
-  val weightCtrlSel: Vec[CommonClusterCtrlIO[Bool, Bool]] = Vec(cgRowNum, Input(new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool())))
+  val weightCtrlSel: Vec[CommonClusterCtrlTwoBoolIO] = Vec(cgRowNum, Flipped(new CommonClusterCtrlTwoBoolIO))
   // weightCtrlSel.inSel indicates whether the cluster group need to translate the data to other side;
   // weightCtrlSel.outSel true, then left one send data to right one;
-  val pSumCtrlSel: Vec[CommonClusterCtrlIO[UInt, UInt]] = Vec(cgColNum, Input(new CommonClusterCtrlIO[UInt, UInt](UInt(2.W), UInt(2.W))))
+  val pSumCtrlSel: Vec[CommonClusterCtrlTwoUIntIO] = Vec(cgColNum, Flipped(new CommonClusterCtrlTwoUIntIO))
   // pSumCtrlSel.inSel
   // pSumCtrlSel.OutSel
 }

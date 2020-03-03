@@ -2,6 +2,7 @@ package dla.tests.clustertest
 
 import Chisel.DecoupledIO
 import chisel3._
+import chisel3.experimental.{DataMirror, Direction}
 import chisel3.tester._
 import dla.cluster._
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
@@ -603,7 +604,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     }
   }
 
-  behavior of "work well on Processing Element Cluster"
+  behavior of "test the spec of Processing Element Cluster"
   it should "work well on the PECluster" in {
     test (new PECluster(true)) { thePECluster =>
       val theTopIO = thePECluster.io
@@ -615,8 +616,16 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     }
   }
   //behavior of "work well on Cluster Group"
-  /*behavior of "test the spec of Router Cluster"
+  behavior of "test the spec of Router Cluster"
   it should "work well on Router Cluster" in {
-
-  }*/
+    test (new RouterCluster(true)) { theRCluster =>
+      val theTop = theRCluster.io
+      val theClock = theRCluster.clock
+      theTop.dataPath.routerData.iRIO.head.inIOs.foreach(x => require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Input))
+      theTop.dataPath.routerData.iRIO.head.outIOs.foreach(x => require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Output))
+      theRCluster.reset.poke(true.B)
+      theClock.step()
+      theRCluster.reset.poke(false.B)
+    }
+  }
 }
