@@ -3,9 +3,10 @@
 This project is a deep learning accelerator implementation in Chisel. The architecture of the accelerator is based on Eyeriss v2.
 
 And it will extend some custom RISC-V instructions in the near future.
+
 ## Run
 
-You can use `mill` in idea after this command
+After clone it, you can use `mill` in idea after this command:
 
 ```bash
 mill mill.scalalib.GenIdea/idea
@@ -99,8 +100,8 @@ Contains some more general configs.
 + psDataWidth: data width of partial sum;
 + fifoSize: the size of FIFO;
 + fifoEn: true then generate a PE with FIFOs;
-+ commonLenWidth: used for get the length of data vector, address vector.
-+ weightDataLenWidth: used for get the length of weight data vector;
++ ~~commonLenWidth: used for get the length of data vector, address vector.~~
++ ~~weightDataLenWidth: used for get the length of weight data vector;~~
 + inActZeroColumnCode: used for judge whether current inAct column is a zero column, default is the last number it can express;
 + weightZeroColumnCode: used for judge whether current weight column is a zero column, default is the last number it can express;
 
@@ -133,7 +134,7 @@ Each router cluster not only connects to one GLB cluster, one PE cluster, but al
 
 This class is the generator of one input activations router.
 
-- InIOs\(0\): the input activation comes from its corresponding input activations SRAM back;
+- InIOs\(0\): the input activation comes from its corresponding input activations SRAM bank\(GLB Cluster\);
 - InIOs\(1\): the input activation comes from its northern inAct router;
 - InIOs\(2\): the input activation comes from its southern inAct router;
 - InIOs\(3\): the input activation comes from its horizontal inAct router;
@@ -141,7 +142,11 @@ This class is the generator of one input activations router.
 - OutIOs\(1\): send the input activation to northern inAct router;
 - OutIOs\(2\): send the input activation to southern inAct router;
 - OutIOs\(3\): send the input activation to horizontal inAct router;
-- outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
+- outSelWire: routing mode:
+  - 0: uni-cast
+  - 1: horizontal
+  - 2: vertical 
+  - 3: broadcast
 
 ##### WeightRouter
 
@@ -162,7 +167,7 @@ This class is the generator of one partial sum router.
 - inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
 - inIOs\(2\): the partial sum transferred from its northern neighboring PSumRouter;
 - OutIOs\(0\): send the partial sum to its corresponding PE Array column;
-- OutIOs\(1\): send the partial sum back to its corresponding partial sum SRAM bank;
+- OutIOs\(1\): send the partial sum bank to its corresponding partial sum SRAM bank;
 - OutIOs\(2\): send the partial sum to its southern neighboring PSumRouter;
 - inSelWire: its value enable the corresponding inIOs, i.e., 0 enables inIOs\(0\)
 - outSelWire: its value enable the corresponding outIOs, i.e., 0 enables outIOs\(0\)
@@ -191,7 +196,19 @@ This is one fundamental scratch pad module to test the read and write with CSC f
 
 This directory contains cluster test files.
 
-## Compressed Sparse Column Data Format
+#### [ClusterSpecTest](./dla/tests/src/clustertest/ClusterSpecTest.scala)
+
+This is the main body of cluster group test. It contains the tests of PECluster, RouterCluster, GLBCluster and the top of three.
+
+##### test the spec of GLB Cluster
+
+This behavior contains several tests related to the GLB cluster's spec, i.e., three submodules and top spec.
+
+##### test the spec of Processing Element Cluster
+
+## Data Format
+
+### Compressed Sparse Column Data Format
 
 Compressed Sparse Column is a data format used to jump zero-element MAC.
 
@@ -205,3 +222,33 @@ The picture above shows the one used in Eyeriss V2, but in this project it chang
 + I used the row number in original matrix instead of the real 'count' vector;
 
 Although it will decrease the size of matrix column with a pseudo-count vector, it is much simpler.
+
+### The Length of Address Vectors and Data Vectors
+
+When we use CSC format data, the length of both address vectors and data vectors are variable. So we can not use the common way to stop reading or writing.
+
+I use one zero `0` to show the end of one vector (one address vector or one data vector with count vector) at Scratch Pad level; I use two continuous zero `00` to show the end of one stream of vectors at SRAM bank level.
+
+## Reference
+
+\[1\]V. Sze, Y.-H. Chen, T.-J. Yang, and J. S. Emer, “Efficient Processing of Deep Neural Networks: A Tutorial and Survey,” Proc. IEEE, vol. 105, no. 12, pp. 2295–2329, Dec. 2017, doi: 10.1109/JPROC.2017.2761740.
+
+\[2\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible Accelerator for Emerging Deep Neural Networks on Mobile Devices,” arXiv:1807.07928 \[cs\], May 2019.
+
+\[3\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible and High-Performance Accelerator for Emerging Deep Neural Networks,” arXiv:1807.07928 \[cs\], May 2019.
+
+\[4\]Y.-H. Chen, J. Emer, V. Sze, Y.-H. Chen, J. Emer, and V. Sze, “Eyeriss: a spatial architecture for energy-efficient dataflow for convolutional neural networks,” ACM SIGARCH Computer Architecture News, vol. 44, no. 3, pp. 367–379, Jun. 2016, doi: 10.1109/ISCA.2016.40.
+
+\[5\]Y.-H. Chen, T. Krishna, J. S. Emer, and V. Sze, “Eyeriss: An Energy-Efficient Reconfigurable Accelerator for Deep Convolutional Neural Networks,” IEEE J. Solid-State Circuits, vol. 52, no. 1, pp. 127–138, Jan. 2017, doi: 10.1109/JSSC.2016.2616357.
+
+\[6\] A. Waterman and H. Cook, “Chisel/FIRRTL: Home,” Chisel/FIRRTL, 2019. \[Online\]. Available: https://www.chisel-lang.org/. \[Accessed: 30-Nov-2019\].
+
+\[7\] D. Pala, “Design and programming of a coprocessor for a RISC-V architecture,” laurea, Politecnico di Torino, 2017.
+
+\[8\] A. Waterman, “Design of the RISC-V Instruction Set Architecture,” PhD Thesis, EECS Department, University of California, Berkeley, 2016.
+
+\[9\] K. Asanović and D. A. Patterson, “Instruction Sets Should Be Free: The Case For RISC-V,” EECS Department, University of California, Berkeley, UCB/EECS-2014-146, Aug. 2014.
+
+\[10\] A. Izraelevitz et al., “Reusability is FIRRTL ground: Hardware construction languages, compiler frameworks, and transformations,” in 2017 IEEE/ACM International Conference on Computer-Aided Design (ICCAD), 2017, pp. 209–216, doi: 10.1109/ICCAD.2017.8203780.
+
+\[11\] K. Asanović et al., “The Rocket Chip Generator,” EECS Department, University of California, Berkeley, UCB/EECS-2016-17,
