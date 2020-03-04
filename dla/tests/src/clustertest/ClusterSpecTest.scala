@@ -605,7 +605,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
   }
 
   behavior of "test the spec of Processing Element Cluster"
-  it should "work well on the PECluster" in {
+  it should "work well on PECluster" in {
     test (new PECluster(true)) { thePECluster =>
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
@@ -615,7 +615,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       thePECluster.reset.poke(false.B)
     }
   }
-  //behavior of "work well on Cluster Group"
   behavior of "test the spec of Router Cluster"
   it should "work well on Router Cluster" in {
     test (new RouterCluster(true)) { theRCluster =>
@@ -626,6 +625,16 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theRCluster.reset.poke(true.B)
       theClock.step()
       theRCluster.reset.poke(false.B)
+    }
+  }
+  behavior of "test the spec of Cluster Group"
+  it should "work well on Cluster Group" in {
+    test (new ClusterGroup(true)) { theCG =>
+      val theTop = theCG.io
+      val theClock = theCG.clock
+      theCG.reset.poke(true.B)
+      theClock.step()
+      theCG.reset.poke(false.B)
     }
   }
 }

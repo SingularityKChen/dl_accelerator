@@ -7,6 +7,8 @@ import dla.pe._
 class PECluster(debug: Boolean) extends Module with ClusterConfig {
   val diagnNum: Int = peColNum + peRowNum - 1
   val io: PEClusterIO = IO(new PEClusterIO)
+  // io.dataPath.pSumDataFromSouthernIO: pSum from southern PE Array
+  // io.dataPath.pSumDataFromSouthernIO: data from pSumRouter
   // io.ctrlPath.inActCtrlSel.inDataSel indicates whether the input activations should be broad-cast;
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
@@ -15,20 +17,24 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   peArray.zipWithIndex.foreach({case (pe, idx) =>
     pe.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"pe($idx)($i)")
     })})
-  private val muxInPSumWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
-  muxInPSumWire.suggestName("muxInPsumWire")
+  private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
+  muxInPSumDataWire.suggestName("muxInPSumDataWire")
   private val muxInActDataWire = Wire(Vec(peRowNum, Vec(peColNum, new CSCStreamIO(inActAdrWidth, inActDataWidth))))
   muxInActDataWire.suggestName("muxInActDataWire")
   // inActRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
   private val inActRoutingMode = Wire(Bool())
+  inActRoutingMode.suggestName("inActRoutingMode")
   // inActMuxDiagnIdxWire: correspond to each diagonal, to choose data read in;
   // 0-2 to inActCluster dataPath's responding index, 3 means wait for a while
   private val inActBroadCastIdxWire = Wire(UInt(2.W))
-  // muxInPSumSelWire: true, then ; false, then
+  inActBroadCastIdxWire.suggestName("inActBroadCastIdxWire")
+  // muxInPSumSelWire: true, then from pSumRouter;
+  //                   false, then from southern PEArray
   private val muxInPSumSelWire = Wire(Vec(peColNum , Bool()))
   muxInPSumSelWire.suggestName("muxInPSumSelWire")
   private val configRegs = VecInit(Seq.fill(6){RegInit(0.U)}) // to store GNMFCS
+  configRegs.suggestName("configRegs")
   configRegs <> io.ctrlPath.configIOs
   private val f2Inc = Wire(Bool())
   f2Inc := configRegs(3) =/= io.ctrlPath.configIOs(3) // if neq, then f2 increases
@@ -38,7 +44,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   })
   private val inActWriteEnWires = Seq.fill(peRowNum, peColNum){Wire(Bool())} // inAct address and data writeEn wires
   thePELoadWires.zipWithIndex.foreach({ case (bools, i) =>
-    bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"thePELoadWires($i)($j)")})
+    bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActWriteEnWires($i)($j)")})
   })
   private def inActWeightConnection(peIO: CSCStreamIO, connectIO: CSCStreamIO): Any = {
     Seq(peIO.adrIOs, peIO.dataIOs).zip(Seq(connectIO.adrIOs, connectIO.dataIOs)).foreach({
@@ -46,28 +52,30 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
         x.data <> y.data
     })
   }
+  muxInPSumSelWire.foreach(x => x := io.ctrlPath.pSumCtrlSel.inDataSel) // TODO: check
   for (i <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
     io.dataPath.pSumIO.outIOs(i) <> peArray.head(i).dataStream.opsIO
     peArray.head(i).dataStream.ipsIO <> peArray(1)(i).dataStream.opsIO
     peArray(1)(i).dataStream.ipsIO <> peArray.last(i).dataStream.opsIO
     // connect input partial sum from top IO to the PE at the tail of each column with the signal after Mux
-    peArray.last(i).dataStream.ipsIO <> muxInPSumWire(i)
+    peArray.last(i).dataStream.ipsIO <> muxInPSumDataWire(i)
     when (muxInPSumSelWire(i)) {
-      muxInPSumWire(i) <> io.dataPath.pSumIO.inIOs(i)
-      io.dataPath.routerInPSumToPEIO(i).ready := false.B
+      muxInPSumDataWire(i) <> io.dataPath.pSumIO.inIOs(i) // from router
+      io.dataPath.pSumDataFromSouthernIO(i).ready := false.B
     } .otherwise {
-      muxInPSumWire(i) <> io.dataPath.routerInPSumToPEIO(i)
+      muxInPSumDataWire(i) <> io.dataPath.pSumDataFromSouthernIO(i) // from southern PEArray
       io.dataPath.pSumIO.inIOs(i).ready := false.B
     }
     for (j <- 0 until peRowNum) {
-      peArray(j)(i).dataStream.inActIOs.adrIOs.data.valid := inActWriteEnWires(j)(i) && muxInActDataWire(j)(i).adrIOs.data.valid
-      peArray(j)(i).dataStream.inActIOs.dataIOs.data.valid := inActWriteEnWires(j)(i) && muxInActDataWire(j)(i).dataIOs.data.valid
+      peArray(j)(i).dataStream.inActIOs.adrIOs.data.valid := inActWriteEnWires(j)(i) &&
+        muxInActDataWire(j)(i).adrIOs.data.valid
+      peArray(j)(i).dataStream.inActIOs.dataIOs.data.valid := inActWriteEnWires(j)(i) &&
+        muxInActDataWire(j)(i).dataIOs.data.valid
       inActWeightConnection(peArray(j)(i).dataStream.weightIOs, io.dataPath.weightIO(j))
       inActWeightConnection(peArray(j)(i).dataStream.inActIOs, muxInActDataWire(j)(i))
     }
   }
-  muxInPSumSelWire.foreach(x => x := io.ctrlPath.pSumCtrlSel.inDataSel) // TODO: check
   inActRoutingMode := io.ctrlPath.inActCtrlSel.inDataSel // true for broad-cast
   inActBroadCastIdxWire := io.ctrlPath.inActCtrlSel.outDataSel
   // state machine of signal PE
@@ -108,11 +116,11 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   inActStateReg.suggestName("inActStateReg")
   private val inActDataIOStateRegs = Seq.fill(inActRouterNum){RegInit(inActZero)} // three inIOs
   inActDataIOStateRegs.zipWithIndex.foreach({ case (int, i) => int.suggestName(s"inActDataIOStateRegs[$i]")})
-  private val inActDataIOZeroWires = WireInit(VecInit(Seq.fill(inActRouterNum){false.B}))
+  private val inActDataIOZeroWires = Seq.fill(inActRouterNum){Wire(Bool())}
   inActDataIOZeroWires.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActDataIOZeroWires[$i]")})
-  private val inActDataIOOneWires = WireInit(VecInit(Seq.fill(inActRouterNum){false.B}))
+  private val inActDataIOOneWires = Seq.fill(inActRouterNum){Wire(Bool())}
   inActDataIOOneWires.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActDataIOOneWires[$i]")})
-  private val inActDataIOTwoWires = WireInit(VecInit(Seq.fill(inActRouterNum){false.B}))
+  private val inActDataIOTwoWires = Seq.fill(inActRouterNum){Wire(Bool())}
   inActDataIOTwoWires.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActDataIOTwoWires[$i]")})
   inActDataIOZeroWires.zip(inActDataIOStateRegs).foreach({ case (bool, int) => bool := int === inActZero})
   inActDataIOOneWires.zip(inActDataIOStateRegs).foreach({ case (bool, int) => bool := int === inActOne})
@@ -159,7 +167,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
     bool.suggestName(s"oneInAct${i}IOReadyWires$j")})
   })
   // connect inActIO's address and data ready signals
-  io.dataPath.inActIO.map(x => x.adrIOs).zip(oneInActIOReadyWires(0)).foreach({ case (o, bool) =>
+  io.dataPath.inActIO.map(x => x.adrIOs).zip(oneInActIOReadyWires.head).foreach({ case (o, bool) =>
     o.data.ready := bool
   })
   io.dataPath.inActIO.map(x => x.dataIOs).zip(oneInActIOReadyWires(1)).foreach({ case (o, bool) =>
@@ -172,8 +180,10 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   // connections of enWires and inActData path
   for (i <- 0 until peRowNum) {
     for (j <- 0 until peColNum) {
-      inActWriteDoneRegVec.head(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.adrWriteFin, !inActWriteDoneRegVec.head(i)(j), inActWriteDoneRegVec.head(i)(j))
-      inActWriteDoneRegVec(1)(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.dataWriteFin, !inActWriteDoneRegVec(1)(i)(j), inActWriteDoneRegVec(1)(i)(j))
+      inActWriteDoneRegVec.head(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.adrWriteFin,
+        !inActWriteDoneRegVec.head(i)(j), inActWriteDoneRegVec.head(i)(j))
+      inActWriteDoneRegVec(1)(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.dataWriteFin,
+        !inActWriteDoneRegVec(1)(i)(j), inActWriteDoneRegVec(1)(i)(j))
       inActWriteDoneWireVec(i)(j) := inActWriteDoneRegVec.head(i)(j) && inActWriteDoneRegVec(1)(i)(j)
       val iPlusJMod = (i + j) % 3
       val iPlusJPlusOneMod = (i + j + 1) % 3
@@ -193,7 +203,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
           connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJPlusTwoMod))
         }
       }
-      def colZeroConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
+      def colZeroConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Seq[Bool]): Unit = {
         when (inActStateEqWires.head) {
           wireVec(i)(j) := connectedWireVec(iPlusJMod)
         } .elsewhen (inActStateEqWires(1)) {
@@ -211,7 +221,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
           connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
         }
       }
-      def colOneConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
+      def colOneConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Seq[Bool]): Unit = {
         when (inActStateEqWires.head) {
           wireVec(i)(j) := connectedWireVec(iPlusJMod)
         } .elsewhen (inActStateEqWires(1)) {
@@ -229,7 +239,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
           connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
         }
       }
-      def colTwoConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
+      def colTwoConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Seq[Bool]): Unit = {
         when (inActStateEqWires.head) {
           wireVec(i)(j) := connectedWireVec(iPlusJMod)
         } .elsewhen (inActStateEqWires(1)) {
@@ -280,6 +290,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
       }
     }
   }
+  // connections of ready wires
   private def reduceMuxInActAdr(indexSeq: Seq[(Int, Int)]): Bool = {
     indexSeq.map({case (a, b) => muxInActDataWire(a)(b)}).map(x => x.adrIOs.data.ready).reduce(_ && _)
   }
@@ -295,31 +306,31 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   private val reduceMuxInActData1322 = Wire(Bool())
   reduceMuxInActData1322 := reduceMuxInActData(Seq((1, 3), (2, 2)))
   when (inActStateEqWires.head) {
-    oneInActIOReadyWires(0)(0) := muxInActDataWire(0)(0).adrIOs.data.ready ||
+    oneInActIOReadyWires.head.head := muxInActDataWire(0)(0).adrIOs.data.ready ||
       reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 1)))
-    oneInActIOReadyWires(0)(1) := reduceMuxInActAdr0110 || reduceMuxInActAdr1322
-    oneInActIOReadyWires(0)(2) := reduceMuxInActAdr(Seq((0, 2), (1, 1), (2, 0))) ||
+    oneInActIOReadyWires.head(1) := reduceMuxInActAdr0110 || reduceMuxInActAdr1322
+    oneInActIOReadyWires.head(2) := reduceMuxInActAdr(Seq((0, 2), (1, 1), (2, 0))) ||
       muxInActDataWire(2)(3).adrIOs.data.ready
-    oneInActIOReadyWires(1)(0) := muxInActDataWire(0)(0).dataIOs.data.ready ||
+    oneInActIOReadyWires(1).head := muxInActDataWire(0)(0).dataIOs.data.ready ||
       reduceMuxInActData(Seq((0, 3), (1, 2), (2, 1)))
     oneInActIOReadyWires(1)(1) := reduceMuxInActData0110 || reduceMuxInActData1322
     oneInActIOReadyWires(1)(2) := reduceMuxInActData(Seq((0, 2), (1, 1), (2, 0))) ||
       muxInActDataWire(2)(3).dataIOs.data.ready
   } .elsewhen (inActStateEqWires(1)) {
-    oneInActIOReadyWires(0)(0) := reduceMuxInActAdr(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).adrIOs.data.ready
-    oneInActIOReadyWires(0)(1) := muxInActDataWire(0)(0).adrIOs.data.ready ||
+    oneInActIOReadyWires.head.head := reduceMuxInActAdr(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).adrIOs.data.ready
+    oneInActIOReadyWires.head(1) := muxInActDataWire(0)(0).adrIOs.data.ready ||
       reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 0))) || muxInActDataWire(2)(3).adrIOs.data.ready
-    oneInActIOReadyWires(0)(2) := reduceMuxInActAdr0110 || reduceMuxInActAdr(Seq((1, 3), (2, 1)))
-    oneInActIOReadyWires(1)(0) := reduceMuxInActData(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).dataIOs.data.ready
+    oneInActIOReadyWires.head(2) := reduceMuxInActAdr0110 || reduceMuxInActAdr(Seq((1, 3), (2, 1)))
+    oneInActIOReadyWires(1).head := reduceMuxInActData(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).dataIOs.data.ready
     oneInActIOReadyWires(1)(1) := muxInActDataWire(0)(0).dataIOs.data.ready ||
       reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 0))) || muxInActDataWire(2)(3).dataIOs.data.ready
     oneInActIOReadyWires(1)(2) := reduceMuxInActData0110 || reduceMuxInActData(Seq((1, 3), (2, 1)))
   } .otherwise {
-    oneInActIOReadyWires(0)(0) := muxInActDataWire(0)(1).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 2), (2, 1)))
-    oneInActIOReadyWires(0)(1) := reduceMuxInActAdr(Seq((0, 2), (1, 0))) || reduceMuxInActAdr1322
-    oneInActIOReadyWires(0)(2) := muxInActDataWire(0)(0).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 1), (2, 0))) ||
+    oneInActIOReadyWires.head.head := muxInActDataWire(0)(1).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 2), (2, 1)))
+    oneInActIOReadyWires.head(1) := reduceMuxInActAdr(Seq((0, 2), (1, 0))) || reduceMuxInActAdr1322
+    oneInActIOReadyWires.head(2) := muxInActDataWire(0)(0).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 1), (2, 0))) ||
     muxInActDataWire(2)(3).adrIOs.data.ready
-    oneInActIOReadyWires(1)(0) := muxInActDataWire(0)(1).dataIOs.data.ready || reduceMuxInActData(Seq((1, 2), (2, 1)))
+    oneInActIOReadyWires(1).head := muxInActDataWire(0)(1).dataIOs.data.ready || reduceMuxInActData(Seq((1, 2), (2, 1)))
     oneInActIOReadyWires(1)(1) := reduceMuxInActData(Seq((0, 2), (1, 0))) || reduceMuxInActData1322
     oneInActIOReadyWires(1)(2) := muxInActDataWire(0)(0).dataIOs.data.ready || reduceMuxInActData(Seq((1, 1), (2, 0))) ||
       muxInActDataWire(2)(3).dataIOs.data.ready

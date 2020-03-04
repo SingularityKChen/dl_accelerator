@@ -5,20 +5,21 @@ import chisel3.util._
 import dla.pe.CSCStreamIO
 
 class ClusterGroupIO extends Bundle {
-  val ctrlPath: ClusterGroupCtrlIO = Flipped(new ClusterGroupCtrlIO)
-  val dataPath = new ClusterDataIO
+  val ctrlPath: ClusterGroupCtrlIO = Flipped(new ClusterGroupCtrlIO) // now, input them
+  val dataPath = new ClusterGroupDataIO
 }
 
-class ClusterDataIO extends Bundle with ClusterConfig {
+class ClusterGroupDataIO extends Bundle with ClusterConfig {
   val glbDataPath = new GLBClusterDataIO // through top to GLB
   val cgDataPath = new RouterDataIO // communicate with other cluster groups
-  // routerPSumToPEIO for translating partial sum from each head in PE array to each tail of its northern PE Array
-  val routerPSumToPEIOs = new PSumRouterDataIO(pSumRouterNum, psDataWidth) // input and output
+  // pSumDataVerticalIOs.outIOs for translating partial sum from each head in PE array to each tail of its northern PE Array
+  // pSumDataVerticalIOs.inIOs, on the other hand, receive partial sum from the head of its southern PE Array
+  val pSumDataVerticalIOs = new PSumRouterDataIO(pSumRouterNum, psDataWidth) // input and output
 }
 
 class ClusterGroupCtrlIO extends Bundle {
-  val peClusterCtrl: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO) // input select signals to PE Cluster
-  val routerClusterCtrl: RouterClusterCtrlIO = Flipped(new RouterClusterCtrlIO) // input select signals to Router Cluster
+  val peClusterCtrl: CommonClusterCtrlBoolUIntIO = new CommonClusterCtrlBoolUIntIO // output select signals to PE Cluster
+  val routerClusterCtrl: RouterClusterCtrlIO = new RouterClusterCtrlIO // output select signals to Router Cluster
 }
 
 class RouterClusterIO extends Bundle {
@@ -28,7 +29,6 @@ class RouterClusterIO extends Bundle {
 
 class RouterClusterDataIO extends Bundle with ClusterConfig {
   val routerData = new RouterDataIO
-  val routerOutPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Decoupled(UInt(psDataWidth.W))) // output only
 }
 
 class CommonRouterBoolIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int) extends Bundle {
@@ -92,7 +92,8 @@ class PEClusterDataIO extends Bundle with ClusterConfig {
   val inActIO: Vec[CSCStreamIO] = Vec(inActRouterNum, Flipped(new CSCStreamIO(inActAdrWidth, inActDataWidth))) // input only
   val weightIO: Vec[CSCStreamIO] = Vec(weightRouterNum, Flipped(new CSCStreamIO(weightAdrWidth, weightDataWidth)))
   val pSumIO = new PSumRouterDataIO(pSumRouterNum, psDataWidth) // input and output
-  val routerInPSumToPEIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(DecoupledIO(UInt(psDataWidth.W)))) // input only
+  // pSumDataFromSouthernIO: the dataIO from southern PEArray
+  val pSumDataFromSouthernIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(DecoupledIO(UInt(psDataWidth.W)))) // input only
 }
 
 class PEClusterCtrlIO extends Bundle { // output only

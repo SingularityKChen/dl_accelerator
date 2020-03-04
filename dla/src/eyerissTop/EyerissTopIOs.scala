@@ -50,12 +50,12 @@ class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
           o.inIOs(2) <> cg1.dataPath.cgDataPath.iRIO(idx).outIOs(1)
         })
         // connections of routers to PE Clusters partial sum
-        cg0.dataPath.routerPSumToPEIOs.inIOs <> cg1.dataPath.routerPSumToPEIOs.outIOs
+        cg0.dataPath.pSumDataVerticalIOs.inIOs <> cg1.dataPath.pSumDataVerticalIOs.outIOs
       })
     } else { // at the last row
       cgArray(i).foreach({ x =>
         x.dataPath.cgDataPath.iRIO.foreach(_.inIOs(2) <> DontCare)
-        x.dataPath.routerPSumToPEIOs.inIOs <> DontCare
+        x.dataPath.pSumDataVerticalIOs.inIOs <> DontCare
       })
     }
     // whether first row?

@@ -15,7 +15,6 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   io.ctrlPath.iRIO.zip(iRouters).foreach({case (x, y) => x <> y.ctrlPath})
   io.ctrlPath.wRIO.zip(wRouters).foreach({case (x, y) => x <> y.ctrlPath})
   io.ctrlPath.pSumRIO.zip(pSRouters).foreach({case (x, y) => x <> y.ctrlPath})
-  io.dataPath.routerOutPSumToPEIO.zip(pSRouters).foreach({ case (x, y) => x <> y.dataPath.outIOs.head})
   io.dataPath.routerData.wRIO.zipWithIndex.foreach({ case (o, i) =>
     o.outIOs.head.suggestName(s"weightRouter${i}ToPECluster")
     o.outIOs.last.suggestName(s"weightRouter${i}ToNeighbor")
@@ -24,9 +23,19 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
 
 class InActRouter extends CSCRouter with ClusterConfig {
   val io: CommonRouterUIntIO = IO(new CommonRouterUIntIO(inActPortNum, inActAdrWidth, inActDataWidth))
+  // io.dataPath.inIOs(0) : inActRouterFromGLB
+  // io.dataPath.inIOs(1) : inActRouterFromNorth
+  // io.dataPath.inIOs(2) : inActRouterFromSouth
+  // io.dataPath.inIOs(3) : inActRouterFromHorizontal
+  // io.dataPath.outIOs(0): inActRouterToPEArray
+  // io.dataPath.outIOs(1): inActRouterToNorth
+  // io.dataPath.outIOs(2): inActRouterToSouth
+  // io.dataPath.outIOs(3): inActRouterToHorizontal
   private val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   // outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
+  inSelWire.suggestName("inActRouterInSelWire")
   private val outSelWire: UInt = Wire(UInt(2.W))
+  outSelWire.suggestName("inActRouterOutSelWire")
   private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
   internalDataWire.suggestName("inActInternalDataWire")
   private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
@@ -39,24 +48,24 @@ class InActRouter extends CSCRouter with ClusterConfig {
     bool.suggestName(s"inActOutSelEq${i}Wire")
     bool := inSelWire === i.asUInt
   })
-  when (inSelEqWires.head) {
+  when (inSelEqWires.head) { // from GLB
     internalDataWire <> io.dataPath.inIOs(0)
     io.dataPath.inIOs.takeRight(3).foreach({x =>
       disableAdrDataReady(x)
     })
-  } .elsewhen (inSelEqWires(1)) {
+  } .elsewhen (inSelEqWires(1)) { // from north
     disableAdrDataReady(io.dataPath.inIOs(0))
     internalDataWire <> io.dataPath.inIOs(1)
     io.dataPath.inIOs.takeRight(2).foreach({x =>
       disableAdrDataReady(x)
     })
-  } .elsewhen (inSelEqWires(2)) {
+  } .elsewhen (inSelEqWires(2)) { // from south
     io.dataPath.inIOs.take(2).foreach({x =>
       disableAdrDataReady(x)
     })
     internalDataWire <> io.dataPath.inIOs(2)
     disableAdrDataReady(io.dataPath.inIOs(3))
-  } .otherwise {
+  } .otherwise { // from horizontal neighborhood
     io.dataPath.inIOs.take(3).foreach({x =>
       disableAdrDataReady(x)
     })
@@ -85,10 +94,16 @@ class InActRouter extends CSCRouter with ClusterConfig {
 
 class WeightRouter extends CSCRouter with ClusterConfig {
   val io: CommonRouterBoolIO = IO(new CommonRouterBoolIO(weightPortNum, weightAdrWidth, weightDataWidth))
+  //io.dataPath.inIOs(0) : weightRouterFromGLB
+  //io.dataPath.inIOs(1) : weightRouterFromHorizontal
+  //io.dataPath.outIOs(0): weightRouterToPEArray
+  //io.dataPath.outIOs(1): weightRouterToHorizontal
   // inSelWire: 0, receive the data come from GLB Cluster; 1, receive it come from its neighborhood WeightRouter
   private val inSelWire: Bool = Wire(Bool())
+  inSelWire.suggestName("weightRouterInSelWire")
   // outSelWire: 0, send the data to PE Cluster; 1, send it to its neighborhood WeightRouter and PE Cluster
   private val outSelWire: Bool = Wire(Bool())
+  outSelWire.suggestName("weightRouterOutSelWire")
   private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
   internalDataWire.suggestName("weightInternalDataWire")
   when (inSelWire) {
@@ -124,8 +139,16 @@ abstract class CSCRouter extends Module {
 
 class PSumRouter extends Module with ClusterConfig {
   val io: PSumRouterIO = IO(new PSumRouterIO)
+  //io.dataPath.inIOs(0) : pSumRouterFromPEArray
+  //io.dataPath.inIOs(1) : pSumRouterFromGLB
+  //io.dataPath.inIOs(2) : pSumRouterFromNorthern
+  //io.dataPath.outIOs(0): pSumRouterToPEArray
+  //io.dataPath.outIOs(1): pSumRouterToGLB
+  //io.dataPath.outIOs(2): pSumRouterToSouthern
   private val inSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  inSelWire.suggestName("pSumRouterInSelWire")
   private val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  outSelWire.suggestName("pSumRouterOutSelWire")
   private val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   internalDataWire.suggestName("pSumInternalDataWire")
   private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}

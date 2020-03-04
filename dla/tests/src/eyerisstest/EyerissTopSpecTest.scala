@@ -11,7 +11,7 @@ import scala.util.Random
 import scala.math.pow
 
 class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matchers {
-  behavior of "work well on Eyeriss"
+  behavior of "test the spec of Eyeriss"
   it should "work well on the basic test of Eyeriss" in {
     test (new Eyeriss(true)) { theEyeriss =>
       val theTopIO = theEyeriss.io
