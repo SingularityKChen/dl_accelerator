@@ -153,101 +153,176 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   inActStateEqWires.head := inActStateReg === inActZero
   inActStateEqWires(1) := inActStateReg === inActOne
   inActStateEqWires(2) := inActStateReg === inActTwo
+  // oneInActIOReadyWires: ready wire used for ready signal, adr/data, inIO index (3)
+  private val oneInActIOReadyWires = Seq.fill(2, inActRouterNum) {Wire(Bool())}
+  oneInActIOReadyWires.zipWithIndex.foreach({ case (bools, i) => bools.zipWithIndex.foreach({ case (bool, j) =>
+    bool.suggestName(s"oneInAct${i}IOReadyWires$j")})
+  })
+  // connect inActIO's address and data ready signals
+  io.dataPath.inActIO.map(x => x.adrIOs).zip(oneInActIOReadyWires(0)).foreach({ case (o, bool) =>
+    o.data.ready := bool
+  })
+  io.dataPath.inActIO.map(x => x.dataIOs).zip(oneInActIOReadyWires(1)).foreach({ case (o, bool) =>
+    o.data.ready := bool
+  })
+  /*io.dataPath.inActIO.map(x => Seq(x.adrIOs, x.dataIOs)).zip(oneInActIOReadyWires).foreach({ case (os, bools) =>
+    os.zip(bools).foreach({ case (o, bool) =>
+      o.data.ready := bool
+    })})*/
   // connections of enWires and inActData path
-  for (i <- thePEStateRegs.indices) {
-    for (j <- thePEStateRegs.head.indices) {
+  for (i <- 0 until peRowNum) {
+    for (j <- 0 until peColNum) {
       inActWriteDoneRegVec.head(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.adrWriteFin, !inActWriteDoneRegVec.head(i)(j), inActWriteDoneRegVec.head(i)(j))
       inActWriteDoneRegVec(1)(i)(j) := Mux(peArray(i)(j).padWF.inActWriteFin.dataWriteFin, !inActWriteDoneRegVec(1)(i)(j), inActWriteDoneRegVec(1)(i)(j))
       inActWriteDoneWireVec(i)(j) := inActWriteDoneRegVec.head(i)(j) && inActWriteDoneRegVec(1)(i)(j)
-      def iPlusJ[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        if (oneOrVec) {
-          wireVec(i)(j) := connectedWireVec((i + j) % 3)
-        } else {
-          wireVec(i)(j) <> connectedWireVec((i + j) % 3)
-        }
+      val iPlusJMod = (i + j) % 3
+      val iPlusJPlusOneMod = (i + j + 1) % 3
+      val iPlusJPlusTwoMod = (i + j + 2) %3
+      def connectAllExceptReady(slaverIO: CSCStreamIO, masterIO: CSCStreamIO): Unit ={
+        slaverIO.dataIOs.data.bits := masterIO.dataIOs.data.bits
+        slaverIO.dataIOs.data.valid := masterIO.dataIOs.data.valid
+        slaverIO.adrIOs.data.bits := masterIO.adrIOs.data.bits
+        slaverIO.adrIOs.data.valid := masterIO.adrIOs.data.valid
       }
-      def iPlusJPlusOne[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        if (oneOrVec) {
-          wireVec(i)(j) := connectedWireVec((i + j + 1) % 3)
-        } else {
-          wireVec(i)(j) <> connectedWireVec((i + j + 1) % 3)
-        }
-      }
-      def iPlusJPlusTwo[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
-        if (oneOrVec) {
-          wireVec(i)(j) := connectedWireVec((i + j + 2) % 3)
-        } else {
-          wireVec(i)(j) <> connectedWireVec((i + j + 2) % 3)
-        }
-      }
-      def colZeroConnection[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
+      def colZeroConnectionCSC(wireVec: Seq[Seq[CSCStreamIO]], connectedWireVec: Vec[CSCStreamIO]): Unit = {
         when (inActStateEqWires.head) {
-          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
         } .elsewhen (inActStateEqWires(1)) {
-          iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-        } otherwise {
-          iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJPlusOneMod))
+        } .otherwise {
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJPlusTwoMod))
         }
       }
-      def colOneConnection[DataType<: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
+      def colZeroConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
         when (inActStateEqWires.head) {
-          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          wireVec(i)(j) := connectedWireVec(iPlusJMod)
         } .elsewhen (inActStateEqWires(1)) {
-          iPlusJPlusOne[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-        } otherwise {
-          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          wireVec(i)(j) := connectedWireVec(iPlusJPlusOneMod)
+        } .otherwise {
+          wireVec(i)(j) := connectedWireVec(iPlusJPlusTwoMod)
         }
       }
-      def colTwoConnection[DataType <: Data](wireVec: Seq[Seq[DataType]], connectedWireVec: Vec[DataType], oneOrVec: Boolean): Unit = {
+      def colOneConnectionCSC(wireVec: Seq[Seq[CSCStreamIO]], connectedWireVec: Vec[CSCStreamIO]): Unit = {
         when (inActStateEqWires.head) {
-          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
         } .elsewhen (inActStateEqWires(1)) {
-          iPlusJPlusTwo[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
-        } otherwise {
-          iPlusJ[DataType](wireVec = wireVec, connectedWireVec = connectedWireVec, oneOrVec = oneOrVec)
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJPlusOneMod))
+        } .otherwise {
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
+        }
+      }
+      def colOneConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
+        when (inActStateEqWires.head) {
+          wireVec(i)(j) := connectedWireVec(iPlusJMod)
+        } .elsewhen (inActStateEqWires(1)) {
+          wireVec(i)(j) := connectedWireVec(iPlusJPlusOneMod)
+        } .otherwise {
+          wireVec(i)(j) := connectedWireVec(iPlusJMod)
+        }
+      }
+      def colTwoConnectionCSC(wireVec: Seq[Seq[CSCStreamIO]], connectedWireVec: Vec[CSCStreamIO]): Unit = {
+        when (inActStateEqWires.head) {
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
+        } .elsewhen (inActStateEqWires(1)) {
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJPlusTwoMod))
+        } .otherwise {
+          connectAllExceptReady(slaverIO = wireVec(i)(j), masterIO = connectedWireVec(iPlusJMod))
+        }
+      }
+      def colTwoConnectionBool(wireVec: Seq[Seq[Bool]], connectedWireVec: Vec[Bool]): Unit = {
+        when (inActStateEqWires.head) {
+          wireVec(i)(j) := connectedWireVec(iPlusJMod)
+        } .elsewhen (inActStateEqWires(1)) {
+          wireVec(i)(j) := connectedWireVec(iPlusJPlusTwoMod)
+        } .otherwise {
+          wireVec(i)(j) := connectedWireVec(iPlusJMod)
         }
       }
       if (i == 0) {
-        colZeroConnection[CSCStreamIO](muxInActDataWire, io.dataPath.inActIO, oneOrVec = false)
+        colZeroConnectionCSC(muxInActDataWire, io.dataPath.inActIO)
         if (j == 3) {
-          colZeroConnection[Bool](inActWriteEnWires, inActDataIOOneWires, oneOrVec = true)
+          colZeroConnectionBool(inActWriteEnWires, inActDataIOOneWires)
         } else {
-          colZeroConnection[Bool](inActWriteEnWires, inActDataIOZeroWires, oneOrVec = true)
+          colZeroConnectionBool(inActWriteEnWires, inActDataIOZeroWires)
         }
       }
       if (i == 1) {
-        colOneConnection[CSCStreamIO](muxInActDataWire, io.dataPath.inActIO, oneOrVec = false)
+        colOneConnectionCSC(muxInActDataWire, io.dataPath.inActIO)
         if (j == 0) {
-          colOneConnection[Bool](inActWriteEnWires, inActDataIOZeroWires, oneOrVec = true)
+          colOneConnectionBool(inActWriteEnWires, inActDataIOZeroWires)
         } else if (j == 1) {
           inActWriteEnWires(i)(j) := MuxLookup(inActStateReg, false.B, Array(
-            inActZero -> inActDataIOZeroWires((i + j) % 3),
-            inActOne -> inActDataIOZeroWires((i + j + 1) % 3),
-            inActTwo -> inActDataIOOneWires((i + j) % 3)
+            inActZero -> inActDataIOZeroWires(iPlusJMod),
+            inActOne -> inActDataIOZeroWires(iPlusJPlusOneMod),
+            inActTwo -> inActDataIOOneWires(iPlusJMod)
           ))
         } else {
-          colOneConnection[Bool](inActWriteEnWires, inActDataIOOneWires, oneOrVec = true)
+          colOneConnectionBool(inActWriteEnWires, inActDataIOOneWires)
         }
       }
       if (i == 2) {
-        colTwoConnection[CSCStreamIO](muxInActDataWire, io.dataPath.inActIO, oneOrVec = false)
+        colTwoConnectionCSC(muxInActDataWire, io.dataPath.inActIO)
         if (j == 0) {
           inActWriteEnWires(i)(j) := MuxLookup(inActStateReg, false.B, Array(
-            inActZero -> inActDataIOZeroWires((i + j) % 3),
-            inActOne -> inActDataIOOneWires((i + j + 2) % 3),
-            inActTwo -> inActDataIOOneWires((i + j) % 3)
+            inActZero -> inActDataIOZeroWires(iPlusJMod),
+            inActOne -> inActDataIOOneWires(iPlusJPlusTwoMod),
+            inActTwo -> inActDataIOOneWires(iPlusJMod)
           ))
         } else if (j == 3) {
           inActWriteEnWires(i)(j) := MuxLookup(inActStateReg, false.B, Array(
-            inActZero -> inActDataIOOneWires((i + j) % 3),
-            inActOne -> inActDataIOTwoWires((i + j + 2) % 3),
-            inActTwo -> inActDataIOTwoWires((i + j) % 3)
+            inActZero -> inActDataIOOneWires(iPlusJMod),
+            inActOne -> inActDataIOTwoWires(iPlusJPlusTwoMod),
+            inActTwo -> inActDataIOTwoWires(iPlusJMod)
           ))
         } else {
-          colTwoConnection[Bool](inActWriteEnWires, inActDataIOOneWires, oneOrVec = true)
+          colTwoConnectionBool(inActWriteEnWires, inActDataIOOneWires)
         }
       }
     }
+  }
+  private def reduceMuxInActAdr(indexSeq: Seq[(Int, Int)]): Bool = {
+    indexSeq.map({case (a, b) => muxInActDataWire(a)(b)}).map(x => x.adrIOs.data.ready).reduce(_ && _)
+  }
+  private def reduceMuxInActData(indexSeq: Seq[(Int, Int)]): Bool = {
+    indexSeq.map({case (a, b) => muxInActDataWire(a)(b)}).map(x => x.dataIOs.data.ready).reduce(_ && _)
+  }
+  private val reduceMuxInActAdr0110 = Wire(Bool())
+  reduceMuxInActAdr0110 := reduceMuxInActAdr(Seq((0, 1), (1, 0)))
+  private val reduceMuxInActData0110 = Wire(Bool())
+  reduceMuxInActData0110 := reduceMuxInActData(Seq((0, 1), (1, 0)))
+  private val reduceMuxInActAdr1322 = Wire(Bool())
+  reduceMuxInActAdr1322 := reduceMuxInActAdr(Seq((1, 3), (2, 2)))
+  private val reduceMuxInActData1322 = Wire(Bool())
+  reduceMuxInActData1322 := reduceMuxInActData(Seq((1, 3), (2, 2)))
+  when (inActStateEqWires.head) {
+    oneInActIOReadyWires(0)(0) := muxInActDataWire(0)(0).adrIOs.data.ready ||
+      reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 1)))
+    oneInActIOReadyWires(0)(1) := reduceMuxInActAdr0110 || reduceMuxInActAdr1322
+    oneInActIOReadyWires(0)(2) := reduceMuxInActAdr(Seq((0, 2), (1, 1), (2, 0))) ||
+      muxInActDataWire(2)(3).adrIOs.data.ready
+    oneInActIOReadyWires(1)(0) := muxInActDataWire(0)(0).dataIOs.data.ready ||
+      reduceMuxInActData(Seq((0, 3), (1, 2), (2, 1)))
+    oneInActIOReadyWires(1)(1) := reduceMuxInActData0110 || reduceMuxInActData1322
+    oneInActIOReadyWires(1)(2) := reduceMuxInActData(Seq((0, 2), (1, 1), (2, 0))) ||
+      muxInActDataWire(2)(3).dataIOs.data.ready
+  } .elsewhen (inActStateEqWires(1)) {
+    oneInActIOReadyWires(0)(0) := reduceMuxInActAdr(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).adrIOs.data.ready
+    oneInActIOReadyWires(0)(1) := muxInActDataWire(0)(0).adrIOs.data.ready ||
+      reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 0))) || muxInActDataWire(2)(3).adrIOs.data.ready
+    oneInActIOReadyWires(0)(2) := reduceMuxInActAdr0110 || reduceMuxInActAdr(Seq((1, 3), (2, 1)))
+    oneInActIOReadyWires(1)(0) := reduceMuxInActData(Seq((0, 2), (1, 1))) || muxInActDataWire(2)(2).dataIOs.data.ready
+    oneInActIOReadyWires(1)(1) := muxInActDataWire(0)(0).dataIOs.data.ready ||
+      reduceMuxInActAdr(Seq((0, 3), (1, 2), (2, 0))) || muxInActDataWire(2)(3).dataIOs.data.ready
+    oneInActIOReadyWires(1)(2) := reduceMuxInActData0110 || reduceMuxInActData(Seq((1, 3), (2, 1)))
+  } .otherwise {
+    oneInActIOReadyWires(0)(0) := muxInActDataWire(0)(1).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 2), (2, 1)))
+    oneInActIOReadyWires(0)(1) := reduceMuxInActAdr(Seq((0, 2), (1, 0))) || reduceMuxInActAdr1322
+    oneInActIOReadyWires(0)(2) := muxInActDataWire(0)(0).adrIOs.data.ready || reduceMuxInActAdr(Seq((1, 1), (2, 0))) ||
+    muxInActDataWire(2)(3).adrIOs.data.ready
+    oneInActIOReadyWires(1)(0) := muxInActDataWire(0)(1).dataIOs.data.ready || reduceMuxInActData(Seq((1, 2), (2, 1)))
+    oneInActIOReadyWires(1)(1) := reduceMuxInActData(Seq((0, 2), (1, 0))) || reduceMuxInActData1322
+    oneInActIOReadyWires(1)(2) := muxInActDataWire(0)(0).dataIOs.data.ready || reduceMuxInActData(Seq((1, 1), (2, 0))) ||
+      muxInActDataWire(2)(3).dataIOs.data.ready
   }
   private val inActDataStateJumpWires = Seq.fill(inActRouterNum, 3){Wire(Bool())}
   inActDataStateJumpWires.zipWithIndex.foreach({ case (bools, i) =>

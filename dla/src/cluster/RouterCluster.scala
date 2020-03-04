@@ -66,10 +66,12 @@ class InActRouter extends CSCRouter with ClusterConfig {
     io.dataPath.outIOs(0) <> internalDataWire // 0 to PE array
     io.dataPath.outIOs.takeRight(3).foreach(_ <> DontCare)
   } .elsewhen (outSelEqWires(1)) { // horizontal
-    io.dataPath.outIOs(0) <> internalDataWire
+    connectAllExceptReady(io.dataPath.outIOs(0), internalDataWire)
     io.dataPath.outIOs(1) <> DontCare // not send this time
     io.dataPath.outIOs(2) <> DontCare // not send this time
-    io.dataPath.outIOs(3) <> internalDataWire
+    connectAllExceptReady(io.dataPath.outIOs(3), internalDataWire)
+    internalDataWire.adrIOs.data.ready := io.dataPath.outIOs(0).adrIOs.data.ready && io.dataPath.outIOs(3).adrIOs.data.ready
+    internalDataWire.dataIOs.data.ready := io.dataPath.outIOs(0).dataIOs.data.ready && io.dataPath.outIOs(3).dataIOs.data.ready
   } .elsewhen (outSelEqWires(2)) { // vertical
     io.dataPath.outIOs.take(3).foreach(_ <> internalDataWire)
     io.dataPath.outIOs(3) <> DontCare// not send this time
@@ -111,6 +113,12 @@ abstract class CSCRouter extends Module {
   protected def disableAdrDataReady(disabledIO: CSCStreamIO): Unit = {
     disabledIO.adrIOs.data.ready := false.B
     disabledIO.dataIOs.data.ready := false.B
+  }
+  protected def connectAllExceptReady(slaverIO: CSCStreamIO, masterIO: CSCStreamIO): Unit ={
+    slaverIO.dataIOs.data.bits := masterIO.dataIOs.data.bits
+    slaverIO.dataIOs.data.valid := masterIO.dataIOs.data.valid
+    slaverIO.adrIOs.data.bits := masterIO.adrIOs.data.bits
+    slaverIO.adrIOs.data.valid := masterIO.adrIOs.data.valid
   }
 }
 
