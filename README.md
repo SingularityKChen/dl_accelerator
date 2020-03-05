@@ -31,6 +31,14 @@ This is the fundamental component of deep learning accelerator.
 
 ![Eyeriss v2 PE Architecture. The address SPad for both inAct and weight are used to store addr vector in the CSC compressed data, while the data SPad stores the data and count vectors](https://images-cdn.shimo.im/Zj7Aa6YzIis6Fhxs/image.png)
 
+At SPad for loop, the row number of the 2D partial sum matrix is `M0`, the column number of it is `F0*N0*E`, the size of partial sum matrix is must less than the size of PSumSPad, which equals to `pSumDataSPadSize`.
+
+The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Data Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
+
+All three kinds of data are stored in column's order, i.e., partial sum store the first `M0` elements, then second until `F0*N0*E` elements.
+
+![Map DNN to a Matrix Multiplication](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200305220730.png)
+
 #### ProcessingElementControl
 
 This is the control module of PE.
