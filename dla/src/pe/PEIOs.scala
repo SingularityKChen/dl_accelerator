@@ -107,7 +107,8 @@ class PEControlToTopIO extends PETopToHigherIO {
 }
 
 class PETopToHigherIO extends Bundle {
-  val pSumEnqOrProduct: DecoupledIO[Bool] = Flipped(Decoupled(Bool())) // true, then read from FIFO; false, then use product
+  val pSumEnqOrProduct: Bool = Input(Bool()) // true, then read from FIFO; false, then use product
+  //val pSumEnqOrProduct: DecoupledIO[Bool] = Flipped(Decoupled(Bool())) // true, then read from FIFO; false, then use product
   val doLoadEn: Bool = Input(Bool()) // true, then write data into inAct and weight SPad and read data out from psData SPad
   val writeFinish: Bool = Output(Bool()) // true then write data into the Scratch Pad finished
   val calFinish: Bool = Output(Bool()) // true then MAC computations finished

@@ -101,7 +101,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
         }
         is (onePEDoing) {
           when (peArray(i)(j).topCtrl.calFinish) {
-            thePEStateRegs(i)(j) := onePEWaitPS
+            thePEStateRegs(i)(j) := onePEWaitPS // TODO
           }
         }
       }
@@ -403,7 +403,6 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   }
   // pSumControl
   peArray.foreach(_.foreach({ x => // FIXME
-    x.topCtrl.pSumEnqOrProduct.bits := true.B
-    x.topCtrl.pSumEnqOrProduct.valid := true.B
+    x.topCtrl.pSumEnqOrProduct := false.B // from product
   }))
 }

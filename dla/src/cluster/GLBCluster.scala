@@ -90,6 +90,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   }
   pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N2.U*M2.U*F2.U + configRegVec(1)*M2.U*F2.U + configRegVec(2)*F2.U + configRegVec(3))
   // FIXME: check the start index of partial sum
+  // TODO: check whether only need the final results rather than all config data
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {

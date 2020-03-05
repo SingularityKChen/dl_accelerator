@@ -99,7 +99,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   private def PEScratchPadWriteIn(inInActAdr: Seq[Int], inInActData: Seq[Int], inWeightAdr: Seq[Int], inWeightData: Seq[Int], topModule: ProcessingElementPad): Any = {
     val theTopSPadIO = topModule.io.dataStream
     val theClock = topModule.clock
-    topModule.io.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
+    topModule.io.padCtrl.fromTopIO.pSumEnqOrProduct.poke(false.B)
     topModule.io.padCtrl.doMACEn.poke(false.B)
     inActAndWeightReadInFuc(inInActAdr, inInActData, inWeightAdr, inWeightData, theTopSPadIO, theClock, topModule.io.padWF)
   }
@@ -195,8 +195,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(true.B, s"now it should be calculating state")
       theTopIO.debugIO.peControlDebugIO.peState.expect(2.U, "now it should be calculating state")
       theTopIO.topCtrl.doLoadEn.poke(false.B)
-      theTopIO.topCtrl.pSumEnqOrProduct.bits.poke(false.B)
-      theTopIO.topCtrl.pSumEnqOrProduct.valid.poke(true.B)
+      theTopIO.topCtrl.pSumEnqOrProduct.poke(false.B)
       theClock.step()
       var i = 0
       while (!theTopIO.topCtrl.calFinish.peek().litToBoolean) {
@@ -263,7 +262,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       }
       theTopIO.padCtrl.fromTopIO.doLoadEn.poke(false.B)
       println("--------------- begin to read ----------------")
-      theTopIO.padCtrl.fromTopIO.pSumEnqOrProduct.bits.poke(false.B)
+      theTopIO.padCtrl.fromTopIO.pSumEnqOrProduct.poke(false.B)
       theTopIO.padCtrl.doMACEn.poke(true.B) // start the state machine
       theClock.step() // from idle to address SPad read
       theTopIO.padCtrl.doMACEn.poke(false.B) // end the state machine

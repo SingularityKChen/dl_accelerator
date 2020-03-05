@@ -60,9 +60,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   // psCal: do MAC computations
   private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
-  io.ctrlTop.pSumEnqOrProduct.ready := Mux(stateMac === psCal, io.ctrlPad.fromTopIO.pSumEnqOrProduct.ready, false.B)
-  io.ctrlPad.fromTopIO.pSumEnqOrProduct.valid := Mux(stateMac === psCal, io.ctrlTop.pSumEnqOrProduct.valid, false.B)
-  io.ctrlPad.fromTopIO.pSumEnqOrProduct.bits := io.ctrlTop.pSumEnqOrProduct.bits
+  io.ctrlPad.fromTopIO.pSumEnqOrProduct := io.ctrlTop.pSumEnqOrProduct
   io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
   io.ctrlPad.doMACEn := stateMac === psCal
   switch (stateMac) {
@@ -245,7 +243,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.io.ctrlPath.indexInc := weightDataSPadIdxIncWire
   weightDataSPad.io.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
-  io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.fromTopIO.pSumEnqOrProduct.bits
+  io.dataStream.ipsIO.ready := padEqMpy && io.padCtrl.fromTopIO.pSumEnqOrProduct
   private val psPadReadIdxCounter: Counter = Counter(M0*E*N0*F0 + 1)
   when (io.padCtrl.fromTopIO.doLoadEn && io.dataStream.opsIO.ready) {
     io.dataStream.opsIO.bits := psDataSPad(psPadReadIdxCounter.value)
@@ -256,7 +254,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     io.dataStream.opsIO.bits := DontCare
   }
   // SPadToCtrl
-  io.padCtrl.fromTopIO.pSumEnqOrProduct.ready := padEqMpy
   pSumResultWire := Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
   /*
   val mcrenfReg: Vec[UInt] = RegInit(VecInit(Seq.fill(6)(0.U(log2Ceil(MCRENF.max).W))))
@@ -341,7 +338,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       readOff()
     }
     is (padMpy) {
-      when (io.padCtrl.fromTopIO.pSumEnqOrProduct.bits) {
+      when (io.padCtrl.fromTopIO.pSumEnqOrProduct) { // FIXME
         when (io.dataStream.ipsIO.valid) {
           sPad := padWriteBack
           productReg := io.dataStream.ipsIO.bits
