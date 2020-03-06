@@ -163,6 +163,12 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     test(new ProcessingElement(true)) { thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
+      val addend = (new Random).nextInt(7)
+      if (randOrNot) {
+        outPSumRand.foreach(x => require(x + addend <= pSumMax, "each pSumRand plus addend should less than the max"))
+      } else {
+        outPSum.foreach(x => require(x + addend <= pSumMax, "each pSum plus addend should less than the max"))
+      }
       println("----------------- test begin -----------------")
       println("----------- Processing Element Module ------------")
       thePE.reset.poke(true.B)
@@ -191,7 +197,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theTopIO.topCtrl.pSumEnqEn.poke(true.B)
         while (!theTopIO.padWF.pSumWriteFin.peek().litToBoolean) {
           if (theTopIO.dataStream.ipsIO.ready.peek().litToBoolean) {
-            theTopIO.dataStream.ipsIO.bits.poke(0.U)
+            theTopIO.dataStream.ipsIO.bits.poke(addend.U)
             theTopIO.dataStream.ipsIO.valid.poke(true.B)
             theClock.step()
           }
@@ -259,9 +265,9 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         theTopIO.debugIO.peSPadDebugIO.sPadState.expect(0.U, "the SPad state should be idle when read out partial sum")
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
         if (randOrNot) {
-          theTopIO.dataStream.opsIO.bits.expect(outPSumRand(i).U, s"the out partial sum should be ${outPSumRand(i)} at $i-th index")
+          theTopIO.dataStream.opsIO.bits.expect((outPSumRand(i) + addend).U, s"the out partial sum should be ${outPSumRand(i) + addend} at $i-th index")
         } else {
-          theTopIO.dataStream.opsIO.bits.expect(outPSum(i).U, s"the out partial sum should be ${outPSum(i)} at $i-th index")
+          theTopIO.dataStream.opsIO.bits.expect((outPSum(i) + addend).U, s"the out partial sum should be ${outPSum(i) + addend} at $i-th index")
         }
         theClock.step()
       }
