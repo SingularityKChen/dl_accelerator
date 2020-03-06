@@ -61,6 +61,8 @@ class SPadCommonCtrlIO(private val padSize: Int) extends Bundle {
 class DataStreamIO extends Bundle with PESizeConfig {
   val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
   val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
+  // TODO: combine ips and ops
+  //val pSumDataIOs = new PSumSPadDataIO
   val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = inActAdrWidth, dataWidth = inActDataWidth))
   val weightIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = weightAdrWidth, dataWidth = weightDataWidth))
 }
@@ -108,8 +110,7 @@ class PEControlToTopIO extends PETopToHigherIO {
 }
 
 class PETopToHigherIO extends Bundle {
-  val pSumEnqOrProduct: Bool = Input(Bool()) // true, then read from FIFO; false, then use product
-  //val pSumEnqOrProduct: DecoupledIO[Bool] = Flipped(Decoupled(Bool())) // true, then read from FIFO; false, then use product
+  val pSumEnqEn: Bool = Input(Bool()) // true, then read from FIFO and write the data into SPad
   val doLoadEn: Bool = Input(Bool()) // true, then write data into inAct and weight SPad and read data out from psData SPad
   val writeFinish: Bool = Output(Bool()) // true then write data into the Scratch Pad finished
   val calFinish: Bool = Output(Bool()) // true then MAC computations finished

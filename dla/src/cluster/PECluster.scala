@@ -403,6 +403,6 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   }
   // pSumControl
   peArray.foreach(_.foreach({ x => // FIXME
-    x.topCtrl.pSumEnqOrProduct := false.B // from product
+    x.topCtrl.pSumEnqEn := false.B // from product
   }))
 }

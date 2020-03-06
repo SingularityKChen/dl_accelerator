@@ -23,7 +23,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   inActAndWeightWFIOs.zip(inActAndWeightTopWFIOs).foreach{case (x, y) => y <> x}
   io.padWF.pSumWriteFin := pePad.padWF.pSumWriteFin
   peCtrl.ctrlPad <> pePad.padCtrl
-  io.topCtrl.pSumEnqOrProduct <> peCtrl.ctrlTop.pSumEnqOrProduct
+  io.topCtrl.pSumEnqEn <> peCtrl.ctrlTop.pSumEnqEn
   io.topCtrl.calFinish := peCtrl.ctrlTop.calFinish
   peCtrl.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
   private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
@@ -53,16 +53,14 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
 
 class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig {
   val io: ProcessingElementControlIO = IO(new ProcessingElementControlIO)
-  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
-  // some config of RS+
-  // logic of PE MAC
   // state machine, control the process of MAC
   // psIdle: wait for signal
   // psLoad: load input activations, weights, partial sums outside and read out output partial sum
   // psCal: do MAC computations
   private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
-  io.ctrlPad.fromTopIO.pSumEnqOrProduct := io.ctrlTop.pSumEnqOrProduct
+  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
+  io.ctrlPad.fromTopIO.pSumEnqEn := io.ctrlTop.pSumEnqEn
   io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
   io.ctrlPad.doMACEn := stateMac === psCal
   switch (stateMac) {
@@ -88,6 +86,35 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   } else {
     io.debugIO <> DontCare
   }
+}
+
+class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeConfig {
+  val io: PSumSPadIO = IO(new PSumSPadIO)
+  private val pSumDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
+  pSumDataSPadReg.suggestName("pSumDataSPadReg")
+  private val readOutDataWire = Wire(UInt(psDataWidth.W))
+  readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
+  io.dataPath.ipsIO.ready := io.dataPath.ipsIO.valid
+  io.dataPath.opsIO.valid := io.dataPath.opsIO.ready
+  io.dataPath.opsIO.bits := Mux(io.dataPath.opsIO.ready, readOutDataWire, DontCare)
+  when (io.dataPath.ipsIO.valid) {
+    pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits
+  }
+}
+
+class PSumSPadIO extends Bundle {
+  val dataPath = new PSumSPadDataIO
+  val ctrlPath = new PSumSPadCtrlIO
+}
+
+class PSumSPadDataIO extends Bundle with PESizeConfig {
+  val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
+  val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
+}
+
+class PSumSPadCtrlIO extends Bundle with SPadSizeConfig {
+  val readIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
+  val writeIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
 }
 
 class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with SPadSizeConfig with PESizeConfig {
@@ -134,8 +161,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     //psPadReadIdxCounter.value := 0.U
   }
   // reg, partial sum scratch pad
-  private val psDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
-  psDataSPadReg.suggestName("psDataSPadReg")
+  private val pSumSPad = Module(new PSumSPad(debug = debug)).io
+  pSumSPad.suggestName("pSumSPad")
   private val inActAdrSPad = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth)).io
   inActAdrSPad.suggestName("inActAdrSPad")
   private val inActDataSPad = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false)).io
@@ -144,6 +171,16 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightAdrSPad.suggestName("weightAdrSPad")
   private val weightDataSPad = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true)).io
   weightDataSPad.suggestName("weightDataSPad")
+  // SPadToCtrl
+  // several signals which can help to indicate the process
+  private val mightInActZeroColumnWire: Bool = Wire(Bool())
+  private val inActSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
+  private val mightInActIdxIncWire: Bool = Wire(Bool())
+  private val mightWeightZeroColumnWire: Bool = Wire(Bool())
+  private val mightWeightIdxIncWire: Bool = Wire(Bool())
+  private val mightInActReadFinish: Bool = Wire(Bool())
+  private val mightWeightReadFinish: Bool = Wire(Bool())
+  private val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
   // InActSPad
   private val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
   private val inActAdrDataWire: UInt = Wire(UInt(inActAdrWidth.W))
@@ -246,52 +283,48 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.ctrlPath.indexInc := weightDataSPadIdxIncWire
   weightDataSPad.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
+  private val pSumResultWire = Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
   private val pSumPadReadIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   pSumPadReadIdxReg.suggestName("pSumPadReadIdxReg")
   private val pSumPadReadIdxInc = Wire(Bool())
   private val pSumPadReadWrap = Wire(Bool())
+  private val pSumPadWriteIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  private val pSumPadWriteIdxInc = Wire(Bool())
+  pSumPadWriteIdxInc.suggestName("pSumPadWriteIdxInc")
+  private val pSumPadWriteWrap = Wire(Bool())
+  private val pSumPadWriteIdxWire = Mux(pSumPadWriteIdxInc, pSumPadWriteIdxReg, psDataSPadIdxWire)
+  pSumPadWriteIdxWire.suggestName("pSumPadWriteIdxWire")
+  // top connections
+  io.padWF.pSumWriteFin := pSumPadWriteWrap
+  pSumPadWriteIdxInc := io.padCtrl.fromTopIO.pSumEnqEn && io.dataStream.ipsIO.valid
+  pSumSPad.dataPath.ipsIO.bits := Mux(pSumPadWriteIdxInc, io.dataStream.ipsIO.bits, pSumResultWire)
+  io.dataStream.ipsIO.ready := pSumSPad.dataPath.ipsIO.ready
+  pSumPadReadIdxInc := io.dataStream.opsIO.ready
+  io.dataStream.opsIO.bits := pSumSPad.dataPath.opsIO.bits
+  io.dataStream.opsIO.valid := Mux(io.dataStream.opsIO.ready, pSumSPad.dataPath.opsIO.valid, false.B)
+  // once ask for Enq, then pSum is read out data, then another pe's ops.ready === true.B,
+  // then another pe read out data with true valid signal, then pSumPadWriteIdxInc === true.B
+  pSumSPad.dataPath.ipsIO.valid := io.padCtrl.fromTopIO.pSumEnqEn || padEqWB
+  pSumSPadLoadReg := pSumSPad.dataPath.opsIO.bits
+  pSumSPad.dataPath.opsIO.ready := padEqMpy || pSumPadReadIdxInc
+  pSumSPad.ctrlPath.readIdx := pSumPadReadIdxReg
+  pSumSPad.ctrlPath.writeIdx := pSumPadWriteIdxWire
   when (pSumPadReadWrap) {
     pSumPadReadIdxReg := 0.U
   }
   when (pSumPadReadIdxInc) {
     pSumPadReadIdxReg := pSumPadReadIdxReg + 1.U
   }
-  private val pSumPadWriteIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
-  private val pSumPadWriteIdxInc = Wire(Bool())
-  private val pSumPadWriteWrap = Wire(Bool())
   when (pSumPadWriteWrap) {
     pSumPadWriteIdxReg := 0.U
   }
   when (pSumPadWriteIdxInc) {
     pSumPadWriteIdxReg := pSumPadWriteIdxReg + 1.U
   }
-  io.padWF.pSumWriteFin := pSumPadWriteWrap
-  when (io.padCtrl.fromTopIO.doLoadEn && io.dataStream.opsIO.ready) { // TODO: change the en signal to read PSum
-    io.dataStream.opsIO.bits := psDataSPadReg(pSumPadReadIdxReg)
-    io.dataStream.opsIO.valid := true.B
-  } .otherwise {
-    io.dataStream.opsIO.valid := false.B
-    io.dataStream.opsIO.bits := DontCare
-  }
-  // SPadToCtrl
-  private val pSumResultWire = Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
-  // several signals which can help to indicate the process
-  private val mightInActZeroColumnWire: Bool = Wire(Bool())
-  private val inActSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
-  private val mightInActIdxIncWire: Bool = Wire(Bool())
-  private val mightWeightZeroColumnWire: Bool = Wire(Bool())
-  private val mightWeightIdxIncWire: Bool = Wire(Bool())
-  private val mightInActReadFinish: Bool = Wire(Bool())
-  private val mightWeightReadFinish: Bool = Wire(Bool())
-  private val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
 
   pSumPadReadWrap := (padEqID && mightInActReadFinish) || (padEqWB && mightInActReadFinish)
-  pSumPadReadIdxInc := io.padCtrl.fromTopIO.doLoadEn && io.dataStream.opsIO.ready
-  pSumPadWriteIdxInc := io.padCtrl.fromTopIO.pSumEnqOrProduct && io.dataStream.ipsIO.valid
   pSumPadWriteWrap := pSumPadWriteIdxReg === (M0*E*N0*F0 - 1).U && pSumPadWriteIdxInc
-  private val pSumPadWriteIdxWire = Mux(pSumPadWriteIdxInc, pSumPadWriteIdxReg, psDataSPadIdxWire)
-  pSumPadWriteIdxWire.suggestName("pSumPadWriteIdxWire")
-
+  // SPadToCtrl
   mightInActZeroColumnWire := inActAdrDataWire === inActZeroColumnCode.U
   mightWeightZeroColumnWire := weightAdrDataWire === weightZeroColumnCode.U
   mightInActIdxIncWire := inActAdrDataWire === (inActDataIndexWire + 1.U)
@@ -311,7 +344,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataIdxMuxWire := padEqID && weightDataSPadFirstRead && !weightMatrixReadFirstColumn
   weightAdrSPadReadIdxWire := Mux(weightDataIdxMuxWire, inActMatrixRowWire - 1.U, inActMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
-  io.padCtrl.fromTopIO.calFinish := mightInActReadFinish // TODO: add more test case to check this logic
+  io.padCtrl.fromTopIO.calFinish := mightInActReadFinish
   psDataSPadIdxWire := weightMatrixRowReg + inActMatrixColumnReg * M0.U
   switch (sPad) {
     is (padIdle) {
@@ -366,10 +399,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     is (padMpy) {
       sPad := padWriteBack
       productReg :=  weightMatrixDataReg * inActMatrixDataWire
-      pSumSPadLoadReg := psDataSPadReg(pSumPadReadIdxReg)
+      // then load pSum
+      //pSumSPadLoadReg := psDataSPadReg(pSumPadReadIdxReg)
     }
     is (padWriteBack) {
-      psDataSPadReg(pSumPadWriteIdxWire) := pSumResultWire //update the partial sum
+      // then write back pSum
+      //psDataSPadReg(pSumPadWriteIdxWire) := pSumResultWire //update the partial sum
       when (mightInActReadFinish) {
         readFinish()
       } .otherwise { // then haven't done all the MAC operations
@@ -393,11 +428,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       }
     }
   }
-  when (pSumPadWriteIdxInc) { // need the router produce this signal when not cal or at the beginning
-    psDataSPadReg(pSumPadWriteIdxWire) := io.dataStream.ipsIO.bits
-    // TODO: check the value of counter at the beginning of ips
-  }
-  io.dataStream.ipsIO.ready := pSumPadWriteIdxInc
+
   if (debug) {
     io.debugIO.inActMatrixColumn := inActMatrixColumnReg
     io.debugIO.inActMatrixData := inActMatrixDataWire
