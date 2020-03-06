@@ -27,10 +27,10 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   io.topCtrl.calFinish := peCtrl.ctrlTop.calFinish
   peCtrl.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
   private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
-    inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin)
+    inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin, pePad.padWF.pSumWriteFin)
   private val writeFinishWire: Bool = Wire(Bool())
-  private val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(4)(false.B)))
-  for (i <- 0 until 4) {
+  private val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(SPadWFSeq.length)(false.B)))
+  for (i <- 0 until 5) {
     when (SPadWFSeq(i)) {
       writeFinishRegVec(i) := true.B
     }
@@ -38,7 +38,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
       writeFinishRegVec(i) := false.B
     }
   }
-  writeFinishWire := writeFinishRegVec.reduce(_ && _) // when all Scratch Pad write finished
+  writeFinishWire := writeFinishRegVec.reduce(_ && _) // when all five Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
   peCtrl.ctrlTop.writeFinish := writeFinishWire
   pePad.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true)
@@ -46,6 +46,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   if (debug) {
     io.debugIO.peControlDebugIO <> peCtrl.debugIO
     io.debugIO.peSPadDebugIO <> pePad.debugIO
+    io.debugIO.writeFinishRegVec <> writeFinishRegVec
   } else {
     io.debugIO <> DontCare
   }

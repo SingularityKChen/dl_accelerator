@@ -130,3 +130,19 @@ class CommonClusterCtrlTwoBoolIO extends Bundle {
 trait HasBusySignal extends Bundle {
   val busy: Bool = Output(Bool())
 }
+
+abstract class HasConnectAllExpRdModule extends Module {
+  protected def connectAllExceptReady(slaverIO: CSCStreamIO, masterIO: CSCStreamIO): Unit ={
+    slaverIO.dataIOs.data.bits := masterIO.dataIOs.data.bits
+    slaverIO.dataIOs.data.valid := masterIO.dataIOs.data.valid
+    slaverIO.adrIOs.data.bits := masterIO.adrIOs.data.bits
+    slaverIO.adrIOs.data.valid := masterIO.adrIOs.data.valid
+  }
+}
+
+abstract class CSCRouter extends HasConnectAllExpRdModule {
+  protected def disableAdrDataReady(disabledIO: CSCStreamIO): Unit = {
+    disabledIO.adrIOs.data.ready := false.B
+    disabledIO.dataIOs.data.ready := false.B
+  }
+}

@@ -6,6 +6,7 @@ import dla.pe._
 import org.scalatest._
 import dla.tests.GenOnePETestData
 import scala.math.pow
+import scala.util.Random
 
 class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with SPadSizeConfig with MCRENFConfig with PESizeConfig {
   // def some common parameters and functions
@@ -170,23 +171,45 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       println("--------------- begin to write ---------------")
       theTopIO.topCtrl.pSumEnqEn.poke(false.B)
       theTopIO.topCtrl.doLoadEn.poke(true.B)
-      if (randOrNot) {
-        println("outPSum    = " + outPSumRand)
-        //println("inActList  = " + inActList)
-        println("inActAdr   = " + inInActAdrRand)
-        println("inActData   = " + inInActDataRand)
-        //println("weightList = " + weightList)
-        println("weightAdr  = " + inWeightAdrRand)
-        println("weightData  = " + inWeightDataRand)
-        inActAndWeightReadInFuc(inInActAdrRand, inInActDataCountDecRand, inWeightAdrRand, inWeightDataCountDecRand,
-          theTopIO.dataStream, theClock, theTopIO.padWF)
-      } else {
-        inActAndWeightReadInFuc(inInActAdr, inInActDataCountDec, inWeightAdr, inWeightDataCountDec,
-          theTopIO.dataStream, theClock, theTopIO.padWF)
-      }
+      fork {
+        if (randOrNot) {
+          println("outPSum    = " + outPSumRand)
+          //println("inActList  = " + inActList)
+          println("inActAdr   = " + inInActAdrRand)
+          println("inActData   = " + inInActDataRand)
+          //println("weightList = " + weightList)
+          println("weightAdr  = " + inWeightAdrRand)
+          println("weightData  = " + inWeightDataRand)
+          inActAndWeightReadInFuc(inInActAdrRand, inInActDataCountDecRand, inWeightAdrRand, inWeightDataCountDecRand,
+            theTopIO.dataStream, theClock, theTopIO.padWF)
+        } else {
+          inActAndWeightReadInFuc(inInActAdr, inInActDataCountDec, inWeightAdr, inWeightDataCountDec,
+            theTopIO.dataStream, theClock, theTopIO.padWF)
+        }
+      } .fork {
+        theClock.step(cycles = (new Random).nextInt(30) + 1)
+        theTopIO.topCtrl.pSumEnqEn.poke(true.B)
+        while (!theTopIO.padWF.pSumWriteFin.peek().litToBoolean) {
+          if (theTopIO.dataStream.ipsIO.ready.peek().litToBoolean) {
+            theTopIO.dataStream.ipsIO.bits.poke(0.U)
+            theTopIO.dataStream.ipsIO.valid.poke(true.B)
+            theClock.step()
+          }
+        }
+        println("----- pSumWF = " + theTopIO.padWF.pSumWriteFin.peek())
+        timescope {
+          theClock.step()
+          theTopIO.debugIO.writeFinishRegVec(4).expect(true.B, " pSumWFReg should be true after one clock")
+          println(s"----- finReg4 = ${theTopIO.debugIO.writeFinishRegVec(4).peek()}")
+        }
+      } .join()
+      println("----- writeFin = " + theTopIO.topCtrl.writeFinish.peek())
       theTopIO.debugIO.peControlDebugIO.peState.expect(1.U, "wait it jump from load to cal")
       theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(false.B, s"now it should be load")
       theClock.step()
+      // NOTE: if disable pSumEnqEn one cycle earlier, then because of the glitch,
+      // writeFinishRegVec(4) can not be assigned to true.B
+      theTopIO.topCtrl.pSumEnqEn.poke(false.B)
       theTopIO.topCtrl.writeFinish.expect(true.B, s"after write in all data, write should finish")
       theTopIO.debugIO.peControlDebugIO.doMACEnDebug.expect(true.B, s"now it should be calculating state")
       theTopIO.debugIO.peControlDebugIO.peState.expect(2.U, "now it should be calculating state")
