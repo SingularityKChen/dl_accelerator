@@ -30,7 +30,7 @@ After clone it with `--recurse-submodules`, you can use `mill` in idea after thi
 mill mill.scalalib.GenIdea/idea
 ```
 
-If you meet any similar error as bellow shows, you can check the `mill` version, and then [install the newest version of `mill`](#Install Mill).
+If you meet any similar error as bellow shows, you can check the `mill` version, and then [install the newest version of `mill`](#Install-Mill).
 
 ![mill gen idea config errors](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200306100848%20mill%20idea%20error.jpg)
 
@@ -53,17 +53,23 @@ You can find more at [the project page](https://github.com/SingularityKChen/dl_a
 
 ### [Processing Element](./dla/src/pe)
 
-This is the fundamental component of deep learning accelerator.
+This is the original fundamental component of deep learning accelerator and the PE in this project is [a little different](#Some-Differences).
 
 ![Eyeriss v2 PE Architecture. The address SPad for both inAct and weight are used to store addr vector in the CSC compressed data, while the data SPad stores the data and count vectors](https://images-cdn.shimo.im/Zj7Aa6YzIis6Fhxs/image.png)
 
 At SPad for loop, the row number of the 2D partial sum matrix is `M0`, the column number of it is `F0*N0*E`, the size of partial sum matrix is must less than the size of PSumSPad, which equals to `pSumDataSPadSize`.
 
-The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Data Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
+The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Data-Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
 
 All three kinds of data are stored in column's order, i.e., partial sum store the first `M0` elements, then second until `F0*N0*E` elements.
 
 ![Map DNN to a Matrix Multiplication](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200305220730.png)
+
+𝑊𝑒𝑖𝑔ℎ𝑡((𝑀0, 𝑅∗𝐶0))∗𝐼𝑛𝐴𝑐𝑡((𝑅∗𝐶0, 𝐹0∗𝑁0∗𝐸))=𝑃𝑆𝑢𝑚((𝑀0, 𝐹0∗𝑁0∗𝐸))
+
+#### Some Differences
+
+The original PE will select the data from input partial sum FIFO or the product result of the current weight and the current input activation, and then add the optional result with the data load from PSum scratch pad. While in this project, due to the misunderstanding of Global buffer level's for loop, I changed this mux: write the data from input partial sum FIFO or the results of current MAC with `pSumEnqEn` signal.
 
 #### ProcessingElementControl
 
