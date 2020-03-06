@@ -17,9 +17,13 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   private val scsDataMax = pow(2, cscDataWidth).toInt
   private val inActList: List[List[Int]] = genHp.inActList
   private val weightList: List[List[Int]] = genHp.weightList
-  private val (inInActAdrRand, inInActCountRand, inInActDataRand) = genHp.genAdrCountData(inActList, inActOrWeight = true)
-  private val (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genHp.genAdrCountData(weightList, inActOrWeight = false)
-  private val outPSumRand: List[Int] = genHp.goldenFlatResult(weightList, inActList)
+  private val inInActAdrRand = genHp.inInActAdrRand
+  private val inInActCountRand = genHp.inInActCountRand
+  private val inInActDataRand = genHp.inInActDataRand
+  private val inWeightAdrRand = genHp.inWeightAdrRand
+  private val inWeightCountRand = genHp.inWeightCountRand
+  private val inWeightDataRand = genHp.inWeightDataRand
+  private val outPSumRand: List[Int] = genHp.outPSumRand
   if (randOrNot) {
     require(inInActAdrRand.head != inActZeroColumnCode, "the head of inAct should not be zero column") // TODO: remove this requirement
     inInActAdrRand.foreach(x => require(x <= inActAdrMax, s"inActAdr value should less than max, do $x < $inActAdrMax ?"))
@@ -209,10 +213,15 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       while (!theTopIO.topCtrl.calFinish.peek().litToBoolean) {
         println(s"--------------- $i-th MAC cycle -----------")
         println(s"----- SPad State   =  ${theTopIO.debugIO.peSPadDebugIO.sPadState.peek()}")
-        println(s"----- inActMatrix   = (${theTopIO.debugIO.peSPadDebugIO.inActMatrixData.peek()}, ${theTopIO.debugIO.peSPadDebugIO.inActMatrixRow.peek()}, ${theTopIO.debugIO.peSPadDebugIO.inActMatrixColumn.peek()})")
-        println(s"----- IAdrIndex   =  ${theTopIO.debugIO.peSPadDebugIO.inActAdrIdx.peek()}, ${theTopIO.debugIO.peSPadDebugIO.inActAdrInc.peek()}")
+        println(s"----- inActMatrix   = ( value = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixData.peek().litValue()}, " +
+          s"row = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixRow.peek().litValue()}, " +
+          s"column = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixColumn.peek().litValue()})")
+        println(s"----- IAdrIndex   =  ${theTopIO.debugIO.peSPadDebugIO.inActAdrIdx.peek()}, " +
+          s"${theTopIO.debugIO.peSPadDebugIO.inActAdrInc.peek()}")
         println(s"----- IDataInc     =  ${theTopIO.debugIO.peSPadDebugIO.inActDataInc.peek()}")
-        println(s"----- weightMatrix = (${theTopIO.debugIO.peSPadDebugIO.weightMatrixData.peek()}, ${theTopIO.debugIO.peSPadDebugIO.weightMatrixRow.peek()}, ${theTopIO.debugIO.peSPadDebugIO.inActMatrixRow.peek()})")
+        println(s"----- weightMatrix = ( value = ${theTopIO.debugIO.peSPadDebugIO.weightMatrixData.peek().litValue()}, " +
+          s"row = ${theTopIO.debugIO.peSPadDebugIO.weightMatrixRow.peek().litValue()}, " +
+          s"column = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixRow.peek().litValue()})")
         println(s"----- WAdrData    =  ${theTopIO.debugIO.peSPadDebugIO.weightAdrSPadReadOut.peek()}")
         println(s"----- WAInIndex    =  ${theTopIO.debugIO.peSPadDebugIO.weightAdrInIdx.peek()}")
         println(s"----- product      =  ${theTopIO.debugIO.peSPadDebugIO.productResult.peek()}")

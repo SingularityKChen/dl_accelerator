@@ -1,62 +1,92 @@
 package dla.tests
 
-import dla.pe.{PESizeConfig, SPadSizeConfig}
+import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 
 import scala.math.pow
 import scala.util.Random
 class GenOnePETestDataTest extends FlatSpec {
-  val oneTest = new GenOnePETestData
-  val theData: List[List[Int]] = oneTest.genSparse(3,5,20,0)
-  val anotherData: List[List[Int]] = oneTest.genSparse(5, 3, 15, 0)
-  val resultData: List[List[Int]] = oneTest.goldenResult(theData, anotherData)
+  val genHp = new GenOnePETestData
+  val theData: List[List[Int]] = genHp.genSparse(3,5,20,0)
+  val anotherData: List[List[Int]] = genHp.genSparse(5, 3, 15, 0)
+  val resultData: List[List[Int]] = genHp.goldenResult(theData, anotherData)
   println("ListA = " + theData)
   println("ListB = " + anotherData)
   println("GoRe  = " + resultData)
-  val (adr, count, data): (List[Int], List[Int], List[Int]) = oneTest.genAdrCountData(theData, inActOrWeight = false)
-  println("adr   = " + adr)
-  println("count = " + count)
-  println("data  = " + data)
-  println(oneTest.goldenFlatResult(theData, anotherData))
+  private val inActList: List[List[Int]] = genHp.inActList
+  private val weightList: List[List[Int]] = genHp.weightList
+  private val inInActAdrRand = genHp.inInActAdrRand
+  private val inInActCountRand = genHp.inInActCountRand
+  private val inInActDataRand = genHp.inInActDataRand
+  private val inWeightAdrRand = genHp.inWeightAdrRand
+  private val inWeightCountRand = genHp.inWeightCountRand
+  private val inWeightDataRand = genHp.inWeightDataRand
+  private val outPSumRand: List[Int] = genHp.outPSumRand
+  println("inInActAdrRand    = " + inInActAdrRand)
+  println("inInActCountRand  = " + inInActCountRand)
+  println("inInActDataRand   = " + inInActDataRand)
+  println("inWeightAdrRand   = " + inWeightAdrRand)
+  println("inWeightCountRand = " + inWeightCountRand)
+  println("inWeightDataRand  = " + inWeightDataRand)
+  println("outPSumRand       = " + outPSumRand)
+  println("inActList         = " + inActList)
+  println("weightList        = " + weightList)
 }
 
-class GenOnePETestData extends PESizeConfig with SPadSizeConfig {
+class GenOnePETestData extends PESizeConfig with SPadSizeConfig with MCRENFConfig {
   private val pSumMax = pow(2, psDataWidth).toInt
   private val inActAdrMax = pow(2, inActAdrWidth).toInt
   private val weightAdrMax = pow(2, weightAdrWidth).toInt
   private val scsDataMax = pow(2, cscDataWidth).toInt
-  var inActList: List[List[Int]] = genSparse(8, 6, max = scsDataMax, 0.845)
-  var weightList: List[List[Int]] = genSparse(4, 8, max = scsDataMax, 0.6)
-  var (inInActAdrRand, inInActCountRand, inInActDataRand) = genAdrCountData(inActList, inActOrWeight = true)
-  var (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genAdrCountData(weightList, inActOrWeight = false)
-  var outPSumRand: List[Int] = goldenFlatResult(weightList, inActList)
-  /*private def checkConstrain(): Unit = {
+  val (inActSeq, weightSeq, outPSumRand, inActWeightList) = genAll()
+  val inActList: List[List[Int]] = inActWeightList.head
+  val weightList: List[List[Int]] = inActWeightList.last
+  val inInActAdrRand: List[Int] = inActSeq.head
+  val inInActCountRand: List[Int] = inActSeq(1)
+  val inInActDataRand: List[Int] = inActSeq(2)
+  val inWeightAdrRand: List[Int] = weightSeq.head
+  val inWeightCountRand: List[Int] = weightSeq(1)
+  val inWeightDataRand: List[Int] = weightSeq(2)
+  private def genAll(): (Seq[List[Int]], Seq[List[Int]], List[Int], Seq[List[List[Int]]]) = {
+    var error = true
+    var inActList: List[List[Int]] = Nil
+    var weightList: List[List[Int]] = Nil
+    var inActSeq: Seq[List[Int]] = Nil
+    var weightSeq: Seq[List[Int]] = Nil
+    var outPSumRand: List[Int] = Nil
+    while (error) {
+      inActList = genSparse(cols = F0*N0*E, rows = R*C0, max = scsDataMax, ratio =  0.845)
+      weightList = genSparse(cols = R*C0, rows = M0, max = scsDataMax, ratio =  0.6)
+      inActSeq = genAdrCountData(inActList, inActOrWeight = true)
+      weightSeq = genAdrCountData(weightList, inActOrWeight = false)
+      outPSumRand = goldenFlatResult(weightList, inActList)
+      error = checkConstrain(inActSeq, weightSeq, outPSumRand)
+    }
+    (inActSeq, weightSeq, outPSumRand, Seq(inActList, weightList))
+  }
+  private def checkConstrain(theInActSeq: Seq[List[Int]], theWeightSeq: Seq[List[Int]], thePSumList: List[Int]): Boolean = {
     var error = false
     if (
-      inInActAdrRand.head == inActZeroColumnCode || // TODO: remove this requirement
-      inWeightAdrRand.head == weightZeroColumnCode || // TODO: remove this requirement
-      inInActAdrRand.length > inActAdrSPadSize ||
-      inInActCountRand.length > inActDataSPadSize ||
-      inWeightAdrRand.length > weightAdrSPadSize ||
-      inWeightCountRand.length > weightDataSPadSize ||
-      outPSumRand.length > pSumDataSPadSize ||
-      inInActAdrRand.max > inActAdrMax ||
-      inWeightAdrRand.max > weightAdrMax ||
-      outPSumRand.max > pSumMax
+      theInActSeq.head.head == inActZeroColumnCode || // TODO: remove this requirement
+      theWeightSeq.head.head == weightZeroColumnCode || // TODO: remove this requirement
+      theInActSeq.head.length > inActAdrSPadSize ||
+      theInActSeq.last.length > inActDataSPadSize ||
+      theWeightSeq.head.length > weightAdrSPadSize ||
+      theWeightSeq.last.length > weightDataSPadSize ||
+      thePSumList.length > pSumDataSPadSize ||
+      theInActSeq.head.max > inActAdrMax ||
+      theWeightSeq.head.max > weightAdrMax ||
+      thePSumList.max > pSumMax
     ) {
       error = true
     }
     if (error) {
-      inActList = genSparse(8, 6, max = scsDataMax, 0.845)
-      weightList = genSparse(4, 8, max = scsDataMax, 0.6)
-      (inInActAdrRand, inInActCountRand, inInActDataRand) = genAdrCountData(inActList, inActOrWeight = true)
-      (inWeightAdrRand, inWeightCountRand, inWeightDataRand) = genAdrCountData(weightList, inActOrWeight = false)
-      outPSumRand = goldenFlatResult(weightList, inActList)
-      println("meet one error")
-      checkConstrain()
+      println("[Waring] Ops!!! those are not what you need!!!")
+    } else {
+      println("[Info] Congratulate!!! you've got what you want!!!")
     }
+    error
   }
-  */
  def genSparse(rows: Int, cols: Int, max: Int, ratio: Double): List[List[Int]] = {
     require(ratio <= 1 && ratio >= 0, "the range of ratio should be (0, 1)")
     var resultList: List[List[Int]] = Nil
@@ -128,14 +158,13 @@ class GenOnePETestData extends PESizeConfig with SPadSizeConfig {
     }
     resultList
   }
-  def genAdrCountData(listA: List[List[Int]], inActOrWeight: Boolean): (List[Int], List[Int], List[Int]) = {
+  def genAdrCountData(listA: List[List[Int]], inActOrWeight: Boolean): Seq[List[Int]] = {
     val zeroCode: Int = if (inActOrWeight) inActZeroColumnCode else weightZeroColumnCode
     var adrList: List[Int] = Nil
     var countList: List[Int] = Nil
     var dataList: List[Int] = Nil
     for (j <- listA.head.indices) { // for column
       val currentCol = listA.map(x => x(j))
-      println(currentCol)
       if (currentCol.max == 0){ // if zero column
         adrList = adrList:::List(zeroCode)
         //println(s"meet a zero column at column $j")
@@ -155,7 +184,7 @@ class GenOnePETestData extends PESizeConfig with SPadSizeConfig {
     adrList = adrList:::List(0)
     countList = countList:::List(0)
     dataList = dataList:::List(0)
-    (adrList, countList, dataList)
+    Seq(adrList, countList, dataList)
   }
 }
 

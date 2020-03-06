@@ -275,7 +275,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   mightInActZeroColumnWire := inActAdrDataWire === inActZeroColumnCode.U
   mightWeightZeroColumnWire := weightAdrDataWire === weightZeroColumnCode.U
   mightInActIdxIncWire := inActAdrDataWire === (inActDataIndexWire + 1.U)
-  mightWeightIdxIncWire := weightAdrDataWire === (weightDataIndexWire + 1.U)
+  mightWeightIdxIncWire := weightAdrDataWire === (weightDataIndexWire + 1.U) || mightWeightReadFinish // or meet finish signal TODO: check
   mightInActReadFinish := inActMatrixDataWire === 0.U && !inActDataSPadFirstReadReg
   mightWeightReadFinish := weightMatrixDataReg === 0.U && !weightDataSPadFirstRead
   inActAdrSPadIdxIncWire := (padEqIA && mightInActZeroColumnWire) || (((padEqWA && mightWeightZeroColumnWire) ||
