@@ -12,7 +12,7 @@ class WeightSPadAdrModule(PadSize: Int, DataWidth: Int) extends SPadAdrModule(Pa
 class SPadAdrModule(PadSize: Int, val DataWidth: Int)
   extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
   private val adrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
-  //adrSPad.suggestName("addressSPad")
+  adrSPad.suggestName("addressSPad")
   // write logic 2
   when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
     adrSPad(padWriteIndexReg) := decoupledDataIO.bits
@@ -34,7 +34,7 @@ class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
   extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
   if (sramOrReg) { // true for weight SPad
     val dataSPad: SyncReadMem[UInt] = SyncReadMem(PadSize,UInt(DataWidth.W))
-    //dataSPad.suggestName("dataSPadSRAM")
+    dataSPad.suggestName("dataSPadSRAM")
     // write logic 2
     when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
       dataSPad.write(padWriteIndexReg, decoupledDataIO.bits)
@@ -54,7 +54,7 @@ class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
     dataWire := dataSPad.read(padReadIndexReg, io.ctrlPath.readEn)
   }else{
     val dataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
-    //dataSPad.suggestName("dataSPadReg")
+    dataSPad.suggestName("dataSPadReg")
     when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
       dataSPad(padWriteIndexReg) := decoupledDataIO.bits
     }

@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.util._
 import dla.cluster.{ClusterGroup, ClusterGroupIO, ClusterSRAMConfig, CommonClusterCtrlTwoBoolIO, CommonClusterCtrlTwoUIntIO, GLBClusterDataIO, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.MCRENFConfig
-import org.scalatest.FlatSpec
 
 class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   require(cgColNum == 2, "the default design is based on 2 columns, you need to change the connections now")

@@ -9,6 +9,7 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   private val peCluster = Module(new PECluster(debug)).io
   private val glbCluster = Module(new GLBCluster(debug)).io
   private val routerCluster = Module(new RouterCluster(debug)).io
+  private val clusterCtrl = Module(new ClusterGroupController(debug = debug)).io
   // doCalReg: true, then they are doing calculation; false, then read in data or read out data
   private val doCalReg: Bool = RegInit(false.B) // TODO: add some logic to change it
   // suggest name
@@ -97,8 +98,8 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
     }
   }
   // configIO
-  glbCluster.ctrlPath.configIOs <> DontCare // FIXME
-  peCluster.ctrlPath.configIOs <> DontCare
+  glbCluster.ctrlPath.pSumSRAMStrIdx := clusterCtrl.pSumSRAMStrIdx
+  peCluster.ctrlPath.configF2Inc := clusterCtrl.configF2Inc
   // writeOrRead
   glbCluster.ctrlPath.pSumIO.writeOrRead := DontCare // FIXME
   glbCluster.ctrlPath.inActIO.writeOrRead := DontCare
@@ -106,4 +107,61 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   glbCluster.ctrlPath.pSumIO.doEn := DontCare // FIXME
   glbCluster.ctrlPath.inActIO.doEn := DontCare
   peCluster.ctrlPath.doEn := DontCare
+}
+
+class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
+  val io: ClusterGroupControllerIO = IO(new ClusterGroupControllerIO)
+  private val configFixValSeq = Seq(G2, N2, M2, F2, C2, S2)
+  private val configIncWireSeq = Seq.fill(6){Wire(Bool())}
+  configIncWireSeq.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"configIncWire$i")})
+  private val (configG2Val, configG2Wrap) = Counter(configIncWireSeq.head, configFixValSeq.head)
+  private val (configN2Val, configN2Wrap) = Counter(configIncWireSeq(1), configFixValSeq(1))
+  private val (configM2Val, configM2Wrap) = Counter(configIncWireSeq(2), configFixValSeq(2))
+  private val (configF2Val, configF2Wrap) = Counter(configIncWireSeq(3), configFixValSeq(3))
+  private val (configC2Val, configC2Wrap) = Counter(configIncWireSeq(4), configFixValSeq(4))
+  private val (configS2Val, configS2Wrap) = Counter(configIncWireSeq(5), configFixValSeq(5))
+  private val configWarpWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
+  private val configValWireVec = Seq(configG2Val, configN2Val, configM2Val, configF2Val, configC2Val, configS2Val) // 0g, 1n, 2m, 3f, 4c, 5s // TODO
+  // Outputs
+  io.pSumSRAMStrIdx := configValWireVec.head*N2.U*M2.U*F2.U + configValWireVec(1)*M2.U*F2.U + configValWireVec(2)*F2.U + configValWireVec(3)
+  io.configF2Inc := configIncWireSeq(3)
+  // cluster group state machine
+  private val cgIdle :: cgLoad :: cgCal :: cgRead :: Nil = Enum(4)
+  private val cgStateReg = RegInit(cgIdle)
+  switch (cgStateReg) {
+    is (cgIdle) {
+      when (true.B) {
+        cgStateReg := cgLoad
+      }
+    }
+    is (cgLoad) {
+      when (true.B) {
+        cgStateReg := cgCal
+      }
+    }
+    is (cgCal) {
+      when (true.B) {
+        cgStateReg := cgLoad
+      } .elsewhen (true.B) {
+        cgStateReg := cgRead
+      } .otherwise {
+        cgStateReg := cgCal
+      }
+    }
+    is (cgRead) {
+      when (true.B) {
+        cgStateReg := cgIdle
+      }
+    }
+  }
+  // logic
+  configIncWireSeq.head := true.B //FIXME
+  for (i <- 1 until 6) {
+    configIncWireSeq(i) := configWarpWireSeq(i - 1)
+  }
+}
+
+class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig {
+  val pSumSRAMStrIdx: UInt = Output(UInt(log2Ceil(pSumSRAMSize).W))
+  val configF2Inc: Bool = Output(Bool())
 }

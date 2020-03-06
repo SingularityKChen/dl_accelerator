@@ -400,7 +400,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "basically write and read data in InAct SPad" in {
-    test(new SPadDataModule( 16, 12, false)) { dataSPad =>
+    test(new SPadDataModule( PadSize = weightDataSPadSize, DataWidth = weightDataWidth, false)) { dataSPad =>
       val theDataPath = dataSPad.io.dataPath
       val theCtrlPath = dataSPad.io.ctrlPath
       val theDataIO = theDataPath.writeInData.data

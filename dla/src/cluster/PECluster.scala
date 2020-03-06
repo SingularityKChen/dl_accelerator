@@ -33,11 +33,11 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
   //                   false, then from southern PEArray
   private val muxInPSumSelWire = Wire(Vec(peColNum , Bool()))
   muxInPSumSelWire.suggestName("muxInPSumSelWire")
-  private val configRegs = VecInit(Seq.fill(6){RegInit(0.U)}) // to store GNMFCS
-  configRegs.suggestName("configRegs")
-  configRegs <> io.ctrlPath.configIOs
-  private val f2Inc = Wire(Bool())
-  f2Inc := configRegs(3) =/= io.ctrlPath.configIOs(3) // if neq, then f2 increases
+  //private val configRegs = VecInit(Seq.fill(6){RegInit(0.U)}) // to store GNMFCS
+  //configRegs.suggestName("configRegs")
+  //configRegs <> io.ctrlPath.configIOs
+  private val f2IncWire = Wire(Bool())
+  f2IncWire := io.ctrlPath.configF2Inc
   private val thePELoadWires = Seq.fill(peRowNum, peColNum){Wire(Bool())}
   thePELoadWires.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"thePELoadWires($i)($j)")})
@@ -144,7 +144,7 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
       }
     }
   }
-  threeState(inActStateReg, changeWire0 = f2Inc, changeWire1 = f2Inc, changeWire2 = f2Inc)
+  threeState(inActStateReg, changeWire0 = f2IncWire, changeWire1 = f2IncWire, changeWire2 = f2IncWire)
   require(peColNum == 4 && peRowNum == 3, "you need to change the following dataPath connections for non default value")
   private val inActWriteDoneRegVec = Seq.fill(2, peRowNum, peColNum){RegInit(false.B)}
   inActWriteDoneRegVec.zipWithIndex.foreach({ case (seq, i) => seq.zipWithIndex.foreach({ case (bools, j) =>

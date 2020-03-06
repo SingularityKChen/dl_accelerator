@@ -85,6 +85,7 @@ class ProcessingElementPadIO extends Bundle {
 class PEPadWriteFinIO extends Bundle {
   val inActWriteFin = new CSCWriteFinIO
   val weightWriteFin = new CSCWriteFinIO
+  val pSumWriteFin: Bool = Output(Bool())
 }
 
 class StreamBitsIO(private val dataWidth: Int) extends Bundle {

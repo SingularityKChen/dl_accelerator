@@ -25,9 +25,9 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   theSRAMsAllDoneWire.suggestName("theSRAMsAllDoneWire")
   private val theSRAMsDoingWire = Wire(Vec(2, Bool()))
   theSRAMsDoingWire.suggestName("theSRAMsDoingWire")
-  private val pSumSRAMStrIdx = Wire(Vec(pSumSRAMNum, UInt(log2Ceil(pSumSRAMSize).W)))
-  private val configRegVec = VecInit(Seq.fill(io.ctrlPath.configIOs.length){RegInit(0.U)}) // 0g, 1n, 2m, 3f, 4c, 5s
-  configRegVec <> io.ctrlPath.configIOs
+  //private val pSumSRAMStrIdx = Wire(Vec(pSumSRAMNum, UInt(log2Ceil(pSumSRAMSize).W)))
+  //private val configRegVec = VecInit(Seq.fill(io.ctrlPath.configIOs.length){RegInit(0.U)}) // 0g, 1n, 2m, 3f, 4c, 5s
+  //configRegVec <> io.ctrlPath.configIOs
   private def OneSRAMState(stateReg: UInt, enable: Bool, done: Bool): Unit = {
     switch (stateReg) {
       is (oneSRAMIdle) {
@@ -76,7 +76,9 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
   pSRAMs.zipWithIndex.foreach({ case (pSumIO, idx) =>
     pSumIO.dataPath <> io.dataPath.pSumIO(idx)
-    pSumIO.ctrlPath.startIdx := pSumSRAMStrIdx(idx) // start index
+    //pSumIO.ctrlPath.startIdx := pSumSRAMStrIdx(idx) // start index
+    pSumIO.ctrlPath.startIdx := io.ctrlPath.pSumSRAMStrIdx // start index
+    // FIXME: check the start index of partial sum
   })
   // connections of debugIO
   if (debug) {
@@ -88,9 +90,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   } else {
     io.debugIO <> DontCare
   }
-  pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N2.U*M2.U*F2.U + configRegVec(1)*M2.U*F2.U + configRegVec(2)*F2.U + configRegVec(3))
-  // FIXME: check the start index of partial sum
-  // TODO: check whether only need the final results rather than all config data
+  //pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N2.U*M2.U*F2.U + configRegVec(1)*M2.U*F2.U + configRegVec(2)*F2.U + configRegVec(3))
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
@@ -395,10 +395,11 @@ class WeightGLBIO extends Bundle with ClusterSRAMConfig {
   val dataPath = new CSCStreamInOutIO(weightAdrWidth, weightDataWidth)
 }
 
-class GLBClusterCtrlIO extends Bundle with GNMFCS1Config {
-  val inActIO = new SRAMCommonCtrlIO with BusySignal
-  val pSumIO =  new SRAMCommonCtrlIO with BusySignal
-  val configIOs: Vec[UInt] = Input(Vec(6, UInt(3.W))) // that's GNMFCS
+class GLBClusterCtrlIO extends Bundle with GNMFCS1Config with ClusterSRAMConfig {
+  val inActIO = new SRAMCommonCtrlIO with HasBusySignal
+  val pSumIO =  new SRAMCommonCtrlIO with HasBusySignal
+  //val configIOs: Vec[UInt] = Input(Vec(6, UInt(3.W))) // that's GNMFCS
+  val pSumSRAMStrIdx: UInt = Input(UInt(log2Ceil(pSumSRAMSize).W))
 }
 
 class GLBClusterDataIO extends Bundle with ClusterSRAMConfig {

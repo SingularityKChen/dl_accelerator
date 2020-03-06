@@ -13,7 +13,7 @@ import scala.math.{min, pow}
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  private val printLogDetails = true // true to print more detailed logs
+  private val printLogDetails = false // true to print more detailed logs
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
   private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
   private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
@@ -457,7 +457,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       val theClock = theGLB.clock
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
-      val gnmfcs1IOs = theTopIO.ctrlPath.configIOs
+      //val gnmfcs1IOs = theTopIO.ctrlPath.configIOs
       val theInActAdrStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)}
       val theInActDataStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)}
       val thePSumDataStreams = Seq.fill(pSumSRAMNum){PSumDataGen(pSumSRAMSize, psDataWidth)}
@@ -494,7 +494,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         thePSumCtrl.doEn.poke(true.B)
         thePSumCtrl.writeOrRead.poke(true.B)
-        gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
+        theTopIO.ctrlPath.pSumSRAMStrIdx.poke(pSumStartIdx.U)
+        //gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
         println("--------------- Enable PSum Now ---------------")
         theClock.step(2) // top from idle to doing, sub from idle to doing;
         theTopIO.debugIO.theState(1).expect(1.U, s"the PSumTopState should be oneSRAMDoing now")
@@ -585,7 +586,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         theTopIO.debugIO.pSumDebugIO.foreach( _.idx.expect(0.U, "when pSum begins to read, the index should be zero"))
         theClock.step()
-        gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
+        theTopIO.ctrlPath.pSumSRAMStrIdx.poke(pSumStartIdx.U)
+        //gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
         topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams, startIndexes = Seq.fill(pSumSRAMNum){pSumStartIdx}, theClock = theClock)
         theClock.step()
         theTopIO.debugIO.theState(1).expect(0.U, "after all read, the PSumState should be idle now")

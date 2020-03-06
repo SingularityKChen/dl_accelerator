@@ -85,7 +85,7 @@ class RouterClusterCtrlIO extends Bundle { // output only
 
 class PEClusterIO extends Bundle with ClusterConfig {
   val dataPath = new PEClusterDataIO
-  val ctrlPath: PEClusterCtrlIO = Flipped(new PEClusterCtrlIO) // input
+  val ctrlPath: PEClusterCtrlIO = new PEClusterCtrlIO
 }
 
 class PEClusterDataIO extends Bundle with ClusterConfig {
@@ -96,15 +96,19 @@ class PEClusterDataIO extends Bundle with ClusterConfig {
   val pSumDataFromSouthernIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(DecoupledIO(UInt(psDataWidth.W)))) // input only
 }
 
-class PEClusterCtrlIO extends Bundle { // output only
+class PEClusterCtrlIO extends Bundle {
   // inActCtrlSel.inDataSel: true for broad-cast, false for others
   // inActCtrlSel.outDataSel: the value indicates the index of router
-  val inActCtrlSel = new CommonClusterCtrlBoolUIntIO
+  val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
   // val weightCtrlSel = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()) // do not need this
   // pSumCtrlSel.inDataSel: true, then receive data from PSumRouter, false then receive data from its southern PE Array
   // pSumCtrlSel.outDataSel: unused
-  val pSumCtrlSel = new CommonClusterCtrlTwoBoolIO
-  val doEn: Bool = Output(Bool())
+  val pSumCtrlSel: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
+  val doEn: Bool = Input(Bool())
+  val configF2Inc: Bool = Input(Bool())
+}
+
+trait HasConfigIOs extends Bundle {
   val configIOs: Vec[UInt] = Output(Vec(6, UInt(3.W))) // that's GNMFCS
 }
 
@@ -123,6 +127,6 @@ class CommonClusterCtrlTwoBoolIO extends Bundle {
   val outDataSel: Bool = Output(Bool())
 }
 
-trait BusySignal extends Bundle {
+trait HasBusySignal extends Bundle {
   val busy: Bool = Output(Bool())
 }
