@@ -6,13 +6,39 @@ And it will extend some custom RISC-V instructions in the near future.
 
 ## Run
 
-After clone it, you can use `mill` in idea after this command:
+### Clone the Project
+
+```bash
+git https://github.com/SingularityKChen/dl_accelerator.git --recurse-submodules
+```
+
+### Install Mill
+
+You can install `mill` manual or [other methods](http://www.lihaoyi.com/mill/)
+
+```bash
+sudo su
+curl -L https://github.com/lihaoyi/mill/releases/download/0.6.1/0.6.1 > /usr/local/bin/mill
+chmod +x /usr/local/bin/mill
+```
+
+### Generate an IntelliJ Project Config
+
+After clone it with `--recurse-submodules`, you can use `mill` in idea after this command:
 
 ```bash
 mill mill.scalalib.GenIdea/idea
 ```
 
-Or you can find `build.sbt` in history versions or other branches.
+If you meet any similar error as bellow shows, you can check the `mill` version, and then [install the newest version of `mill`](#Install Mill).
+
+![mill gen idea config errors](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200306100848%20mill%20idea%20error.jpg)
+
+If your mill can not find some `build.sc` files under `firrtl`, `chisel3`, etc., then you need to clone the submodules as well.
+
+### An Alternative Option: `Sbt`
+
+You can use `sbt` with `build.sbt` in history versions or other branches.
 
 ## TODO
 
