@@ -85,7 +85,7 @@ class RouterClusterCtrlIO extends Bundle { // output only
 
 class PEClusterIO extends Bundle with ClusterConfig {
   val dataPath = new PEClusterDataIO
-  val ctrlPath: PEClusterCtrlIO = new PEClusterCtrlIO
+  val ctrlPath = new PEClusterCtrlIO
 }
 
 class PEClusterDataIO extends Bundle with ClusterConfig {
@@ -100,11 +100,11 @@ class PEClusterCtrlIO extends Bundle {
   // inActCtrlSel.inDataSel: true for broad-cast, false for others
   // inActCtrlSel.outDataSel: the value indicates the index of router
   val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
-  // val weightCtrlSel = new CommonClusterCtrlIO[Bool, Bool](Bool(), Bool()) // do not need this
   // pSumCtrlSel.inDataSel: true, then receive data from PSumRouter, false then receive data from its southern PE Array
   // pSumCtrlSel.outDataSel: unused
   val pSumCtrlSel: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
-  val doEn: Bool = Input(Bool())
+  val doEn: Bool = Input(Bool()) // load inAct and weight
+  val pSumLoadEn: Bool = Input(Bool()) // load accumulate pSum
   val configF2Inc: Bool = Input(Bool())
 }
 
@@ -118,7 +118,7 @@ class CommonClusterCtrlTwoUIntIO extends Bundle {
 }
 
 class CommonClusterCtrlBoolUIntIO extends Bundle {
-  val inDataSel: UInt = Output(Bool())
+  val inDataSel: Bool = Output(Bool())
   val outDataSel: UInt = Output(UInt(2.W))
 }
 

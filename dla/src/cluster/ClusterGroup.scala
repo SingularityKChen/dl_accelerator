@@ -23,7 +23,7 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl
   peCluster.ctrlPath.pSumCtrlSel.inDataSel := DontCare // FIXME: select from outside or router
   // we can disable the outDataSel, as output of pSum is connected directly to router and outside
-  peCluster.ctrlPath.pSumCtrlSel.outDataSel := DontCare
+  peCluster.ctrlPath.pSumCtrlSel.outDataSel := DontCare // unused
   // connections of data path
   // input activations
   for (i <- 0 until inActRouterNum) {

@@ -214,6 +214,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // pSumSPad
   private val productReg: UInt = RegInit(0.U(psDataWidth.W))
   private val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
+  private val pSumSPadLoadWire: UInt = Wire(UInt(psDataWidth.W))
   // State Machine
   // padIdle: the pad is idle, and if received valid signal from control, then read and send data to mac
   // padInActAdr: read the input activation address
@@ -284,47 +285,39 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPad.ctrlPath.indexInc := weightDataSPadIdxIncWire
   weightDataSPad.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
-  private val pSumResultWire = Mux(padEqWB, pSumSPadLoadReg + productReg, 0.U)
+  val pSumAddResultWire: UInt = Mux(io.padCtrl.fromTopIO.pSumEnqEn, pSumSPadLoadWire, pSumSPadLoadReg) +
+    Mux(io.padCtrl.fromTopIO.pSumEnqEn, io.dataStream.ipsIO.bits, productReg) // to save adder
+  private val pSumResultWire = Mux(padEqWB, pSumAddResultWire, 0.U)
   private val pSumPadReadIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   pSumPadReadIdxReg.suggestName("pSumPadReadIdxReg")
-  private val pSumPadReadIdxInc = Wire(Bool())
+  private val pSumPadReadIdxIncWire = Wire(Bool())
+  pSumPadReadIdxIncWire.suggestName("pSumPadReadIdxIncWire")
   private val pSumPadReadWrap = Wire(Bool())
-  private val pSumPadWriteIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
-  private val pSumPadWriteIdxInc = Wire(Bool())
-  pSumPadWriteIdxInc.suggestName("pSumPadWriteIdxInc")
-  private val pSumPadWriteWrap = Wire(Bool())
-  private val pSumPadWriteIdxWire = Mux(pSumPadWriteIdxInc, pSumPadWriteIdxReg, psDataSPadIdxWire)
-  pSumPadWriteIdxWire.suggestName("pSumPadWriteIdxWire")
   // top connections
-  io.padWF.pSumWriteFin := pSumPadWriteWrap
-  pSumPadWriteIdxInc := io.padCtrl.fromTopIO.pSumEnqEn && io.dataStream.ipsIO.valid
-  pSumSPad.dataPath.ipsIO.bits := Mux(pSumPadWriteIdxInc, io.dataStream.ipsIO.bits, pSumResultWire)
-  io.dataStream.ipsIO.ready := pSumSPad.dataPath.ipsIO.ready
-  pSumPadReadIdxInc := io.dataStream.opsIO.ready
-  io.dataStream.opsIO.bits := pSumSPad.dataPath.opsIO.bits
-  io.dataStream.opsIO.valid := Mux(io.dataStream.opsIO.ready, pSumSPad.dataPath.opsIO.valid, false.B)
+  io.padWF.pSumWriteFin := pSumPadReadWrap
+  //io.padCtrl.fromTopIO.pSumEnqEn
+  pSumSPad.dataPath.ipsIO.bits := pSumResultWire // only calculate need write back
+  io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready
+  pSumPadReadIdxIncWire := io.dataStream.opsIO.ready
+  io.dataStream.opsIO.bits := pSumAddResultWire
+  io.dataStream.opsIO.valid := pSumSPad.dataPath.opsIO.valid && io.dataStream.ipsIO.valid
   // once ask for Enq, then pSum is write in data, then another pe's ops.ready === true.B,
   // then another pe read out data with true valid signal, then pSumPadWriteIdxInc === true.B
-  pSumSPad.dataPath.ipsIO.valid := io.padCtrl.fromTopIO.pSumEnqEn || padEqWB
-  pSumSPadLoadReg := pSumSPad.dataPath.opsIO.bits
-  pSumSPad.dataPath.opsIO.ready := padEqMpy || pSumPadReadIdxInc
+  pSumSPad.dataPath.ipsIO.valid := padEqWB
+  pSumSPadLoadWire := pSumSPad.dataPath.opsIO.bits
+  pSumSPadLoadReg := pSumSPadLoadWire
+
+  pSumSPad.dataPath.opsIO.ready := padEqMpy || io.dataStream.ipsIO.valid // when ips valid, then need read out PSum
   pSumSPad.ctrlPath.readIdx := pSumPadReadIdxReg
-  pSumSPad.ctrlPath.writeIdx := pSumPadWriteIdxWire
+  pSumSPad.ctrlPath.writeIdx := psDataSPadIdxWire // only calculate need write back
   when (pSumPadReadWrap) {
     pSumPadReadIdxReg := 0.U
   }
-  when (pSumPadReadIdxInc) {
+  when (pSumPadReadIdxIncWire) {
     pSumPadReadIdxReg := pSumPadReadIdxReg + 1.U
-  }
-  when (pSumPadWriteWrap) {
-    pSumPadWriteIdxReg := 0.U
-  }
-  when (pSumPadWriteIdxInc) {
-    pSumPadWriteIdxReg := pSumPadWriteIdxReg + 1.U
   }
 
   pSumPadReadWrap := (padEqID && mightInActReadFinish) || (padEqWB && mightInActReadFinish)
-  pSumPadWriteWrap := pSumPadWriteIdxReg === (M0*E*N0*F0 - 1).U && pSumPadWriteIdxInc
   // SPadToCtrl
   mightInActZeroColumnWire := inActAdrDataWire === inActZeroColumnCode.U
   mightWeightZeroColumnWire := weightAdrDataWire === weightZeroColumnCode.U

@@ -11,7 +11,8 @@ import org.scalatest._
 import scala.util.Random
 import scala.math.{min, pow}
 
-class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
+class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
+  with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
   private val printLogDetails = false // true to print more detailed logs
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
@@ -151,7 +152,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       }
     }
     // read begin
-    thePSumDebugIOs.zip(startIndexes).foreach({ case (strIO, str) => strIO.idx.expect(str.U, "the start index should be start index")})
+    thePSumDebugIOs.zip(startIndexes).foreach({ case (strIO, str) =>
+      strIO.idx.expect(str.U, "the start index should be start index")
+    })
     theCtrlIO.doEn.poke(true.B)
     theCtrlIO.writeOrRead.poke(false.B)
     theClock.step() // the topPSum from idle to oneSRAMDoing
@@ -175,7 +178,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         dataRdIdx = dataRdIdx + 1
       }
       println("------------ data read one stream -------------")
-      theDebugIO.dataDebug.subDone.expect(true.B, s"current data equals to ${dataStream(dataRdIdx - 1)}, data should finish now")
+      theDebugIO.dataDebug.subDone.expect(true.B, s"current data equals to " +
+        s"${dataStream(dataRdIdx - 1)}, data should finish now")
       theOutIO.dataIOs.data.ready.poke(false.B)
     } .fork {
       while (!theDebugIO.adrDebug.subDone.peek().litToBoolean) {
@@ -255,7 +259,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       theCtrlIO.doEn.poke(false.B)
       theClock.step(cycles = (new Random).nextInt(50) + 50)
       theTopIO.debugIO.theState(0).expect(0.U, "the topInActState should be idle when done one stream")
-      theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(false.B,"after several cycles, every Vec Reg should be false as initial state"))
+      theTopIO.debugIO.oneInActSRAMDone.foreach(_.expect(false.B,"after several cycles, " +
+        "every Vec Reg should be false as initial state"))
       if (printLogDetails) println(s"-------- topInActState  = ${theTopIO.debugIO.theState(0).peek()} ")
       inActStateBeZero(theTopIO)
     }
@@ -466,7 +471,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
       require(pSumStartIdx + oneSPadPSum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
       def forkWriteInPSumHelper(index: Int, startIndex: Int): Unit = {
         writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),
-          doneIO = theTopIO.debugIO.onePSumSRAMDone(index), theData = thePSumDataStreams(index), startIndex = startIndex, theClock = theClock)
+          doneIO = theTopIO.debugIO.onePSumSRAMDone(index), theData = thePSumDataStreams(index),
+          startIndex = startIndex, theClock = theClock)
         println(s"-------- $index PSum finish")
         timescope{
           theClock.step()
@@ -588,7 +594,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
         theClock.step()
         theTopIO.ctrlPath.pSumSRAMStrIdx.poke(pSumStartIdx.U)
         //gnmfcs1IOs.zip(gnmfcs1Stream).foreach({ case (io, cfg) => io.poke(cfg.U)})
-        topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams, startIndexes = Seq.fill(pSumSRAMNum){pSumStartIdx}, theClock = theClock)
+        topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams,
+          startIndexes = Seq.fill(pSumSRAMNum){pSumStartIdx}, theClock = theClock)
         theClock.step()
         theTopIO.debugIO.theState(1).expect(0.U, "after all read, the PSumState should be idle now")
         println("------------ all pSum read finish --------------")
@@ -611,10 +618,27 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     test (new PECluster(true)) { thePECluster =>
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
-      //val
+      val pSumDataIO = theTopIO.dataPath.pSumIO
+      def forkPSumHelper(idx: Int): Unit = {
+        theClock.step((new Random).nextInt(10) + 1)
+        pSumDataIO.inIOs(idx).enqueueSeq(Seq(0.U)) // TODO
+        println(s"-------- $idx-th Column PEs receive all inPSum")
+      }
+      println("----------------- test begin -----------------")
+      println("------------ PE Cluster Top Spec -------------")
+      println("----------- test basic functions -------------")
       thePECluster.reset.poke(true.B)
       theClock.step()
       thePECluster.reset.poke(false.B)
+      theClock.step()
+      theTopIO.ctrlPath.pSumCtrlSel.inDataSel.poke(true.B) // receive data from PSum Router
+      theTopIO.ctrlPath.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
+      theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
+      // after finish
+      theTopIO.ctrlPath.pSumLoadEn.poke(true.B) // begin to accumulate PSum
+      (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {
+        case (left, right) => left.fork(forkPSumHelper(idx = right))
+      }.join()
     }
   }
   behavior of "test the spec of Router Cluster"
@@ -622,8 +646,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers 
     test (new RouterCluster(true)) { theRCluster =>
       val theTop = theRCluster.io
       val theClock = theRCluster.clock
-      theTop.dataPath.routerData.iRIO.head.inIOs.foreach(x => require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Input))
-      theTop.dataPath.routerData.iRIO.head.outIOs.foreach(x => require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Output))
+      theTop.dataPath.routerData.iRIO.head.inIOs.foreach(x =>
+        require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Input))
+      theTop.dataPath.routerData.iRIO.head.outIOs.foreach(x =>
+        require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Output))
       theRCluster.reset.poke(true.B)
       theClock.step()
       theRCluster.reset.poke(false.B)

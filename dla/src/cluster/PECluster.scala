@@ -20,21 +20,15 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   private val peClusterInAct = Module(new PEClusterInAct).io
   peClusterInAct.suggestName("peClusterInAct")
   // connections of peClusterInAct
-  peClusterInAct.topToInAct.inActCtrlSel <> io.ctrlPath.inActCtrlSel
+  peClusterInAct.inActCtrlSel <> io.ctrlPath.inActCtrlSel
   peClusterInAct.inActWriteFinVec.zip(peArray).foreach({ case (os, peCol) =>
     os.zip(peCol).foreach({ case (o, onePE) =>
       o := onePE.padWF.inActWriteFin
     })})
   peClusterInAct.inActToArrayData.inActIO <> io.dataPath.inActIO
   // connections of peClusterPSum
-  private val peClusterPSumCtrl = Module(new PEClusterPSumController).io
-  peClusterPSumCtrl.suggestName("peClusterPSumCtrl")
-  peClusterPSumCtrl.doEn := io.ctrlPath.doEn
   private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
-  private val muxInPSumSelWire = Seq.fill(peColNum){Wire(Bool())}
-  muxInPSumSelWire.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"muxInPSumSelWire$i")})
-  muxInPSumSelWire.foreach(x => x := io.ctrlPath.pSumCtrlSel.inDataSel) // TODO: check
   for (j <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
     io.dataPath.pSumIO.outIOs(j) <> peArray.head(j).dataStream.opsIO
@@ -42,7 +36,8 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
     peArray(1)(j).dataStream.ipsIO <> peArray.last(j).dataStream.opsIO
     // connect input partial sum from top IO to the PE at the tail of each column with the signal after Mux
     peArray.last(j).dataStream.ipsIO <> muxInPSumDataWire(j)
-    when (muxInPSumSelWire(j)) {
+    // select ips of the tail of each column, true from router, false from southern PEArray
+    when (io.ctrlPath.pSumCtrlSel.inDataSel) {
       muxInPSumDataWire(j) <> io.dataPath.pSumIO.inIOs(j) // from router
       io.dataPath.pSumDataFromSouthernIO(j).ready := false.B
     } .otherwise {
@@ -56,49 +51,9 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       peArray(i)(j).dataStream.inActIOs <> peClusterInAct.inActToArrayData.muxInActData(i)(j)
       peArray(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
       // pSumControl
-      peArray(i)(j).topCtrl.pSumEnqEn := peClusterPSumCtrl.pSumEnqEn(i)(j)
-      peClusterPSumCtrl.pSumWF(i)(j) := peArray(i)(j).padWF.pSumWriteFin
+      peArray(i)(j).topCtrl.pSumEnqEn := io.ctrlPath.doEn // FIXME: should be assigned to pSumLoadEn
     }
   }
-}
-
-class PEClusterPSumController extends Module with ClusterConfig {
-  val io: PEClusterPSumCtrlIO = IO(new PEClusterPSumCtrlIO)
-  // the machine state of each PSum's column
-  // pSumZero, one, two enable each row's Enq signal,
-  // i.e., when pSumZero, then current column, row zero pSumEnqEn assign to true.B, and row one's opsIO.ready === true.B
-  // Note: we assume when doLoadEn, the PSum from the head of each column has been read. TODO: check
-  require(peRowNum == 3, "peRowNum should be 3 or you need change the state machine")
-  private val pSumIdle :: pSumZero :: pSumOne :: pSumTwo :: Nil = Enum(4)
-  private val pSumColStateRegs = Seq.fill(peColNum){RegInit(pSumIdle)}
-  pSumColStateRegs.zipWithIndex.foreach({ case (pSumStateReg, colIdx) =>
-    pSumStateReg.suggestName(s"pSumCol${colIdx}StateReg")
-    io.pSumEnqEn(0)(colIdx) := pSumStateReg === pSumZero
-    io.pSumEnqEn(1)(colIdx) := pSumStateReg === pSumOne
-    io.pSumEnqEn(2)(colIdx) := pSumStateReg === pSumTwo
-    switch (pSumStateReg) {
-      is (pSumIdle) {
-        when (io.doEn) {
-          pSumStateReg := pSumZero
-        }
-      }
-      is (pSumZero) {
-        when (io.pSumWF(0)(colIdx)) {
-          pSumStateReg := pSumOne
-        }
-      }
-      is (pSumOne) {
-        when (io.pSumWF(1)(colIdx)) {
-          pSumStateReg := pSumTwo
-        }
-      }
-      is (pSumTwo) {
-        when (io.pSumWF(2)(colIdx)) {
-          pSumStateReg := pSumIdle
-        }
-      }
-    }
-  })
 }
 
 class PEClusterInAct extends Module with ClusterConfig {
@@ -106,8 +61,6 @@ class PEClusterInAct extends Module with ClusterConfig {
   private val dataPart = Module(new PEClusterInActDataConnections).io
   private val ctrlPart = Module(new PEClusterInActController).io// connections of enWires
   io.inActWriteFinVec <> ctrlPart.inActWriteFinVec
-  ctrlPart.topToInAct <> io.topToInAct
-  dataPart.inActToArrayData.inActIO <> io.inActToArrayData.inActIO
   for (i <- 0 until peRowNum) {
     for (j <- 0 until peColNum) {
       val theTopMux = io.inActToArrayData.muxInActData(i)(j)
@@ -119,6 +72,40 @@ class PEClusterInAct extends Module with ClusterConfig {
       theSubMux.adrIOs.data.ready := theTopMux.adrIOs.data.ready
       theSubMux.dataIOs.data.ready := theTopMux.dataIOs.data.ready
     }
+  }
+  // inActRoutingMode: whether the input activations should be broad-cast;
+  // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
+  private val inActRoutingMode = Wire(Bool())
+  inActRoutingMode.suggestName("inActRoutingMode")
+  private val inActBroadCastIdxWire = Wire(UInt(2.W))
+  inActBroadCastIdxWire.suggestName("inActBroadCastIdxWire")
+  inActRoutingMode := io.inActCtrlSel.inDataSel // true for broad-cast
+  inActBroadCastIdxWire := io.inActCtrlSel.outDataSel
+  when (inActRoutingMode) {
+    dataPart.inActToArrayData.inActIO.foreach({x =>
+      x.adrIOs.data.bits := MuxLookup(io.inActCtrlSel.outDataSel, 0.U, io.inActToArrayData.inActIO.zipWithIndex.map({
+        case (o, i) => i.asUInt -> o.adrIOs.data.bits}))
+      x.adrIOs.data.valid := MuxLookup(io.inActCtrlSel.outDataSel, false.B, io.inActToArrayData.inActIO.zipWithIndex.map({
+        case (o, i) => i.asUInt -> o.adrIOs.data.valid}))
+      x.dataIOs.data.bits := MuxLookup(io.inActCtrlSel.outDataSel, 0.U, io.inActToArrayData.inActIO.zipWithIndex.map({
+        case (o, i) => i.asUInt -> o.dataIOs.data.bits}))
+      x.dataIOs.data.valid := MuxLookup(io.inActCtrlSel.outDataSel, false.B, io.inActToArrayData.inActIO.zipWithIndex.map({
+        case (o, i) => i.asUInt -> o.dataIOs.data.valid}))
+    })
+    io.inActToArrayData.inActIO.zipWithIndex.foreach({case (x, idx1) =>
+      x.adrIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B, Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
+        if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.adrIOs.data.ready).reduce(_ && _)
+        else idx.asUInt -> false.B
+      }))
+    })
+    io.inActToArrayData.inActIO.zipWithIndex.foreach({case (x, idx1) =>
+      x.dataIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B, Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
+        if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.dataIOs.data.ready).reduce(_ && _)
+        else idx.asUInt -> false.B
+      }))
+    })
+  } .otherwise {
+    dataPart.inActToArrayData.inActIO <> io.inActToArrayData.inActIO
   }
 }
 
@@ -174,14 +161,7 @@ class PEClusterInActDataConnections extends HasConnectAllExpRdModule with Cluste
 
 class PEClusterInActController extends Module with ClusterConfig {
   val io: PEClusterInActCtrlIO = IO(new PEClusterInActCtrlIO)// state machine of inAct in the PE Cluster
-  // inActRoutingMode: whether the input activations should be broad-cast;
-  // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
-  private val inActRoutingMode = Wire(Bool()) // FIXME: unused
-  inActRoutingMode.suggestName("inActRoutingMode")
-  private val inActBroadCastIdxWire = Wire(UInt(2.W))  // FIXME: unused
-  inActBroadCastIdxWire.suggestName("inActBroadCastIdxWire")
-  inActRoutingMode := io.topToInAct.inActCtrlSel.inDataSel // true for broad-cast
-  inActBroadCastIdxWire := io.topToInAct.inActCtrlSel.outDataSel
+
   // inActWriteEnWires: inAct address and data writeEn wires, used to `and` with valid data
   private val inActWriteEnWires = Seq.fill(peRowNum, peColNum){Wire(Bool())}
   inActWriteEnWires.zipWithIndex.foreach({ case (bools, i) =>
@@ -267,10 +247,6 @@ class PEClusterInActController extends Module with ClusterConfig {
   }
 }
 
-class PEClusterTopToInActCtrlIO extends Bundle {
-  val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
-}
-
 class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
   // output bits and valid
   val muxInActData: Vec[Vec[CSCStreamIO]] = Vec(peRowNum, Vec(peColNum, new CSCStreamIO(inActAdrWidth, inActDataWidth)))
@@ -278,7 +254,7 @@ class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
 }
 
 class PEClusterInActIO extends Bundle with ClusterConfig {
-  val topToInAct = new PEClusterTopToInActCtrlIO
+  val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
   val inActToArrayData = new PEClusterInActToArrayDataIO
 }
@@ -288,14 +264,6 @@ class PEClusterInActDataIO extends Bundle with ClusterConfig {
 }
 
 class PEClusterInActCtrlIO extends Bundle with ClusterConfig {
-  val topToInAct = new PEClusterTopToInActCtrlIO
   val writeEn: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Output(Bool())))
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
-}
-
-class PEClusterPSumCtrlIO extends Bundle with ClusterConfig {
-  val pSumEnqEn: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Output(Bool())))
-  val doEn: Bool = Input(Bool()) // doEn signal from top
-  // pSumWF: receive write finish signals from each PE
-  val pSumWF: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Input(Bool())))
 }
