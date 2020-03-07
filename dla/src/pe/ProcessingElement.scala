@@ -303,7 +303,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   pSumPadReadIdxInc := io.dataStream.opsIO.ready
   io.dataStream.opsIO.bits := pSumSPad.dataPath.opsIO.bits
   io.dataStream.opsIO.valid := Mux(io.dataStream.opsIO.ready, pSumSPad.dataPath.opsIO.valid, false.B)
-  // once ask for Enq, then pSum is read out data, then another pe's ops.ready === true.B,
+  // once ask for Enq, then pSum is write in data, then another pe's ops.ready === true.B,
   // then another pe read out data with true valid signal, then pSumPadWriteIdxInc === true.B
   pSumSPad.dataPath.ipsIO.valid := io.padCtrl.fromTopIO.pSumEnqEn || padEqWB
   pSumSPadLoadReg := pSumSPad.dataPath.opsIO.bits

@@ -27,6 +27,10 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
       o := onePE.padWF.inActWriteFin
     })})
   peClusterInAct.inActToArrayData.inActIO <> io.dataPath.inActIO
+  // connections of peClusterPSum
+  private val peClusterPSumCtrl = Module(new PEClusterPSumController).io
+  peClusterPSumCtrl.suggestName("peClusterPSumCtrl")
+  peClusterPSumCtrl.doEn := io.ctrlPath.doEn
   private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
   private val muxInPSumSelWire = Seq.fill(peColNum){Wire(Bool())}
@@ -56,12 +60,50 @@ class PECluster(debug: Boolean) extends Module with ClusterConfig {
       inActWeightConnection(peArray(i)(j).dataStream.weightIOs, io.dataPath.weightIO(i))
       inActWeightConnection(peArray(i)(j).dataStream.inActIOs, peClusterInAct.inActToArrayData.muxInActData(i)(j))
       peArray(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
+      // pSumControl
+      peArray(i)(j).topCtrl.pSumEnqEn := peClusterPSumCtrl.pSumEnqEn(i)(j)
+      peClusterPSumCtrl.pSumWF(i)(j) := peArray(i)(j).padWF.pSumWriteFin
     }
   }
-  // pSumControl
-  peArray.foreach(_.foreach({ x => // FIXME
-    x.topCtrl.pSumEnqEn := false.B // from product
-  }))
+}
+
+class PEClusterPSumController extends Module with ClusterConfig {
+  val io: PEClusterPSumCtrlIO = IO(new PEClusterPSumCtrlIO)
+  // the machine state of each PSum's column
+  // pSumZero, one, two enable each row's Enq signal,
+  // i.e., when pSumZero, then current column, row zero pSumEnqEn assign to true.B, and row one's opsIO.ready === true.B
+  // Note: we assume when doLoadEn, the PSum from the head of each column has been read. TODO: check
+  require(peRowNum == 3, "peRowNum should be 3 or you need change the state machine")
+  private val pSumIdle :: pSumZero :: pSumOne :: pSumTwo :: Nil = Enum(4)
+  private val pSumColStateRegs = Seq.fill(peColNum){RegInit(pSumIdle)}
+  pSumColStateRegs.zipWithIndex.foreach({ case (pSumStateReg, colIdx) =>
+    pSumStateReg.suggestName(s"pSumCol${colIdx}StateReg")
+    io.pSumEnqEn(0)(colIdx) := pSumStateReg === pSumZero
+    io.pSumEnqEn(1)(colIdx) := pSumStateReg === pSumOne
+    io.pSumEnqEn(2)(colIdx) := pSumStateReg === pSumTwo
+    switch (pSumStateReg) {
+      is (pSumIdle) {
+        when (io.doEn) {
+          pSumStateReg := pSumZero
+        }
+      }
+      is (pSumZero) {
+        when (io.pSumWF(0)(colIdx)) {
+          pSumStateReg := pSumOne
+        }
+      }
+      is (pSumOne) {
+        when (io.pSumWF(1)(colIdx)) {
+          pSumStateReg := pSumTwo
+        }
+      }
+      is (pSumTwo) {
+        when (io.pSumWF(2)(colIdx)) {
+          pSumStateReg := pSumIdle
+        }
+      }
+    }
+  })
 }
 
 class PEClusterInAct extends Module with ClusterConfig {
@@ -446,4 +488,11 @@ class PEClusterInActCtrlIO extends Bundle with ClusterConfig {
   val writeEn: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Output(Bool())))
   val inActStateEq: Vec[Bool] = Vec(3, Output(Bool()))
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
+}
+
+class PEClusterPSumCtrlIO extends Bundle with ClusterConfig {
+  val pSumEnqEn: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Output(Bool())))
+  val doEn: Bool = Input(Bool()) // doEn signal from top
+  // pSumWF: receive write finish signals from each PE
+  val pSumWF: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Input(Bool())))
 }

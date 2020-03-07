@@ -130,34 +130,48 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
   private val cgStateReg = RegInit(cgIdle)
   switch (cgStateReg) {
     is (cgIdle) {
-      when (true.B) {
+      when (true.B) {  // when doEn ClusterGroup
         cgStateReg := cgLoad
       }
     }
     is (cgLoad) {
-      when (true.B) {
+      when (true.B) { // when all write finish
         cgStateReg := cgCal
       }
     }
     is (cgCal) {
-      when (true.B) {
-        cgStateReg := cgLoad
-      } .elsewhen (true.B) {
-        cgStateReg := cgRead
-      } .otherwise {
-        cgStateReg := cgCal
+      when (configIncWireSeq(5)) { // every time s2Inc, that means cal finish
+        when (configWarpWireSeq(4)) { // when c2Wrap, we need to read out PSum without change the values of f2, etc.
+          cgStateReg := cgRead
+        } .otherwise {// or we need to load new InAct and Weight BUT PSum
+          cgStateReg := cgLoad
+        }
       }
     }
     is (cgRead) {
-      when (true.B) {
-        cgStateReg := cgIdle
+      when (true.B) { // after read out all PSum from the head of each column
+        when (configG2Wrap) { // when g2 wrap, then finish current takes
+          cgStateReg := cgIdle
+        } .otherwise { // or , load next c2*s2
+          cgStateReg := cgLoad
+        }
       }
     }
   }
   // logic
-  configIncWireSeq.head := true.B //FIXME
-  for (i <- 1 until 6) {
-    configIncWireSeq(i) := configWarpWireSeq(i - 1)
+  private val c2WrapReg = RegInit(false.B)
+  when (configWarpWireSeq(4)) {
+    c2WrapReg := true.B
+  } .elsewhen (configIncWireSeq(3)) { // after use this value
+    c2WrapReg := false.B
+  } .otherwise {
+    c2WrapReg := c2WrapReg
+  }
+  configIncWireSeq(5) := true.B //FIXME: when cal finish
+  configIncWireSeq(4) := configWarpWireSeq(5) // s2Wrap, c2Inc
+  configIncWireSeq(3) := c2WrapReg && true.B // c2Wrap and read finish all PSum
+  for (i <- 1 until 4) {
+    configIncWireSeq(i - 1) := configWarpWireSeq(i)
   }
 }
 
