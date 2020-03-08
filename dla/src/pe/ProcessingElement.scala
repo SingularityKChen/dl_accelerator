@@ -10,10 +10,10 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   private val pePad = Module(new ProcessingElementPad(debug = debug)).io
   pePad.suggestName("pePad")
   if (fifoEn) {
-    pePad.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true)
-    pePad.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true)
-    pePad.dataStream.weightIOs.adrIOs.data <> Queue(io.dataStream.weightIOs.adrIOs.data, fifoSize, flow = true)
-    pePad.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true)
+    pePad.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
+    pePad.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
+    pePad.dataStream.weightIOs.adrIOs.data <> Queue(io.dataStream.weightIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
+    pePad.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
   } else {
     pePad.dataStream.inActIOs <> io.dataStream.inActIOs
     pePad.dataStream.weightIOs <> io.dataStream.weightIOs
@@ -21,16 +21,16 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   private val inActAndWeightWFIOs = Seq(pePad.padWF.inActWriteFin, pePad.padWF.weightWriteFin)
   val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
   inActAndWeightWFIOs.zip(inActAndWeightTopWFIOs).foreach{case (x, y) => y <> x}
-  io.padWF.pSumWriteFin := pePad.padWF.pSumWriteFin
+  io.padWF.pSumAddFin := pePad.padWF.pSumAddFin
   peCtrl.ctrlPad <> pePad.padCtrl
   io.topCtrl.pSumEnqEn <> peCtrl.ctrlTop.pSumEnqEn
   io.topCtrl.calFinish := peCtrl.ctrlTop.calFinish
   peCtrl.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
   private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
-    inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin, pePad.padWF.pSumWriteFin)
+    inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin)
   private val writeFinishWire: Bool = Wire(Bool())
   private val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(SPadWFSeq.length)(false.B)))
-  for (i <- 0 until 5) {
+  for (i <- SPadWFSeq.indices) {
     when (SPadWFSeq(i)) {
       writeFinishRegVec(i) := true.B
     }
@@ -41,8 +41,8 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   writeFinishWire := writeFinishRegVec.reduce(_ && _) // when all five Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
   peCtrl.ctrlTop.writeFinish := writeFinishWire
-  pePad.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true)
-  io.dataStream.opsIO <> Queue(pePad.dataStream.opsIO, fifoSize, flow = true)
+  pePad.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true, pipe = true)
+  io.dataStream.opsIO <> Queue(pePad.dataStream.opsIO, fifoSize, flow = true, pipe = true)
   if (debug) {
     io.debugIO.peControlDebugIO <> peCtrl.debugIO
     io.debugIO.peSPadDebugIO <> pePad.debugIO
@@ -159,7 +159,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private def readFinish(): Unit = {
     sPad := padIdle
     inActMatrixColumnReg := 0.U
-    //psPadReadIdxCounter.value := 0.U
   }
   // reg, partial sum scratch pad
   private val pSumSPad = Module(new PSumSPad(debug = debug)).io
@@ -204,7 +203,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val weightAdrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight address SPad
   private val weightDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight data SPad
   private val weightMatrixDataReg: UInt = Wire(UInt(cscDataWidth.W))
-  //val weightMatrixDataReg: UInt = RegInit(0.U(cscDataWidth.W))
   private val weightDataSPadFirstRead: Bool = RegInit(true.B)
   private val weightDataIdxMuxWire: Bool = Wire(Bool()) // false, then means need to read the first column of weight Matrix
   private val weightAdrSPadReadIdxWire: UInt = Wire(UInt(cscCountWidth.W))
@@ -294,20 +292,25 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   pSumPadReadIdxIncWire.suggestName("pSumPadReadIdxIncWire")
   private val pSumPadReadWrap = Wire(Bool())
   // top connections
-  io.padWF.pSumWriteFin := pSumPadReadWrap
-  //io.padCtrl.fromTopIO.pSumEnqEn
-  pSumSPad.dataPath.ipsIO.bits := pSumResultWire // only calculate need write back
-  io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready
-  pSumPadReadIdxIncWire := io.dataStream.opsIO.ready
+  io.padWF.pSumAddFin := pSumPadReadWrap && io.padCtrl.fromTopIO.pSumEnqEn // when need read and wrap
+  // TODO: check whether need pSumAddFin
+  io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
+  pSumPadReadIdxIncWire := pSumSPad.dataPath.opsIO.valid && io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
+  // only when need enqueue, and pSumSPad has read out data, and io.dataStream.ops has received data,
+  // then increase read index
   io.dataStream.opsIO.bits := pSumAddResultWire
-  io.dataStream.opsIO.valid := pSumSPad.dataPath.opsIO.valid && io.dataStream.ipsIO.valid
-  // once ask for Enq, then pSum is write in data, then another pe's ops.ready === true.B,
-  // then another pe read out data with true valid signal, then pSumPadWriteIdxInc === true.B
+  io.dataStream.opsIO.valid := pSumSPad.dataPath.opsIO.valid && io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn
+  // once ask for Enq, pSumSPad will wait for io.dataStream.ipsIO.valid, then read out data,
+  // and add the data read out from pSumSPad with io.dataStream.ipsIO.bit.
+  // io.dataStream.opsIO.valid will be true when those two addends valid.
+  // The read address will increase after io.dataStream.ops.ready is true, as well as io.dataStream.ips.ready.
+  // Because we have Queue, so we don't need to worry about the timing of this combination logic.
   pSumSPad.dataPath.ipsIO.valid := padEqWB
-  pSumSPadLoadWire := pSumSPad.dataPath.opsIO.bits
-  pSumSPadLoadReg := pSumSPadLoadWire
-
-  pSumSPad.dataPath.opsIO.ready := padEqMpy || io.dataStream.ipsIO.valid // when ips valid, then need read out PSum
+  pSumSPad.dataPath.ipsIO.bits := pSumResultWire // only calculate need write back
+  pSumSPadLoadWire := pSumSPad.dataPath.opsIO.bits // for emergence use
+  pSumSPadLoadReg := pSumSPadLoadWire // used in calculating
+  // when ips valid and Enabled, then need read out PSum
+  pSumSPad.dataPath.opsIO.ready := padEqMpy || (io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn)
   pSumSPad.ctrlPath.readIdx := pSumPadReadIdxReg
   pSumSPad.ctrlPath.writeIdx := psDataSPadIdxWire // only calculate need write back
   when (pSumPadReadWrap) {
@@ -317,7 +320,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     pSumPadReadIdxReg := pSumPadReadIdxReg + 1.U
   }
 
-  pSumPadReadWrap := (padEqID && mightInActReadFinish) || (padEqWB && mightInActReadFinish)
+  pSumPadReadWrap := (padEqID && mightInActReadFinish) || (padEqWB && mightInActReadFinish) ||
+    (pSumPadReadIdxIncWire && pSumPadReadIdxReg === (M0*E*N0*F0 -1 ).U) // no need to use mux
   // SPadToCtrl
   mightInActZeroColumnWire := inActAdrDataWire === inActZeroColumnCode.U
   mightWeightZeroColumnWire := weightAdrDataWire === weightZeroColumnCode.U
@@ -438,6 +442,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     io.debugIO.pSumLoad := pSumSPadLoadReg
     io.debugIO.weightAdrInIdx := weightAdrSPadReadIdxWire
     io.debugIO.sPadState := sPad
+    io.debugIO.pSumReadIdx := pSumPadReadIdxReg
   }else {
     io.debugIO <> DontCare
   }

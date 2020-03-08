@@ -13,7 +13,7 @@ class ProcessingElementIO extends Bundle {
 class PETopDebugIO extends Bundle {
   val peControlDebugIO = new PEControlDebugIO
   val peSPadDebugIO = new PESPadDebugIO
-  val writeFinishRegVec: Vec[Bool] = Vec(5, Output(Bool()))
+  val writeFinishRegVec: Vec[Bool] = Vec(4, Output(Bool()))
 }
 
 class PEControlDebugIO extends Bundle {
@@ -21,7 +21,7 @@ class PEControlDebugIO extends Bundle {
   val doMACEnDebug: Bool = Output(Bool())
 }
 
-class PESPadDebugIO extends Bundle with PESizeConfig {
+class PESPadDebugIO extends Bundle with PESizeConfig with SPadSizeConfig {
   val inActMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val inActMatrixRow: UInt = Output(UInt(cscCountWidth.W))
   val inActMatrixColumn: UInt = Output(UInt(inActAdrWidth.W))
@@ -36,6 +36,7 @@ class PESPadDebugIO extends Bundle with PESizeConfig {
   val pSumLoad: UInt = Output(UInt(psDataWidth.W))
   val weightAdrInIdx: UInt = Output(UInt(cscCountWidth.W))
   val sPadState: UInt = Output(UInt(3.W))
+  val pSumReadIdx: UInt = Output(UInt(log2Ceil(pSumDataSPadSize).W))
 }
 
 class SPadCommonModuleIO(private val dataWidth: Int, private val padSize: Int) extends Bundle {
@@ -88,7 +89,7 @@ class ProcessingElementPadIO extends Bundle {
 class PEPadWriteFinIO extends Bundle {
   val inActWriteFin = new CSCWriteFinIO
   val weightWriteFin = new CSCWriteFinIO
-  val pSumWriteFin: Bool = Output(Bool())
+  val pSumAddFin: Bool = Output(Bool())
 }
 
 class StreamBitsIO(private val dataWidth: Int) extends Bundle {
