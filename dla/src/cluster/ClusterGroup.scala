@@ -18,7 +18,12 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   require(DataMirror.directionOf(io.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel) == Direction.Input, "it should be input")
   routerCluster.ctrlPath.iRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.inActCtrlSel)
   routerCluster.ctrlPath.wRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.weightCtrlSel)
-  routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
+  //routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
+  routerCluster.ctrlPath.pSumRIO.foreach({x =>
+    x.outDataSel := Mux(clusterCtrl.configF2Inc, 0.U, 1.U)
+    x.inDataSel := Mux(clusterCtrl.configF2Inc, 1.U, 0.U)
+  }) // FIXME
+  routerCluster.pSumLoadEn := clusterCtrl.configF2Inc
   // true for broad-cast
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl
   peCluster.ctrlPath.pSumCtrlSel.inDataSel := DontCare // FIXME: select from outside or router
@@ -99,7 +104,8 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   }
   // configIO
   glbCluster.ctrlPath.pSumSRAMStrIdx := clusterCtrl.pSumSRAMStrIdx
-  peCluster.ctrlPath.configF2Inc := clusterCtrl.configF2Inc
+  clusterCtrl.allPSumAddFin := peCluster.ctrlPath.allPSumAddFin
+  peCluster.ctrlPath.pSumLoadEn := clusterCtrl.configF2Inc
   // writeOrRead
   glbCluster.ctrlPath.pSumIO.writeOrRead := DontCare // FIXME
   glbCluster.ctrlPath.inActIO.writeOrRead := DontCare
@@ -160,7 +166,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
   }
   // logic
   private val c2WrapReg = RegInit(false.B)
-  when (configWarpWireSeq(4)) {
+  when (configWarpWireSeq(4)) { // c2 warp, then f2 will increase
     c2WrapReg := true.B
   } .elsewhen (configIncWireSeq(3)) { // after use this value
     c2WrapReg := false.B
@@ -169,7 +175,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
   }
   configIncWireSeq(5) := true.B //FIXME: when cal finish
   configIncWireSeq(4) := configWarpWireSeq(5) // s2Wrap, c2Inc
-  configIncWireSeq(3) := c2WrapReg && true.B // c2Wrap and read finish all PSum
+  configIncWireSeq(3) := c2WrapReg && io.allPSumAddFin // c2Wrap and read finish all PSum
   for (i <- 1 until 4) {
     configIncWireSeq(i - 1) := configWarpWireSeq(i)
   }
@@ -178,4 +184,5 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
 class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig {
   val pSumSRAMStrIdx: UInt = Output(UInt(log2Ceil(pSumSRAMSize).W))
   val configF2Inc: Bool = Output(Bool())
+  val allPSumAddFin: Bool = Input(Bool())
 }

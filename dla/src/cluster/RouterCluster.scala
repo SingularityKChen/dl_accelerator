@@ -19,6 +19,7 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
     o.outIOs.head.suggestName(s"weightRouter${i}ToPECluster")
     o.outIOs.last.suggestName(s"weightRouter${i}ToNeighbor")
   })
+  pSRouters.foreach(_.pSumLoadEn := io.pSumLoadEn)
 }
 
 class InActRouter extends CSCRouter with ClusterConfig {
@@ -136,6 +137,7 @@ class PSumRouter extends Module with ClusterConfig {
   inSelWire.suggestName("pSumRouterInSelWire")
   private val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
   outSelWire.suggestName("pSumRouterOutSelWire")
+  private val pSumLoadEnReg = RegInit(false.B)
   private val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   internalDataWire.suggestName("pSumInternalDataWire")
   private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
@@ -162,7 +164,10 @@ class PSumRouter extends Module with ClusterConfig {
     io.dataPath.inIOs(1).ready := false.B
   }
   when (outSelEqWires.head) {
-    io.dataPath.outIOs(0) <> internalDataWire
+    // then it will need write data back
+    io.dataPath.outIOs(0).bits := internalDataWire.bits
+    io.dataPath.outIOs(0).valid := internalDataWire.valid && pSumLoadEnReg
+    internalDataWire.ready := io.dataPath.outIOs(0).ready && pSumLoadEnReg
     io.dataPath.outIOs(1) <> DontCare
     io.dataPath.outIOs(2) <> DontCare
   } .elsewhen (outSelEqWires(1)) {
@@ -177,4 +182,5 @@ class PSumRouter extends Module with ClusterConfig {
   // control path
   inSelWire := io.ctrlPath.inDataSel
   outSelWire := io.ctrlPath.outDataSel
+  pSumLoadEnReg := io.pSumLoadEn
 }

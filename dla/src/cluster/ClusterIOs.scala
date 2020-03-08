@@ -22,7 +22,7 @@ class ClusterGroupCtrlIO extends Bundle {
   val routerClusterCtrl: RouterClusterCtrlIO = new RouterClusterCtrlIO // output select signals to Router Cluster
 }
 
-class RouterClusterIO extends Bundle {
+class RouterClusterIO extends Bundle with HasPSumLoadEnIO {
   val ctrlPath: RouterCtrlIO = Flipped(new RouterCtrlIO) // input
   val dataPath = new RouterClusterDataIO
 }
@@ -41,7 +41,7 @@ class CommonRouterUIntIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int
   val ctrlPath: CommonClusterCtrlTwoUIntIO = Flipped(new CommonClusterCtrlTwoUIntIO)
 }
 
-class PSumRouterIO extends Bundle with ClusterConfig {
+class PSumRouterIO extends Bundle with ClusterConfig with HasPSumLoadEnIO {
   val dataPath = new PSumRouterDataIO(pSumPortNum, psDataWidth)
   val ctrlPath: CommonClusterCtrlTwoUIntIO = Flipped(new CommonClusterCtrlTwoUIntIO)
 }
@@ -96,7 +96,7 @@ class PEClusterDataIO extends Bundle with ClusterConfig {
   val pSumDataFromSouthernIO: Vec[DecoupledIO[UInt]] = Vec(pSumRouterNum, Flipped(DecoupledIO(UInt(psDataWidth.W)))) // input only
 }
 
-class PEClusterCtrlIO extends Bundle {
+class PEClusterCtrlIO extends Bundle with HasPSumLoadEnIO {
   // inActCtrlSel.inDataSel: true for broad-cast, false for others
   // inActCtrlSel.outDataSel: the value indicates the index of router
   val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
@@ -104,12 +104,15 @@ class PEClusterCtrlIO extends Bundle {
   // pSumCtrlSel.outDataSel: unused
   val pSumCtrlSel: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
   val doEn: Bool = Input(Bool()) // load inAct and weight
-  val pSumLoadEn: Bool = Input(Bool()) // load accumulate pSum
-  val configF2Inc: Bool = Input(Bool())
+  val allPSumAddFin: Bool = Output(Bool())
 }
 
 trait HasConfigIOs extends Bundle {
   val configIOs: Vec[UInt] = Output(Vec(6, UInt(3.W))) // that's GNMFCS
+}
+
+trait HasPSumLoadEnIO extends Bundle {
+  val pSumLoadEn: Bool = Input(Bool()) // load accumulate pSum
 }
 
 class CommonClusterCtrlTwoUIntIO extends Bundle {

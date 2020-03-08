@@ -18,6 +18,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
   private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
   private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
+  private val addendRand = Seq.fill(peColNum, oneSPadPSum){(new Random).nextInt(10)}
   private def InActDataGen(n: Int, dataWidth: Int, maxLen: Int, minLen: Int): List[Int] = {
     require(maxLen > minLen, s"maxLen should larger than minLen, $maxLen should lg $minLen")
     var resultList: List[Int] = Nil
@@ -619,9 +620,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
       val pSumDataIO = theTopIO.dataPath.pSumIO
+      pSumDataIO.inIOs.foreach(_.setSourceClock(theClock))
       def forkPSumHelper(idx: Int): Unit = {
         theClock.step((new Random).nextInt(10) + 1)
-        pSumDataIO.inIOs(idx).enqueueSeq(Seq(0.U)) // TODO
+        pSumDataIO.inIOs(idx).enqueueSeq(addendRand(idx).map(x => x.U))
         println(s"-------- $idx-th Column PEs receive all inPSum")
       }
       println("----------------- test begin -----------------")

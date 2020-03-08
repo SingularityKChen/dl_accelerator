@@ -293,7 +293,6 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val pSumPadReadWrap = Wire(Bool())
   // top connections
   io.padWF.pSumAddFin := pSumPadReadWrap && io.padCtrl.fromTopIO.pSumEnqEn // when need read and wrap
-  // TODO: check whether need pSumAddFin
   io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
   pSumPadReadIdxIncWire := pSumSPad.dataPath.opsIO.valid && io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
   // only when need enqueue, and pSumSPad has read out data, and io.dataStream.ops has received data,
