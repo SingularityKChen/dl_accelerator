@@ -133,50 +133,29 @@ class PSumRouter extends Module with ClusterConfig {
   //io.dataPath.outIOs(0): pSumRouterToPEArray
   //io.dataPath.outIOs(1): pSumRouterToGLB
   //io.dataPath.outIOs(2): pSumRouterToSouthern
-  private val inSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  private val inSelWire = Wire(Bool()) // true for GLB Cluster, false for vertical
   inSelWire.suggestName("pSumRouterInSelWire")
-  private val outSelWire: UInt = Wire(UInt(2.W)) // 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
+  private val outSelWire = Wire(Bool()) // true for PE Cluster, false for vertical
   outSelWire.suggestName("pSumRouterOutSelWire")
   private val pSumLoadEnReg = RegInit(false.B)
   private val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   internalDataWire.suggestName("pSumInternalDataWire")
-  private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
-  inSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
-    bool.suggestName(s"pSumInSelEq${i}Wire")
-    bool := inSelWire === i.asUInt
-  })
-  private val outSelEqWires = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
-  outSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
-    bool.suggestName(s"pSumOutSelEq${i}Wire")
-    bool := inSelWire === i.asUInt
-  })
-  when (inSelEqWires.head) {
-    internalDataWire <> io.dataPath.inIOs(0)
-    io.dataPath.inIOs(1).ready := false.B
-    io.dataPath.inIOs(2).ready := false.B
-  } .elsewhen (inSelEqWires(1)) {
+  // connect inData from PECluster with outData to GLBCluster
+  io.dataPath.outIOs(1) <> io.dataPath.inIOs(0)
+  when (inSelWire) {
     internalDataWire <> io.dataPath.inIOs(1)
-    io.dataPath.inIOs(0).ready := false.B
     io.dataPath.inIOs(2).ready := false.B
   } .otherwise {
     internalDataWire <> io.dataPath.inIOs(2)
-    io.dataPath.inIOs(0).ready := false.B
     io.dataPath.inIOs(1).ready := false.B
   }
-  when (outSelEqWires.head) {
-    // then it will need write data back
+  when (outSelWire) {
     io.dataPath.outIOs(0).bits := internalDataWire.bits
     io.dataPath.outIOs(0).valid := internalDataWire.valid && pSumLoadEnReg
     internalDataWire.ready := io.dataPath.outIOs(0).ready && pSumLoadEnReg
-    io.dataPath.outIOs(1) <> DontCare
-    io.dataPath.outIOs(2) <> DontCare
-  } .elsewhen (outSelEqWires(1)) {
-    io.dataPath.outIOs(0) <> DontCare
-    io.dataPath.outIOs(1) <> internalDataWire
     io.dataPath.outIOs(2) <> DontCare
   } .otherwise {
     io.dataPath.outIOs(0) <> DontCare
-    io.dataPath.outIOs(1) <> DontCare
     io.dataPath.outIOs(2) <> internalDataWire
   }
   // control path

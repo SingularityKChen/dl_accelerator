@@ -18,11 +18,7 @@ class ClusterGroup(debug: Boolean) extends Module with ClusterConfig {
   require(DataMirror.directionOf(io.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel) == Direction.Input, "it should be input")
   routerCluster.ctrlPath.iRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.inActCtrlSel)
   routerCluster.ctrlPath.wRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.weightCtrlSel)
-  //routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
-  routerCluster.ctrlPath.pSumRIO.foreach({x =>
-    x.outDataSel := Mux(clusterCtrl.configF2Inc, 0.U, 1.U)
-    x.inDataSel := Mux(clusterCtrl.configF2Inc, 1.U, 0.U)
-  }) // FIXME
+  routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
   routerCluster.pSumLoadEn := clusterCtrl.configF2Inc
   // true for broad-cast
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl

@@ -43,7 +43,8 @@ class CommonRouterUIntIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int
 
 class PSumRouterIO extends Bundle with ClusterConfig with HasPSumLoadEnIO {
   val dataPath = new PSumRouterDataIO(pSumPortNum, psDataWidth)
-  val ctrlPath: CommonClusterCtrlTwoUIntIO = Flipped(new CommonClusterCtrlTwoUIntIO)
+  val ctrlPath: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
+  //  see commends in class RouterClusterCtrlIO
 }
 
 class RouterDataIO extends Bundle with ClusterConfig {
@@ -78,9 +79,10 @@ class RouterClusterCtrlIO extends Bundle { // output only
   // weightCtrlSel.inDataSel: true for broad-cast and multi-cast, false for uni-cast
   // weightCtrlSel.outDataSel: 0, send the data to PE Cluster; 1, send it to its neighboring WeightRouter and PE Cluster
   val weightCtrlSel = new CommonClusterCtrlTwoBoolIO
-  // pSumCtrlSel.inDataSel: 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
-  // pSumCtrlSel.outDataSel: 0 for PE Cluster, 1 for GLB Cluster, 2 for vertical
-  val pSumCtrlSel = new CommonClusterCtrlTwoUIntIO
+  // inData from PECluster will connect directly to outData to GLBCluster
+  // pSumCtrlSel.inDataSel: true for GLB Cluster, false for vertical
+  // pSumCtrlSel.outDataSel: true for PE Cluster, false for vertical
+  val pSumCtrlSel = new CommonClusterCtrlTwoBoolIO
 }
 
 class PEClusterIO extends Bundle with ClusterConfig {

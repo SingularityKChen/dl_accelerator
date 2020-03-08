@@ -457,7 +457,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  it should "work well on GLBCluster" in {
+  it should "work well on GLB Cluster" in {
     test (new GLBCluster(true)) { theGLB =>
       val theTopIO = theGLB.io
       val theClock = theGLB.clock
@@ -614,8 +614,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  behavior of "test the spec of Processing Element Cluster"
-  it should "work well on PECluster" in {
+  behavior of "test the spec of PE Cluster"
+  it should "work well on PE Cluster" in {
     test (new PECluster(true)) { thePECluster =>
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
