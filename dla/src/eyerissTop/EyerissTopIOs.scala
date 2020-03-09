@@ -25,7 +25,7 @@ class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   }))
   for (i <- 0 until cgRowNum) {
     for (j <- 0 until cgColNum) {
-      cgArray(i)(j).ctrlPath.peClusterCtrl.inDataSel := io.ctrlPath.inActCtrlSel(i)(j).outDataSel === 3.U
+      cgArray(i)(j).ctrlPath.peClusterCtrl.inActSel.inDataSel := io.ctrlPath.inActCtrlSel(i)(j).outDataSel === 3.U
       cgArray(i)(j).dataPath.glbDataPath <> io.dataPath.glbDataPath(i)(j)
       // disable the unused IOs
       cgArray(i)(j).dataPath.cgDataPath.iRIO.foreach(_.inIOs.head <> DontCare)

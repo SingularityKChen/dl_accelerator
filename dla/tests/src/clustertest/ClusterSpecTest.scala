@@ -640,7 +640,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       } .join()
       // write test finish
       println("--------------- begin to read ----------------")
-      /*fork {
+      fork {
         theClock.step(cycles = (new Random).nextInt(30) + 1)
         theTopIO.debugIO.pSumDebugIO.foreach( _.idx.expect(0.U, "when pSum begins to read, the index should be zero"))
         theClock.step()
@@ -650,7 +650,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         theClock.step()
         theTopIO.debugIO.theState(1).expect(0.U, "after all read, the PSumState should be idle now")
         println("------------ all pSum read finish --------------")
-      } .*/fork {
+      } .fork {
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         // begin to read out streams into data sram and address sram
         topReadOutActAdrAndData(theTopIO, theInActAdrStreams, theInActDataStreams, theClock)

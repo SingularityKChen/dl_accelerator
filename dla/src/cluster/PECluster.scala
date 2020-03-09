@@ -30,6 +30,9 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"col${i}PSumAddFinReg")})
   private val allColPSumAddFin = Wire(Bool())
   allColPSumAddFin := oneColumnPSumAddFinRegVec.reduce(_ && _)
+  private val onePECalFinReg = Seq.fill(peRowNum, peColNum){RegInit(false.B)}
+  private val allCalFinWire = Wire(Bool())
+  allCalFinWire := onePECalFinReg.map(_.reduce(_ && _)).reduce(_ && _)
   // connections of peClusterPSum
   private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
@@ -62,9 +65,16 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       peArray(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
       // pSumControl
       peArray(i)(j).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
+      when (peArray(i)(j).topCtrl.calFinish) {
+        onePECalFinReg(i)(j) := true.B
+      }
+      when (allCalFinWire) {
+        onePECalFinReg(i)(j) := false.B
+      }
     }
   }
   io.ctrlPath.allPSumAddFin := allColPSumAddFin
+  io.ctrlPath.allCalFin := allCalFinWire
 }
 
 class PEClusterInAct extends Module with ClusterConfig {

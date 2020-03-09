@@ -18,8 +18,12 @@ class ClusterGroupDataIO extends Bundle with ClusterConfig {
 }
 
 class ClusterGroupCtrlIO extends Bundle {
-  val peClusterCtrl: CommonClusterCtrlBoolUIntIO = new CommonClusterCtrlBoolUIntIO // output select signals to PE Cluster
+  val peClusterCtrl = new Bundle {
+    val inActSel = new CommonClusterCtrlBoolUIntIO
+    val pSumInSel: Bool = Output(Bool())
+  } // output select signals to PE Cluster
   val routerClusterCtrl: RouterClusterCtrlIO = new RouterClusterCtrlIO // output select signals to Router Cluster
+  val readOutPSum: Bool = Output(Bool()) // true then to read out partial sums from GLB
 }
 
 class RouterClusterIO extends Bundle with HasPSumLoadEnIO {
@@ -70,7 +74,6 @@ class CommonRouterDataIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int
 }
 
 class RouterClusterCtrlIO extends Bundle { // output only
-  // TODO: check whether each router needs its own config signals
   // uni-cast, horizontal, vertical, broad-cast
   // inActCtrlSel.inDataSel: 0 for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   // inActCtrlSel.outDataSel 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
@@ -106,7 +109,8 @@ class PEClusterCtrlIO extends Bundle with HasPSumLoadEnIO {
   // pSumCtrlSel.outDataSel: unused
   val pSumCtrlSel: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
   val doEn: Bool = Input(Bool()) // load inAct and weight
-  val allPSumAddFin: Bool = Output(Bool())
+  val allPSumAddFin: Bool = Output(Bool()) // true when all columns of PEs have finished accumulating PSum
+  val allCalFin: Bool = Output(Bool()) // true when all pe finish computation
 }
 
 trait HasConfigIOs extends Bundle {
