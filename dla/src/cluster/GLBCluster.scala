@@ -65,7 +65,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
       // if inAct state is idle, then assign done reg to false.
       theSRAMsDoneRegVec(i)(j) := Mux(
         !(theSRAMsStateRegVec(i) === oneSRAMIdle),
-        Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)),
+        Mux(theSRAMsCtrl(i)(j).done, true.B, theSRAMsDoneRegVec(i)(j)),
         false.B)
       theSRAMsCtrl(i)(j).writeOrRead := theTopCtrls(i).writeOrRead
     }
