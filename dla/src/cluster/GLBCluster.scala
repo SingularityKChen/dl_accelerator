@@ -16,18 +16,16 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
   private val theSRAMsEnWire = Wire(Vec(2, Bool()))
   theSRAMsEnWire.suggestName("theSRAMsEnWire")
-  private val theSRAMsStateRegVec = RegInit(VecInit(Seq.fill(2){oneSRAMIdle}))
-  theSRAMsStateRegVec.suggestName("theSRAMsStateRegVec")
-  private val theSRAMsDoneRegVec = Seq(RegInit(VecInit(Seq.fill(inActSRAMNum){false.B})), RegInit(VecInit(Seq.fill(pSumSRAMNum){false.B})))
-  theSRAMsDoneRegVec.head.suggestName("inActSRAMDoneRegVec")
-  theSRAMsDoneRegVec.last.suggestName("pSumSRAMDoneRegVec")
+  private val theSRAMsStateRegVec = Seq.fill(2){RegInit(oneSRAMIdle)}
+  theSRAMsStateRegVec.head.suggestName("theInActSRAMsStateReg")
+  theSRAMsStateRegVec.last.suggestName("thePSumSRAMsStateReg")
+  private val theSRAMsDoneRegVec = Seq(Seq.fill(inActSRAMNum){RegInit(false.B)}, Seq.fill(pSumSRAMNum){RegInit(false.B)})
+  theSRAMsDoneRegVec.head.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActSRAMDoneReg$i")})
+  theSRAMsDoneRegVec.last.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"pSumSRAMDoneReg$i")})
   private val theSRAMsAllDoneWire = Wire(Vec(2, Bool()))
   theSRAMsAllDoneWire.suggestName("theSRAMsAllDoneWire")
   private val theSRAMsDoingWire = Wire(Vec(2, Bool()))
   theSRAMsDoingWire.suggestName("theSRAMsDoingWire")
-  //private val pSumSRAMStrIdx = Wire(Vec(pSumSRAMNum, UInt(log2Ceil(pSumSRAMSize).W)))
-  //private val configRegVec = VecInit(Seq.fill(io.ctrlPath.configIOs.length){RegInit(0.U)}) // 0g, 1n, 2m, 3f, 4c, 5s
-  //configRegVec <> io.ctrlPath.configIOs
   private def OneSRAMState(stateReg: UInt, enable: Bool, done: Bool): Unit = {
     switch (stateReg) {
       is (oneSRAMIdle) {
@@ -65,7 +63,10 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
       theSRAMsCtrl(i)(j).doEn := theSRAMsDoingWire(i) && !theSRAMsDoneRegVec(i)(j)
       // if one received done signal, then its signal flips, from false to true, then disable its enable signal
       // if inAct state is idle, then assign done reg to false.
-      theSRAMsDoneRegVec(i)(j) := Mux(!(theSRAMsStateRegVec(i) === oneSRAMIdle), Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)), false.B)
+      theSRAMsDoneRegVec(i)(j) := Mux(
+        !(theSRAMsStateRegVec(i) === oneSRAMIdle),
+        Mux(theSRAMsCtrl(i)(j).done, !theSRAMsDoneRegVec(i)(j), theSRAMsDoneRegVec(i)(j)),
+        false.B)
       theSRAMsCtrl(i)(j).writeOrRead := theTopCtrls(i).writeOrRead
     }
     OneSRAMState(theSRAMsStateRegVec(i), theSRAMsEnWire(i), theSRAMsAllDoneWire(i))
@@ -76,7 +77,6 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
   pSRAMs.zipWithIndex.foreach({ case (pSumIO, idx) =>
     pSumIO.dataPath <> io.dataPath.pSumIO(idx)
-    //pSumIO.ctrlPath.startIdx := pSumSRAMStrIdx(idx) // start index
     pSumIO.ctrlPath.startIdx := io.ctrlPath.pSumSRAMStrIdx // start index
     // FIXME: check the start index of partial sum
   })
@@ -90,10 +90,11 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   } else {
     io.debugIO <> DontCare
   }
-  //pSumSRAMStrIdx.foreach(_ := configRegVec(0)*N2.U*M2.U*F2.U + configRegVec(1)*M2.U*F2.U + configRegVec(2)*F2.U + configRegVec(3))
 }
 
-class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
+class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean)
+  extends SRAMCommon(theSRAMSize, theDataWidth)
+  with ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
   private val oneSRAMPSum: Int = oneSPadPSum * N2*M2*F2 // when write counts this, then finished
   require(oneSRAMPSum <= pSumSRAMSize, s"the size of PSum SRAM is $pSumSRAMSize, " +
@@ -180,7 +181,8 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
   }
 }
 
-class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean) extends SRAMCommon(theSRAMSize, theDataWidth) {
+class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean)
+  extends SRAMCommon(theSRAMSize, theDataWidth) {
   theSRAM.suggestName("oneInActSRAM")
   val io: InACTSRAMCommonIO = IO(new InACTSRAMCommonIO(theSRAMSize, theDataWidth))
   private val doMeetZeroWire = Wire(Bool()) // current data equals to zero
@@ -280,7 +282,9 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
       }
     }
     is (inActDoing) {
-      when (adrDoneWire) {
+      when (adrDoneWire && dataDoneWire) {
+        inActState := inActIdle
+      } .elsewhen (adrDoneWire) {
         inActState := inActWaitData
       } .elsewhen (dataDoneWire) {
         inActState := inActWaitAdr
