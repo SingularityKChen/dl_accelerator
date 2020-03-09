@@ -1,10 +1,10 @@
 package dla.tests
 
-import dla.cluster.GNMFCS2Config
+import dla.cluster.{ClusterSRAMConfig, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 
-import scala.math.pow
+import scala.math.{min, pow}
 import scala.util.Random
 class GenOnePETestDataTest extends FlatSpec {
   val genHp = new GenOnePETestData
@@ -27,8 +27,9 @@ class GenOnePETestDataTest extends FlatSpec {
   println("inActList         = " + inActList)
   println("weightList        = " + weightList)
   val oneStreamTest = new GenOneStreamData
-  println("inActStream = " + oneStreamTest.inActStream)
-  println("pSumStream  = " + oneStreamTest.outPSumStream)
+  println("inActAdrStream  = " + oneStreamTest.inActAdrStream.flatten)
+  println("weightAdrStream = " + oneStreamTest.weightAdrStream.flatten)
+  println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
 class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS2Config {
@@ -193,18 +194,24 @@ class GenOnePETestData extends GenFunc {
   }
 }
 
-class GenOneStreamData extends GenFunc {
+class GenOneStreamData extends GenFunc with ClusterSRAMConfig {
   require(M2 <= N2*F2, s"M2 should less than N2*F2, $M2 <= ${N2*F2} ?")
   private val oneStream = Seq.fill(inActStreamNum) {new GenOnePETestData}
   val inActStream: Seq[List[List[Int]]] = oneStream.map(x => x.inActList)
-  val inActAdrStream: Seq[List[Int]] = oneStream.map(x => x.inInActAdrRand)
-  val inActCountStream: Seq[List[Int]] = oneStream.map(x => x.inInActCountRand)
-  val inActDataStream: Seq[List[Int]] = oneStream.map(x => x.inInActDataRand)
+  val inActAdrStream: Seq[List[Int]] = oneStream.map(x => x.inInActAdrRand).:+(List(0))
+  val inActCountStream: Seq[List[Int]] = oneStream.map(x => x.inInActCountRand).:+(List(0))
+  val inActDataStream: Seq[List[Int]] = oneStream.map(x => x.inInActDataRand).:+(List(0))
   val weightStream: Seq[List[List[Int]]] = oneStream.take(weightStreamNum).map(x => x.weightList)
-  val weightAdrStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightAdrRand)
-  val weightCountStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightCountRand)
-  val weightDataStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightDataRand)
+  val weightAdrStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightAdrRand).:+(List(0))
+  val weightCountStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightCountRand).:+(List(0))
+  val weightDataStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightDataRand).:+(List(0))
   val outPSumStream: List[List[Int]] = goldenFlatStreamResult()
+  require(inActAdrStream.flatten.length <= inActAdrSRAMSize, s"inActAdrSRAM should fit in all inActAdr, " +
+    s"but ${inActAdrStream.flatten.length} > $inActAdrSRAMSize")
+  require(inActCountStream.flatten.length <= inActDataSRAMSize, s"inActDataSRAM should fit in all inActData, " +
+    s"but ${inActCountStream.flatten.length} > $inActDataSRAMSize")
+  require(outPSumStream.flatten.length <= pSumSRAMSize, s"pSumSRAM should fit in all pSumData, " +
+    s"but ${outPSumStream.flatten.length} > $pSumSRAMSize")
   private def goldenFlatStreamResult(): List[List[Int]] = {
     var outPSumStream: List[List[Int]] = Nil
     for (g2 <- 0 until G2) {

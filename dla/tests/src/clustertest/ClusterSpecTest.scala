@@ -6,49 +6,26 @@ import chisel3.experimental.{DataMirror, Direction}
 import chisel3.tester._
 import dla.cluster._
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
+import dla.tests.GenOneStreamData
 import org.scalatest._
-
 import scala.util.Random
-import scala.math.{min, pow}
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
   private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
-  private val printLogDetails = false // true to print more detailed logs
-  private val maxInActStreamNum: Int = min(inActAdrSRAMSize/inActAdrSPadSize, inActDataSRAMSize/inActDataSPadSize)
-  private val theInActStreamNum: Int = (new Random).nextInt(maxInActStreamNum - 5) + 5
+  private val printLogDetails = true // true to print more detailed logs
+  private val inActStreamNum: Int = G2*N2*F2*C2*S2
+  private val weightStreamNum: Int = G2*M2*C2*S2
   private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
   private val addendRand = Seq.fill(peColNum, oneSPadPSum){(new Random).nextInt(10)}
-  private def InActDataGen(n: Int, dataWidth: Int, maxLen: Int, minLen: Int): List[Int] = {
-    require(maxLen > minLen, s"maxLen should larger than minLen, $maxLen should lg $minLen")
-    var resultList: List[Int] = Nil
-    for (_ <- 0 until n) {
-      var temResultList: List[Int] = Nil
-      val randomLen: Int = (new Random).nextInt(maxLen-minLen) + minLen // the length of one SPad range(minLen, maxLen)
-      while (temResultList.length < randomLen) {
-        val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt - 1) + 1
-        temResultList = temResultList:::List(randomNum)
-      }
-      temResultList = temResultList:::List(0) // one zero, that's the end of one SPad data
-      resultList = resultList:::temResultList
-    }
-    resultList = resultList:::List(0) // two zeros, that's the end of this stream data
-    resultList
-  }
-  private def PSumDataGen(n:Int, dataWidth: Int): List[Int] = {
-    //require(n <= maxPSumStreamNum, s"you should assign a smaller 'n' oneSPadPSum = $oneSPadPSum, pSumSRAMSize = $pSumSRAMSize")
-    var resultList: List[Int] = Nil
-    while ( resultList.length < n ){
-      val randomNum = (new Random).nextInt(pow(2, dataWidth).toInt)
-      resultList = resultList:::List(randomNum)
-      /*
-      if( !resultList.exists( s=>s==randomNum )){
-        resultList = resultList:::List(randomNum)
-      }
-      */
-    }
-    resultList
-  }
+  private val oneStreamData = new GenOneStreamData
+  private val inActAdrStream = oneStreamData.inActAdrStream
+  private val inActDataStream = oneStreamData.inActDataStream
+  private val inActCountStream = oneStreamData.inActCountStream
+  private val weightAdrStream = oneStreamData.weightAdrStream
+  private val weightDataStream = oneStreamData.weightDataStream
+  private val weightCountStream = oneStreamData.weightCountStream
+  private val pSumStream = oneStreamData.outPSumStream
   private def readOutAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO, doneIO: Bool,
                          theData: List[Int], idx: Int, theClock: Clock, adrOrData: Boolean
                         ): Unit = {
@@ -62,6 +39,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     outIO.data.valid.expect(false.B, s"$currentType should not valid now")
     debugIO.idxInc.expect(false.B, s"$idx, index should not increase now")
     if (printLogDetails) println(
+      s"-------- $idx.0 $currentType done = ${doneIO.peek()}\n" +
+        s"-------- $idx.5 $currentType valid= ${outIO.data.valid.peek()}\n" +
+        s"-------- $idx.5 $currentType doEn = ${debugIO.idxCount.peek()}\n" +
       s"-------- $idx.0 $currentType crDt = ${debugIO.currentData.peek()}\n" +
       s"-------- $idx.0 $currentType waFR = ${debugIO.waitForRead.peek()}\n" +
       s"-------- $idx.0 $currentType doRd = ${debugIO.doReadWire.peek()}\n" +
@@ -72,6 +52,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     outIO.data.bits.expect(theData(idx).U, s"theData($idx) = ${theData(idx)}")
     outIO.data.valid.expect(true.B, s"$currentType should valid now")
     if (printLogDetails) println(
+      s"-------- $idx.5 $currentType done = ${doneIO.peek()}\n" +
+      s"-------- $idx.5 $currentType valid= ${outIO.data.valid.peek()}\n" +
+      s"-------- $idx.5 $currentType doEn = ${debugIO.idxCount.peek()}\n" +
       s"-------- $idx.5 $currentType crDt = ${debugIO.currentData.peek()}\n" +
       s"-------- $idx.5 $currentType waFR = ${debugIO.waitForRead.peek()}\n" +
       s"-------- $idx.5 $currentType doRd = ${debugIO.doReadWire.peek()}\n" +
@@ -79,6 +62,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       s"-------- $idx.5 $currentType data = ${outIO.data.bits.peek()}\n" +
       s"-------- $idx.5 $currentType idx  = ${debugIO.idx.peek()}"
     )
+    outIO.data.valid.expect(true.B, s"$currentType should valid now")
     theClock.step()
     if (theData(idx) != 0) {
       doneIO.expect(false.B, s"current data equals to ${theData(idx)}, does not equal to zero, " +
@@ -195,6 +179,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theOutIO.adrIOs.data.ready.poke(false.B)
     } .join()
     println("---------- both read out one stream ------------")
+    timescope {
+      theClock.step()
+      println("the state = " + theDebugIO.theState.peek())
+    }
     (adrRdIdx, dataRdIdx)
   }
   private def topReadOutActAdrAndData(theTopIO: GLBClusterIO, adrStreams: Seq[List[Int]], dataStreams: Seq[List[Int]],
@@ -205,7 +193,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     var (adrRdIdx_0, dataRdIdx_0): (Int, Int) = (0, 0)
     var (adrRdIdx_1, dataRdIdx_1): (Int, Int) = (0, 0)
     var (adrRdIdx_2, dataRdIdx_2): (Int, Int) = (0, 0)
-    for (_ <- 0 until theInActStreamNum) {
+    for (_ <- 0 until inActStreamNum) {
       println("------------- begin SRAMs read -------------")
       theCtrlIO.doEn.poke(true.B)
       theCtrlIO.writeOrRead.poke(false.B)
@@ -270,9 +258,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   private def readOutActAdrAndData(theOutIO: CSCStreamIO, theCtrlIO:SRAMCommonCtrlIO, theDebugIO: InActSRAMBankDebugIO,
                                    adrStream: List[Int], dataStream: List[Int], theClock: Clock): Unit = {
     var (adrRdIdx, dataRdIdx): (Int, Int) = (0, 0)
-    for (_ <- 0 until theInActStreamNum) {
+    for (_ <- 0 until inActStreamNum) {
       theCtrlIO.doEn.poke(true.B)
-      theCtrlIO.writeOrRead.poke(false.B)
+      theCtrlIO.writeOrRead.poke(false.B) // begin to read
       theClock.step() // from idle to doing
       val (adrRdIdxTmp: Int, dataRdIdxTmp: Int) = forkReadAdrAndData(theOutIO, theDebugIO,
         adrStream, dataStream, adrRdIdx, dataRdIdx, theClock)
@@ -344,7 +332,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     test(new PSumSRAMBank(pSumSRAMSize, psDataWidth, true)) { thePSumBank =>
       val theTopIO = thePSumBank.io
       val theClock = thePSumBank.clock
-      val theData = PSumDataGen(pSumSRAMSize, psDataWidth)
+      val theData = pSumStream.flatten
       val startIndex = (new Random).nextInt(maxPSumStreamNum - 1) * oneSPadPSum
       println("---------------- test begin ----------------")
       println("---------- Partial Sum SRAM Bank -----------")
@@ -378,7 +366,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
         val theTopIO = theAdrSRAM.io
         val theClock = theAdrSRAM.clock
-        val InActAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
+        val InActAdrStream = inActAdrStream.flatten.toList
         println("----------------- test begin -----------------")
         println("----------- InputActAdr SRAM Bank ------------")
         println("----------- test basic functions -------------")
@@ -397,7 +385,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         println("--------------- begin to read ----------------")
         // begin to read out data
         var theRdIdx = 0
-        for (_ <- 0 until theInActStreamNum) {
+        for (_ <- 0 until inActStreamNum) {
           theTopIO.ctrlPath.writeOrRead.poke(false.B)
           while (!theTopIO.ctrlPath.done.peek().litToBoolean) {
             theTopIO.ctrlPath.doEn.poke(true.B)
@@ -413,7 +401,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         }
         // read out finish
         println("---------------- read finish -----------------")
-        println(s"-------- streamNum = $theInActStreamNum")
+        println(s"-------- streamNum = $inActStreamNum")
         println("---------------- test finish -----------------")
       }
   }
@@ -422,10 +410,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     test(new InActSRAMBank(true)) { theInAct =>
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
-      val InActAdrStream = InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)
-      val InActDataStream = InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)
+      val InActAdrStream = inActAdrStream.flatten.toList
+      val InActDataStream = inActDataStream.flatten.toList
+      println("----- inActReadCycle = " + InActAdrStream.length)
       println("----------------- test begin -----------------")
-      println(s"--------  theInActStreamNum = $theInActStreamNum")
+      println(s"--------  theInActStreamNum = $inActStreamNum")
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
       theInAct.reset.poke(true.B)
@@ -452,7 +441,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTopIO.debugIO.theState.expect(0.U, "after all read, the state should be idle now")
       println(s"-------- theState = ${theTopIO.debugIO.theState.peek()}")
       println("-------------- all read finish ---------------")
-      println(s"-------- streamNum = $theInActStreamNum")
+      println(s"-------- streamNum = $inActStreamNum")
       println("---------------- test finish -----------------")
     }
   }
@@ -464,9 +453,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
       //val gnmfcs1IOs = theTopIO.ctrlPath.configIOs
-      val theInActAdrStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActAdrWidth, 8, 3)}
-      val theInActDataStreams = Seq.fill(inActSRAMNum){InActDataGen(theInActStreamNum, inActDataWidth, 15, 9)}
-      val thePSumDataStreams = Seq.fill(pSumSRAMNum){PSumDataGen(pSumSRAMSize, psDataWidth)}
+      val theInActAdrStreams = Seq.fill(inActSRAMNum){inActAdrStream.flatten.toList}
+      val theInActDataStreams = Seq.fill(inActSRAMNum){inActDataStream.flatten.toList}
+      val thePSumDataStreams = Seq.fill(pSumSRAMNum){pSumStream.flatten}
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
       val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
       require(pSumStartIdx + oneSPadPSum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
@@ -608,7 +597,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         if (printLogDetails) theTopIO.debugIO.oneInActSRAMDone.foreach(x => println(s"-------- oneSRAMDone = ${x.peek()}"))
         theTopIO.debugIO.theState(0).expect(0.U, "after all read, the inActState should be idle now")
         println("------------ all inAct read finish -------------")
-        println(s"-------- InActStreamNum = $theInActStreamNum")
+        println(s"-------- InActStreamNum = $inActStreamNum")
       } .join()
       println("---------------- test finish -----------------")
     }
