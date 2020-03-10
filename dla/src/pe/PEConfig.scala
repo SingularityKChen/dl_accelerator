@@ -11,6 +11,7 @@ trait MCRENFConfig extends NNShapeConfig { // contains some scala values
   protected val N0: Int = 3 // the number of partial sum
   protected val F0: Int = 1 // one row of partial sum
   protected val MCRENF: List[Int] = List(M0, C0, R, E, N0, F0)
+  protected val pSumOneSPadNum: Int = M0*E*N0*F0
   // C0*R0 < iacAdrSize = 9
   // C0*R0*E0*N0*F0 <
 }

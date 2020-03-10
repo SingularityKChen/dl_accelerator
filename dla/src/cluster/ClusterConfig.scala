@@ -37,4 +37,7 @@ trait GNMFCS2Config {
   val F2: Int = 3
   val C2: Int = 3
   val S2: Int = 4
+  protected val weightStreamNum: Int = G2*M2*C2*S2
+  protected val inActStreamNum: Int = G2*N2*C2*(F2 + S2)
+  protected val pSumStreamNum: Int = G2*N2*M2*F2
 }

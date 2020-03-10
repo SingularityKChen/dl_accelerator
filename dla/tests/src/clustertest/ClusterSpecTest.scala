@@ -13,12 +13,9 @@ import scala.math.max
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
-  private val oneSPadPSum: Int = M0*E*N0*F0 // when read counts this, then stop
   private val printLogDetails = true // true to print more detailed logs
-  private val inActStreamNum: Int = G2*N2*F2*C2*S2
-  private val weightStreamNum: Int = G2*M2*C2*S2
-  private val maxPSumStreamNum: Int = pSumSRAMSize/oneSPadPSum
-  private val addendRand = Seq.fill(peColNum, oneSPadPSum){(new Random).nextInt(10)}
+  private val maxPSumStreamNum: Int = pSumSRAMSize/pSumOneSPadNum
+  private val addendRand = Seq.fill(peColNum, pSumOneSPadNum){(new Random).nextInt(10)}
   private val oneStreamData = Seq.fill(max(inActRouterNum, pSumRouterNum)){new GenOneStreamData}
   private val inActAdrStream = oneStreamData.map(_.inActAdrStream)
   private val inActDataStream = oneStreamData.map(_.inActDataStream)
@@ -74,7 +71,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   }
   private def readOutPSumData(OutIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int],
                       startIndex: Int, theClock: Clock): Unit = {
-    for (i <- 0 until oneSPadPSum) {
+    for (i <- 0 until pSumOneSPadNum) {
       println(s"--------------- $i-th read cycle -----------")
       if (printLogDetails) {
         println(s"-------- data       = ${theData(i)} \n" +
@@ -96,7 +93,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       OutIO.bits.expect(theData(i).U, s"$i, theData should be ${theData(i)}")
       OutIO.valid.expect(true.B, "it should valid now")
       theClock.step()
-      doneIO.expect((i == oneSPadPSum - 1).B)
+      doneIO.expect((i == pSumOneSPadNum - 1).B)
       println(s"-------- pSum PASS $i")
     }
   }
@@ -335,7 +332,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   }
   private def writeInPSumData(inIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int],
                               startIndex: Int, theClock: Clock): Unit = {
-    for (i <- 0 until oneSPadPSum) {
+    for (i <- 0 until pSumOneSPadNum) {
       println(s"--------------- $i-th PSum write cycle -----------")
       inIO.bits.poke(theData(i).U)
       inIO.valid.poke(true.B)
@@ -348,7 +345,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       }
       inIO.ready.expect(true.B, s"$i, it should be ready now")
       theClock.step()
-      doneIO.expect((i == oneSPadPSum - 1).B, s"i = $i, write should finish?")
+      doneIO.expect((i == pSumOneSPadNum - 1).B, s"i = $i, write should finish?")
       println(s"-------- $i PASS")
     }
   }
@@ -396,7 +393,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theTopIO = thePSumBank.io
       val theClock = thePSumBank.clock
       val theData = pSumStream.head.flatten
-      val startIndex = (new Random).nextInt(maxPSumStreamNum - 1) * oneSPadPSum
+      val startIndex = (new Random).nextInt(maxPSumStreamNum - 1) * pSumOneSPadNum
       println("---------------- test begin ----------------")
       println("---------- Partial Sum SRAM Bank -----------")
       println("---------- test basic functions ------------")
@@ -520,7 +517,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
       val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
-      require(pSumStartIdx + oneSPadPSum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
+      require(pSumStartIdx + pSumOneSPadNum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
       def forkWriteInPSumHelper(index: Int, startIndex: Int): Unit = {
         writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),
           doneIO = theTopIO.debugIO.onePSumSRAMDone(index), theData = thePSumDataStreams(index),

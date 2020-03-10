@@ -132,7 +132,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
 }
 
 abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth: Int) extends Module {
-  protected val theSRAM: SyncReadMem[UInt] = SyncReadMem(theSRAMSize, UInt(theDataWidth.W))
+  protected val theSRAM: SyncReadMem[UInt] = SyncReadMem(theSRAMSize, UInt(theDataWidth.W), SyncReadMem.ReadFirst)
   // SRAM read write logic
   protected val writeOrReadWire: Bool = Wire(Bool()) // true then "do" means write, false then "do" means read
   // because it will not read and write at the same time

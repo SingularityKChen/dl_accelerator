@@ -4,7 +4,7 @@ import dla.cluster.{ClusterSRAMConfig, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 
-import scala.math.{min, pow}
+import scala.math.{max, pow}
 import scala.util.Random
 class GenOnePETestDataTest extends FlatSpec {
   val genHp = new GenOnePETestData
@@ -37,10 +37,6 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
   protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt
   protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt
   protected val scsDataMax: Int = pow(2, cscDataWidth).toInt
-  protected val weightStreamNum: Int = G2*M2*C2*S2
-  protected val inActStreamNum: Int = G2*N2*F2*C2*S2
-  protected val pSumStreamNum: Int = G2*N2*M2*F2
-  protected val pSumOneSPadNum: Int = M0*E*N0*F0
   protected def genSparse(rows: Int, cols: Int, max: Int, ratio: Double): List[List[Int]] = {
     require(ratio <= 1 && ratio >= 0, "the range of ratio should be (0, 1)")
     var resultList: List[List[Int]] = Nil
@@ -196,11 +192,11 @@ class GenOnePETestData extends GenFunc {
 
 class GenOneStreamData extends GenFunc with ClusterSRAMConfig {
   require(M2 <= N2*F2, s"M2 should less than N2*F2, $M2 <= ${N2*F2} ?")
-  private val oneStream = Seq.fill(inActStreamNum) {new GenOnePETestData}
-  val inActStream: Seq[List[List[Int]]] = oneStream.map(x => x.inActList)
-  val inActAdrStream: Seq[List[Int]] = oneStream.map(x => x.inInActAdrRand).:+(List(0))
-  val inActCountStream: Seq[List[Int]] = oneStream.map(x => x.inInActCountRand).:+(List(0))
-  val inActDataStream: Seq[List[Int]] = oneStream.map(x => x.inInActDataRand).:+(List(0))
+  private val oneStream = Seq.fill(max(inActStreamNum, weightStreamNum)){new GenOnePETestData}
+  val inActStream: Seq[List[List[Int]]] = oneStream.take(inActStreamNum).map(x => x.inActList)
+  val inActAdrStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActAdrRand).:+(List(0))
+  val inActCountStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActCountRand).:+(List(0))
+  val inActDataStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActDataRand).:+(List(0))
   val weightStream: Seq[List[List[Int]]] = oneStream.take(weightStreamNum).map(x => x.weightList)
   val weightAdrStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightAdrRand).:+(List(0))
   val weightCountStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightCountRand).:+(List(0))
@@ -222,8 +218,10 @@ class GenOneStreamData extends GenFunc with ClusterSRAMConfig {
             var currentTempPSum: List[List[Int]] = Nil
             for (c2 <- 0 until C2) {
               for (s2 <- 0 until S2) {
-                val goldFlatPSum = goldenFlatResult(weightStream(g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2),
-                  inActStream(g2*N2*F2*C2*S2 + n2*F2*C2*S2 + f2*C2*S2 + c2*S2 + s2))
+                val weightIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
+                val inActIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2)
+                val goldFlatPSum = goldenFlatResult(weightStream(weightIdx),
+                  inActStream(inActIdx))
                 currentTempPSum = currentTempPSum:::List(goldFlatPSum)
               }
             }
