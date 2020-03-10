@@ -24,11 +24,7 @@ class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matche
 }
 
 class CheckConfigs extends FlatSpec with EyerissTopConfig with GNMFCS1Config with GNMFCS2Config with MCRENFConfig with ClusterSRAMConfig with SPadSizeConfig{
-  private val oneInActMatrixSize = Seq(R*C0, F0*N0*E)
-  private val oneWeightMatrixSize = Seq(M0, R*C0)
   private val onePSumMatrixSize = Seq(M0, F0*N0*E)
-  //private val oneSPadInAct = oneInActMatrixSize.product
-  //private val oneSPadWeight = oneWeightMatrixSize.product
   private val oneSPadPSum: Int = onePSumMatrixSize.product // when read counts this, then stop
   assert(C1 < cgRowNum, "C1 should smaller than cgRowNum to accumulate tiling partial sums together")
   assert(G1*N1*M1 < cgColNum*cgRowNum, "should have enough ClusterGroups to be mapped with tiling matrix multiplication")

@@ -3,6 +3,7 @@ package dla.cluster
 import chisel3._
 import chisel3.experimental.{DataMirror, Direction}
 import chisel3.util._
+import dla.pe.SPadSizeConfig
 
 class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with ClusterConfig {
   val io: ClusterGroupIO = IO(new ClusterGroupIO)
@@ -17,7 +18,7 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   routerCluster.ctrlPath.iRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.inActCtrlSel)
   routerCluster.ctrlPath.wRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.weightCtrlSel)
   routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
-  routerCluster.pSumLoadEn := clusterCtrl.configF2Inc
+  routerCluster.pSumLoadEn := clusterCtrl.peCtrlIO.pSumLoadEn
   // peCluster control path
   // true for broad-cast
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl.inActSel
@@ -25,23 +26,17 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   // we can disable the outDataSel, as output of pSum is connected directly to router and outside
   peCluster.ctrlPath.pSumCtrlSel.outDataSel := DontCare // unused
   // doEn
-  peCluster.ctrlPath.doEn := clusterCtrl.peLoadEn // to load inAct and weight // TODO: check
-  peCluster.ctrlPath.pSumLoadEn := clusterCtrl.configF2Inc
+  peCluster.ctrlPath.doEn := clusterCtrl.peCtrlIO.peLoadEn // to load inAct and weight // TODO: check
+  peCluster.ctrlPath.pSumLoadEn := clusterCtrl.peCtrlIO.pSumLoadEn
   // GLB control path
-  glbCluster.ctrlPath.pSumSRAMStrIdx := clusterCtrl.pSumSRAMStrIdx
-  // writeOrRead
+  glbCluster.ctrlPath.pSumIO.zip(clusterCtrl.glbPSumCtrlIOs).foreach({ case (o, o1) => o <> o1})
   // glbCluster.ctrlPath.pSumIO.writeOrRead: true when glbLoad or write back from PEArray
-  glbCluster.ctrlPath.pSumIO.writeOrRead := clusterCtrl.glbLoadEn || clusterCtrl.pSumAdd
-  //io.ctrlPath.readOutPSum true, then read enable // FIXME: use w/r enable wires
-  glbCluster.ctrlPath.inActIO.writeOrRead := clusterCtrl.glbLoadEn // read when peLoad, but don't need
-  // doEn
-  glbCluster.ctrlPath.pSumIO.doEn := clusterCtrl.glbLoadEn || clusterCtrl.pSumAdd || io.ctrlPath.readOutPSum // FIXME
-  glbCluster.ctrlPath.inActIO.doEn := clusterCtrl.glbLoadEn || clusterCtrl.peLoadEn// begin read or write
+  glbCluster.ctrlPath.inActIO.zip(clusterCtrl.glbInActCtrlIOs).foreach({ case (o, o1) => o <> o1})
   // clusterCtrl
+  clusterCtrl.topIO.readOutPSum := io.ctrlPath.readOutPSum
+  clusterCtrl.topIO.cgEnable := io.ctrlPath.readOutPSum // FIXME
   clusterCtrl.allPSumAddFin := peCluster.ctrlPath.allPSumAddFin
   clusterCtrl.allCalFin := peCluster.ctrlPath.allCalFin
-  clusterCtrl.glbLoadFin.head := glbCluster.ctrlPath.inActIO.done
-  clusterCtrl.glbLoadFin.last := glbCluster.ctrlPath.pSumIO.done
   // connections of data path
   // input activations
   for (i <- 0 until inActRouterNum) {
@@ -121,7 +116,7 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   }
 }
 
-class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
+class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config with ClusterSRAMConfig with SPadSizeConfig{
   val io: ClusterGroupControllerIO = IO(new ClusterGroupControllerIO)
   private val configFixValSeq = Seq(G2, N2, M2, F2, C2, S2)
   private val configIncWireSeq = Seq.fill(6){Wire(Bool())}
@@ -135,18 +130,16 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
   private val configWarpWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
   private val configValWireVec = Seq(configG2Val, configN2Val, configM2Val, configF2Val, configC2Val, configS2Val)
   // 0g, 1n, 2m, 3f, 4c, 5s
-  private val glbWriteFinReg = Seq.fill(2){RegInit(false.B)}
+  private val glbInActWriteFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
+  private val glbPSumWriteFinReg = Seq.fill(pSumSRAMNum){RegInit(false.B)}
   private val glbWriteFinWire = Wire(Bool()) // true then both inAct and PSum have loaded into GLB
-  when (io.glbLoadFin.head) {
-    glbWriteFinReg.head := true.B
-  }
-  when (io.glbLoadFin.last) {
-    glbWriteFinReg.last := true.B
-  }
-  glbWriteFinWire := glbWriteFinReg.reduce(_ && _)
-  when (glbWriteFinWire) {
-    glbWriteFinReg.foreach(x => x := false.B)
-  }
+  glbInActWriteFinReg.zip(io.glbInActCtrlIOs.map(x => x.writeIO.done)).foreach({ case (reg, doneIO) =>
+    reg := Mux(glbWriteFinWire, false.B, Mux(doneIO, true.B, reg))
+  })
+  glbPSumWriteFinReg.zip(io.glbPSumCtrlIOs.map(x => x.writeIO.done)).foreach({case (reg, doneIO) =>
+    reg := Mux(glbWriteFinWire, false.B, Mux(doneIO, true.B, reg))
+  })
+  glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
   // cluster group state machine
   // cgLoadGLB: load inAct and PSum from outside CG into GLBCluster
   // cgLoadPE: load inAct, weight from outside PECluster (from GLB and outside CG)
@@ -156,7 +149,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
   private val cgStateReg = RegInit(cgIdle)
   switch (cgStateReg) {
     is (cgIdle) {
-      when (true.B) {  // when doEn ClusterGroup
+      when (io.topIO.cgEnable) {  // when doEn ClusterGroup
         cgStateReg := cgLoadGLB
       }
     }
@@ -205,23 +198,49 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config {
     configIncWireSeq(i - 1) := configWarpWireSeq(i)
   }
   // Outputs
-  io.pSumSRAMStrIdx := configValWireVec.head*N2.U*M2.U*F2.U + configValWireVec(1)*M2.U*F2.U +
-    configValWireVec(2)*F2.U + configValWireVec(3)
-  io.configF2Inc := configIncWireSeq(3)
-  io.glbLoadEn := cgStateReg === cgLoadGLB
-  io.peLoadEn := cgStateReg === cgLoadPE
-  io.pSumAdd := cgStateReg === cgRead
+  private val pSumAdrL2 = configValWireVec.head*N2.U*M2.U*F2.U +
+    configValWireVec(1)*M2.U*F2.U + configValWireVec(2)*F2.U + configValWireVec(3)
+  private val inActReadAdrL2 = configValWireVec.head // FIXME
+  private val pSumWriteAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  private val pSumReadAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  private val cgLoadGLBWire = cgStateReg === cgLoadGLB
+  private val cgLoadPEWire = cgStateReg === cgLoadPE
+  private val cgReadWire = cgStateReg === cgRead
+  io.glbPSumCtrlIOs.foreach({x =>
+    x.writeIO.adr := pSumAdrL2 + pSumWriteAdrL4Reg
+    x.writeIO.enable := cgLoadGLBWire || cgReadWire
+    pSumWriteAdrL4Reg := Mux(x.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg) // FIXME: need reset
+    x.readIO.adr := pSumAdrL2 + pSumReadAdrL4Reg
+    x.readIO.enable := cgReadWire || io.topIO.readOutPSum
+    pSumReadAdrL4Reg := Mux(x.readIO.done, pSumReadAdrL4Reg + 1.U, pSumReadAdrL4Reg) // FIXME: need reset
+  })
+  io.glbInActCtrlIOs.foreach({x =>
+    x.writeIO.enable := cgLoadGLBWire
+    x.writeIO.adr := DontCare
+    x.readIO.adr := inActReadAdrL2
+    x.readIO.enable := cgLoadPEWire
+  })
+  io.peCtrlIO.pSumLoadEn := configIncWireSeq(3)
+  io.peCtrlIO.peLoadEn := cgLoadPEWire
+  io.pSumAdd := cgReadWire
   io.peCal := cgStateReg === cgCal
+  io.glbLoadEn := cgLoadGLB
 }
 
-class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig {
-  val pSumSRAMStrIdx: UInt = Output(UInt(log2Ceil(pSumSRAMSize).W))
-  val configF2Inc: Bool = Output(Bool())
+class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS2Config {
+  val glbPSumCtrlIOs: Vec[SRAMCommonCtrlIO] = Vec(pSumSRAMNum, Flipped(new SRAMCommonCtrlIO(theMemSize = pSumSRAMSize)))
+  val glbInActCtrlIOs: Vec[SRAMCommonCtrlIO] = Vec(inActSRAMNum, Flipped(new SRAMCommonCtrlIO(theMemSize = inActStreamNum)))
+  val peCtrlIO = new Bundle {
+    val peLoadEn: Bool = Output(Bool())
+    val pSumLoadEn: Bool = Output(Bool())
+  }
   val allPSumAddFin: Bool = Input(Bool())
   val allCalFin: Bool = Input(Bool())
-  val glbLoadEn: Bool = Output(Bool())
-  val peLoadEn: Bool = Output(Bool())
   val pSumAdd: Bool = Output(Bool())
-  val glbLoadFin: Vec[Bool] = Input(Vec(2, Bool()))
   val peCal: Bool = Output(Bool())
+  val topIO = new Bundle {
+    val readOutPSum: Bool = Input(Bool())
+    val cgEnable: Bool = Input(Bool())
+  }
+  val glbLoadEn: Bool = Output(Bool())
 }
