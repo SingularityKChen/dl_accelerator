@@ -25,6 +25,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   private val weightDataStream = oneStreamData.map(_.weightDataStream)
   private val weightCountStream = oneStreamData.map(_.weightCountStream)
   private val pSumStream = oneStreamData.map(_.outPSumStream)
+  private def toBinary(i: Int, digits: Int = 8): String =
+    String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
+  private def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = { // input data and count, and combine them together
+    val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
+    val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
+    val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
+    theDataCountDec
+  }
   private def readOutAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
                          theData: List[Int], idx: Int, theClock: Clock, adrOrData: Boolean
                         ): Unit = {
@@ -431,7 +439,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
       val InActAdrStream = inActAdrStream.head.flatten.toList
-      val InActDataStream = inActDataStream.head.flatten.toList
+      //val InActDataStream = inActDataStream.head.flatten.toList
+      val InActDataStream = combineDataAndCount(inActDataStream.head.flatten, inActCountStream.head.flatten).toList
       println("----- inActReadCycle = " + InActAdrStream.length)
       println("----------------- test begin -----------------")
       println(s"--------  theInActStreamNum = $inActStreamNum")
@@ -472,7 +481,10 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
       val theInActAdrStreams = inActAdrStream.take(inActRouterNum).map(_.flatten.toList)
-      val theInActDataStreams = inActDataStream.take(inActRouterNum).map(_.flatten.toList)
+      //val theInActDataStreams = inActDataStream.take(inActRouterNum).map(_.flatten.toList)
+      val theInActDataStreams = inActDataStream.take(inActRouterNum).zip(inActCountStream.take(inActRouterNum)).map({ case (seq, seq1) =>
+        combineDataAndCount(seq.flatten, seq1.flatten).toList
+      })
       val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
       val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
@@ -567,11 +579,61 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
       val pSumDataIO = theTopIO.dataPath.pSumIO
+      val inActDataIO = theTopIO.dataPath.inActIO
+      val weightDataIO = theTopIO.dataPath.weightIO
+      val theInActAdrStreams = inActAdrStream.take(inActRouterNum).map(_.flatten.toList)
+      val theInActDataStreams = inActDataStream.take(inActRouterNum).zip(inActCountStream.take(inActRouterNum)).map({ case (seq, seq1) =>
+        combineDataAndCount(seq.flatten, seq1.flatten).toList
+      })
+      val theWeightAdrStreams = weightAdrStream.take(weightRouterNum).map(_.flatten.toList)
+      val theWeightDataStreams = weightDataStream.take(weightRouterNum).zip(weightCountStream.take(weightRouterNum)).map({ case (seq, seq1) =>
+        combineDataAndCount(seq.flatten, seq1.flatten).toList
+      })
+      val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
       pSumDataIO.inIOs.foreach(_.setSourceClock(theClock))
+      inActDataIO.foreach({x =>
+        x.adrIOs.data.setSourceClock(theClock)
+        x.dataIOs.data.setSourceClock(theClock)
+      })
+      weightDataIO.foreach({x =>
+        x.adrIOs.data.setSourceClock(theClock)
+        x.dataIOs.data.setSourceClock(theClock)
+      })
+      def writeCSCPECluster(theInIO: StreamBitsIO, theStream: List[Int]): Unit = {
+        var idx = 0
+        while (theStream(idx) != 0) {
+          println(s"------------- write cycle $idx --------------")
+          theInIO.data.enqueueNow(theStream(idx).U)
+          /*theInIO.data.bits.poke(theStream(idx).U)
+          theInIO.data.valid.poke(true.B)
+          theInIO.data.ready.expect(false.B)*/
+          theClock.step()
+          idx = idx + 1
+        }
+        println(s"------------- write cycle $idx --------------")
+        theInIO.data.enqueueNow(theStream(idx).U)
+        /*theInIO.data.bits.poke(theStream(idx).U)
+        theInIO.data.valid.poke(true.B)
+        theInIO.data.ready.expect(false.B)*/
+        theClock.step()
+        // then should be in cal
+      }
       def forkPSumHelper(idx: Int): Unit = {
         theClock.step((new Random).nextInt(10) + 1)
         pSumDataIO.inIOs(idx).enqueueSeq(addendRand(idx).map(x => x.U))
         println(s"-------- $idx-th Column PEs receive all inPSum")
+      }
+      def forkWriteCSCHelper(index: Int, theCSCIO: CSCStreamIO, theAdrStream: List[Int],
+                             theDataStream: List[Int]): Unit = {
+        fork {
+          println(s"------------- write adr $index begin --------------")
+          writeCSCPECluster(theCSCIO.adrIOs, theAdrStream)
+          println(s"------------ write adr $index finish --------------")
+        } .fork {
+          println(s"------------ write data $index begin --------------")
+          writeCSCPECluster(theCSCIO.dataIOs, theDataStream)
+          println(s"------------ write data $index finish -------------")
+        } .join()
       }
       println("----------------- test begin -----------------")
       println("------------ PE Cluster Top Spec -------------")
@@ -580,10 +642,26 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theClock.step()
       thePECluster.reset.poke(false.B)
       theClock.step()
+      println("--------------- begin to load ----------------")
       theTopIO.ctrlPath.pSumCtrlSel.inDataSel.poke(true.B) // receive data from PSum Router
       theTopIO.ctrlPath.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
       theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
+      theClock.step()
+      fork {
+        (1 until inActSRAMNum).foldLeft(fork (forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
+          theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head))) {
+          case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
+            theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right)))
+        }
+      } .fork {
+        (1 until weightRouterNum).foldLeft(fork (forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
+          theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head))) {
+          case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
+            theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right)))
+        }
+      } .join()
       // after finish
+      //theTopIO.ctrlPath.allCalFin.expect(true.B)
       theTopIO.ctrlPath.pSumLoadEn.poke(true.B) // begin to accumulate PSum
       (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {
         case (left, right) => left.fork(forkPSumHelper(idx = right))
@@ -605,6 +683,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
   behavior of "test the spec of Cluster Group"
+  //chisel3.Driver.emitVerilog(new ClusterGroup(false))
   it should "work well on Cluster Group" in {
     test (new ClusterGroup(true)) { theCG =>
       val theTop = theCG.io
