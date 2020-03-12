@@ -59,7 +59,7 @@ This is the original fundamental component of deep learning accelerator and the 
 
 At SPad for loop, the row number of the 2D partial sum matrix is `M0`, the column number of it is `F0*N0*E`, the size of partial sum matrix is must less than the size of PSumSPad, which equals to `pSumDataSPadSize`.
 
-The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Data-Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
+The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Compressed-Sparse-Column-Data-Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
 
 All three kinds of data are stored in column's order, i.e., partial sum store the first `M0` elements, then second until `F0*N0*E` elements.
 
@@ -69,7 +69,7 @@ All three kinds of data are stored in column's order, i.e., partial sum store th
 
 #### Some Differences
 
-The original PE will select the data from input partial sum FIFO or the product result of the current weight and the current input activation, and then add the optional result with the data load from PSum scratch pad. While in this project, due to the misunderstanding of Global buffer level's for loop, I changed this mux: write the data from input partial sum FIFO or the results of current MAC with `pSumEnqEn` signal.
+The original one use CSC format, but I changed it for convenience. More details can be found [later](#Compressed-Sparse-Column-Data-Format)
 
 #### ProcessingElementControl
 
@@ -246,7 +246,33 @@ This behavior contains several tests related to the GLB cluster's spec, i.e., th
 
 ##### test the spec of Processing Element Cluster
 
-## Data Format
+## Data Flow And Data Format
+
+### Row-Stationary Plus \(RS+\) DataFlow
+
+The figure bellow shows the data flow of Row Stationary Plus, and you can find it at ref.3.
+
+![](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312231702.png)
+
+And the figure bellow is the data flow of Row Stationary, you will find more information at ref.1.
+
+![](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200311220756.png)
+
+However, when I tried to map the Row Stationary Plus data flow into a graph like Row Stationary's, I found that we are supposed to accumulate each partial sum columns rather than rows, because in RS+, we have done each row in SPad Level, i.e., the for loop of `E` and `R`.
+
+So we can get the graphs bellow.
+
+At SPad level, we will calculate all rows of weights and partial sums, so we don't have to care about this dimension at other levels.
+
+![EyerissV2 SPad Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232716EyerissV2SPadLevel.png)
+
+At Noc level, all kinds of data will be mapped in to PE array at same time, and regard the PEs which will produce the same column of partial sums as one group.
+
+![EyerissV2 NoC Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232830EyerissV2NoCLevel.png)
+
+At Global Buffer level, each group we created at Noc level will read in those data.
+
+![EyerissV2 Global Buffer Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312233211EyerissV2GlobalBufferLevel.png)
 
 ### Compressed Sparse Column Data Format
 
