@@ -1,6 +1,6 @@
 package dla.tests
 
-import dla.cluster.{ClusterSRAMConfig, GNMFCS2Config}
+import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 
@@ -32,7 +32,7 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS2Config {
+class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config {
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
   protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt
   protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt

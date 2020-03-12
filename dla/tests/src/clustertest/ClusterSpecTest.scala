@@ -574,6 +574,24 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   }
 
   behavior of "test the spec of PE Cluster"
+  it should "work well on PE Controller" in {
+    test (new PEClusterInAct) { thePEAct =>
+      val theTopIO = thePEAct.io
+      val theClock = thePEAct.clock
+      val theTopToCtrlIO = theTopIO.inActToArrayData.inActIO // inActRouter number
+      val theCtrlToPEIO = theTopIO.inActToArrayData.muxInActData // (peRow, peCol)
+      val theCtrlIO = theTopIO.inActCtrlSel
+      val theDoneIO = theTopIO.inActWriteFinVec // (peRow, peCol)
+      println("----------------- test begin -----------------")
+      println("----------- PE Cluster Ctrl Spec -------------")
+      println("---------- test basic connections-------------")
+      thePEAct.reset.poke(true.B)
+      theClock.step()
+      thePEAct.reset.poke(false.B)
+      theClock.step()
+      println("--------------- begin to load ----------------")
+    }
+  }
   it should "work well on PE Cluster" in {
     test (new PECluster(true)) { thePECluster =>
       val theTopIO = thePECluster.io
@@ -590,37 +608,27 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         combineDataAndCount(seq.flatten, seq1.flatten).toList
       })
       val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
-      pSumDataIO.inIOs.foreach(_.setSourceClock(theClock))
-      inActDataIO.foreach({x =>
-        x.adrIOs.data.setSourceClock(theClock)
-        x.dataIOs.data.setSourceClock(theClock)
-      })
-      weightDataIO.foreach({x =>
-        x.adrIOs.data.setSourceClock(theClock)
-        x.dataIOs.data.setSourceClock(theClock)
-      })
       def writeCSCPECluster(theInIO: StreamBitsIO, theStream: List[Int]): Unit = {
         var idx = 0
         while (theStream(idx) != 0) {
           println(s"------------- write cycle $idx --------------")
-          theInIO.data.enqueueNow(theStream(idx).U)
-          /*theInIO.data.bits.poke(theStream(idx).U)
+          theInIO.data.bits.poke(theStream(idx).U)
           theInIO.data.valid.poke(true.B)
-          theInIO.data.ready.expect(false.B)*/
+          theInIO.data.ready.expect(false.B)
           theClock.step()
           idx = idx + 1
         }
         println(s"------------- write cycle $idx --------------")
-        theInIO.data.enqueueNow(theStream(idx).U)
-        /*theInIO.data.bits.poke(theStream(idx).U)
+        theInIO.data.bits.poke(theStream(idx).U)
         theInIO.data.valid.poke(true.B)
-        theInIO.data.ready.expect(false.B)*/
+        theInIO.data.ready.expect(false.B)
         theClock.step()
         // then should be in cal
       }
       def forkPSumHelper(idx: Int): Unit = {
         theClock.step((new Random).nextInt(10) + 1)
-        pSumDataIO.inIOs(idx).enqueueSeq(addendRand(idx).map(x => x.U))
+        pSumDataIO.inIOs(idx).valid.poke(true.B)
+        pSumDataIO.inIOs(idx).bits.poke(addendRand(idx).head.U) // FIXME
         println(s"-------- $idx-th Column PEs receive all inPSum")
       }
       def forkWriteCSCHelper(index: Int, theCSCIO: CSCStreamIO, theAdrStream: List[Int],
@@ -648,17 +656,17 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
       theClock.step()
       fork {
-        (1 until inActSRAMNum).foldLeft(fork (forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
+        (1 until inActSRAMNum).foldLeft( fork(forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
           theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head))) {
           case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
             theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right)))
-        }
+        } .join()
       } .fork {
-        (1 until weightRouterNum).foldLeft(fork (forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
+        (1 until weightRouterNum).foldLeft( fork(forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
           theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head))) {
           case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
             theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right)))
-        }
+        } .join()
       } .join()
       // after finish
       //theTopIO.ctrlPath.allCalFin.expect(true.B)

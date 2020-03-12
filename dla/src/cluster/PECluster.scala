@@ -102,7 +102,7 @@ class PEClusterInAct extends Module with ClusterConfig {
   inActBroadCastIdxWire.suggestName("inActBroadCastIdxWire")
   inActRoutingMode := io.inActCtrlSel.inDataSel // true for broad-cast
   inActBroadCastIdxWire := io.inActCtrlSel.outDataSel
-  when (inActRoutingMode) {
+  when (inActRoutingMode) { // when need to broad-cast, then each port of inAct should connect to the same one
     dataPart.inActToArrayData.inActIO.foreach({x =>
       x.adrIOs.data.bits := MuxLookup(io.inActCtrlSel.outDataSel, 0.U, io.inActToArrayData.inActIO.zipWithIndex.map({
         case (o, i) => i.asUInt -> o.adrIOs.data.bits}))
@@ -118,8 +118,6 @@ class PEClusterInAct extends Module with ClusterConfig {
         if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.adrIOs.data.ready).reduce(_ && _)
         else idx.asUInt -> false.B
       }))
-    })
-    io.inActToArrayData.inActIO.zipWithIndex.foreach({case (x, idx1) =>
       x.dataIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B, Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
         if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.dataIOs.data.ready).reduce(_ && _)
         else idx.asUInt -> false.B
@@ -221,10 +219,6 @@ class PEClusterInActController extends Module with ClusterConfig {
       inActWriteDoneRegVec(1)(i)(j) := Mux(io.inActWriteFinVec(i)(j).dataWriteFin,
         !inActWriteDoneRegVec(1)(i)(j), inActWriteDoneRegVec(1)(i)(j))
       inActWriteDoneWireVec(i)(j) := inActWriteDoneRegVec.head(i)(j) && inActWriteDoneRegVec(1)(i)(j)
-      when (inActWriteDoneWireVec(i)(j)) {
-        // only need one cycle for inActStateReg to jump, then can assign them to false
-        inActWriteDoneRegVec.foreach(x => x(i)(j) := false.B)
-      }
       val iPlusJMod = (i + j) % inActRouterNum
       if (i + j < inActRouterNum) {
         inActWriteEnWires(i)(j) := inActDataIOZeroWires(iPlusJMod)
@@ -244,8 +238,20 @@ class PEClusterInActController extends Module with ClusterConfig {
     var wDoneJPOneWires: Seq[Bool] = Nil
     for (i <- 0 until peRowNum) {
       for (j <- 0 until peColNum) {
-        if (i + j == k) wDoneJPZeroWires = wDoneJPZeroWires.+:(inActWriteDoneWireVec(i)(j))
-        if (i + j == k + inActRouterNum) wDoneJPOneWires = wDoneJPOneWires.+:(inActWriteDoneWireVec(i)(j))
+        if (i + j == k) {
+          wDoneJPZeroWires = wDoneJPZeroWires.+:(inActWriteDoneWireVec(i)(j)) // do now
+          when (inActDataStateJumpWires.head(k)) {
+            // only need one cycle for inActStateReg to jump, then can assign them to false
+            inActWriteDoneRegVec.foreach(x => x(i)(j) := false.B)
+          }
+        }
+        if (i + j == k + inActRouterNum) {
+          wDoneJPOneWires = wDoneJPOneWires.+:(inActWriteDoneWireVec(i)(j)) // do later
+          when (inActDataStateJumpWires.last(k)) {
+            // only need one cycle for inActStateReg to jump, then can assign them to false
+            inActWriteDoneRegVec.foreach(x => x(i)(j) := false.B)
+          }
+        }
       }
     }
     inActDataStateJumpWires.head(k) := wDoneJPZeroWires.reduce(_ && _)
@@ -269,8 +275,9 @@ class PEClusterInActController extends Module with ClusterConfig {
 }
 
 class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
-  // output bits and valid
+  // output bits and valid, from inActCtrl to PEArray
   val muxInActData: Vec[Vec[CSCStreamIO]] = Vec(peRowNum, Vec(peColNum, new CSCStreamIO(inActAdrWidth, inActDataWidth)))
+  // from top to inActCtrl
   val inActIO: Vec[CSCStreamIO] = Vec(inActRouterNum, Flipped(new CSCStreamIO(inActAdrWidth, inActDataWidth))) // input only
 }
 

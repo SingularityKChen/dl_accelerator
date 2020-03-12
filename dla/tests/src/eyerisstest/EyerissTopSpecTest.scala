@@ -12,6 +12,7 @@ import scala.math.pow
 
 class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "test the spec of Eyeriss"
+  //chisel3.Driver.emitVerilog(new Eyeriss(false))
   it should "work well on the basic test of Eyeriss" in {
     test (new Eyeriss(true)) { theEyeriss =>
       val theTopIO = theEyeriss.io
@@ -23,13 +24,15 @@ class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matche
   }
 }
 
-class CheckConfigs extends FlatSpec with EyerissTopConfig with GNMFCS1Config with GNMFCS2Config with MCRENFConfig with ClusterSRAMConfig with SPadSizeConfig{
+class CheckConfigs extends FlatSpec with EyerissTopConfig with GNMFCS1Config with GNMFCS2Config with MCRENFConfig
+  with ClusterSRAMConfig with SPadSizeConfig {
   private val onePSumMatrixSize = Seq(M0, F0*N0*E)
   private val oneSPadPSum: Int = onePSumMatrixSize.product // when read counts this, then stop
-  assert(C1 < cgRowNum, "C1 should smaller than cgRowNum to accumulate tiling partial sums together")
-  assert(G1*N1*M1 < cgColNum*cgRowNum, "should have enough ClusterGroups to be mapped with tiling matrix multiplication")
+  assert(G1*(S1/peRowNum)*(F1/peColNum)*C1*N1*M1 == cgRowNum * cgColNum)
+  assert(S1 % peRowNum == 0, s"S1 should be a multiple of peRowNum, $S1 % $peRowNum == 0?")
+  assert(F1 % peColNum == 0, s"S1 should be a multiple of peRowNum, $F1 % $peColNum == 0?")
+  assert(C1*S1 < cgRowNum, "C1*S1 should smaller than cgRowNum to accumulate tiling partial sums together")
   assert(oneSPadPSum*N2*M2*F2 < pSumSRAMSize, "pSumSRAM should contain one group of data")
-  assert(F1 == 1, "maybe you need to change the logic design")
-  assert(S1 == 1, "maybe you need to change the logic design")
+  assert(C1 == 1 && S1 == peRowNum && F1 == peColNum, "maybe you need to change the logic design") // TODO: remove this
   assert(oneSPadPSum <= pSumDataSPadSize, "oneSPadPSum should less than the size of pSum SPad")
 }
