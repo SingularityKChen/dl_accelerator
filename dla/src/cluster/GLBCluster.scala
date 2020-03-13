@@ -117,7 +117,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   theSRAM.suggestName("oneInActSRAM")
   val io: InACTSRAMCommonIO = IO(new InACTSRAMCommonIO(theSRAMSize, theDataWidth))
   // use lookup table to store the start addrsss in the SRAM of each stream
-  private val adrLookUpTable = Mem(inActStreamNum, UInt(log2Ceil(theSRAMSize).W))
+  private val adrLookUpTable = Mem(2*inActStreamNum, UInt(log2Ceil(theSRAMSize).W))
   private val noZero :: oneZero :: twoZeros :: Nil = Enum(3)
   private val zeroState = Seq.fill(2){RegInit(noZero)} // 0 for read, 1 for write
   private val meetZeroWire = Wire(Vec(2, Bool())) // 0 for read, 1 for write
@@ -126,7 +126,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   private val writeIdxReg = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
   private val readIdxIncReg = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
   // lookup table
-  private val lookupTableWriteIdx = RegInit(0.U(log2Ceil(inActStreamNum).W))
+  private val lookupTableWriteIdx = RegInit(0.U(log2Ceil(2*inActStreamNum).W))
   private val readStartIdx = adrLookUpTable.read(io.ctrlPath.readIO.adr)
   when (RegNext(meetZeroWire.last)) {
     // when meet zero, then next cycle, after the writeIdx reg increase, we need to record the start index of new stream

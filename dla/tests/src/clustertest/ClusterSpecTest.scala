@@ -5,6 +5,7 @@ import chisel3._
 import chisel3.experimental.{DataMirror, Direction}
 import chisel3.tester._
 import dla.cluster._
+import dla.eyerissTop.EyerissTopConfig
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import dla.tests.GenOneStreamData
 import org.scalatest._
@@ -12,27 +13,21 @@ import scala.util.Random
 import scala.math.max
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
-  with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config {
+  with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config
+  with EyerissTopConfig with GNMFCS1Config {
   //private val printLogDetails = false // true to print more detailed logs
   private val printLogDetails = true // true to print more detailed logs
   private val maxPSumStreamNum: Int = pSumSRAMSize/pSumOneSPadNum
   private val addendRand = Seq.fill(peColNum, pSumOneSPadNum){(new Random).nextInt(10)}
-  private val oneStreamData = Seq.fill(max(inActRouterNum, pSumRouterNum)){new GenOneStreamData}
-  private val inActAdrStream = oneStreamData.map(_.inActAdrStream)
-  private val inActDataStream = oneStreamData.map(_.inActDataStream)
-  private val inActCountStream = oneStreamData.map(_.inActCountStream)
-  private val weightAdrStream = oneStreamData.map(_.weightAdrStream)
-  private val weightDataStream = oneStreamData.map(_.weightDataStream)
-  private val weightCountStream = oneStreamData.map(_.weightCountStream)
-  private val pSumStream = oneStreamData.map(_.outPSumStream)
+  private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
+  private val oneStreamData = new GenOneStreamData
+  private val inActAdrStream = oneStreamData.inActAdrStream
+  private val inActDataStream = oneStreamData.inActDataStream
+  private val weightAdrStream = oneStreamData.weightAdrStream
+  private val weightDataStream = oneStreamData.weightDataStream
+  private val pSumStream = oneStreamData.outPSumStream
   private def toBinary(i: Int, digits: Int = 8): String =
     String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
-  private def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = { // input data and count, and combine them together
-    val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
-    val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
-    val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
-    theDataCountDec
-  }
   private def readOutAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
                          theData: List[Int], idx: Int, theClock: Clock, adrOrData: Boolean
                         ): Unit = {
@@ -361,7 +356,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     test(new PSumSRAMBank(pSumSRAMSize, psDataWidth, true)) { thePSumBank =>
       val theTopIO = thePSumBank.io
       val theClock = thePSumBank.clock
-      val theData = pSumStream.head.flatten
+      val theData = pSumStream.head
       val startIndex = (new Random).nextInt(maxPSumStreamNum - 1) * pSumOneSPadNum
       println("---------------- test begin ----------------")
       println("---------- Partial Sum SRAM Bank -----------")
@@ -391,7 +386,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
         val theTopIO = theAdrSRAM.io
         val theClock = theAdrSRAM.clock
-        val InActAdrStream = inActAdrStream.head.flatten.toList
+        val InActAdrStream = inActAdrStream.head
+        require(InActAdrStream.length <= inActAdrSRAMSize, s"the size of current inAct should less than inActAdrSRAMSize, " +
+          s"but ${InActAdrStream.length} > $inActAdrSRAMSize")
         println("----------------- test begin -----------------")
         println("----------- InputActAdr SRAM Bank ------------")
         println("----------- test basic functions -------------")
@@ -438,9 +435,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     test(new InActSRAMBank(true)) { theInAct =>
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
-      val InActAdrStream = inActAdrStream.head.flatten.toList
-      //val InActDataStream = inActDataStream.head.flatten.toList
-      val InActDataStream = combineDataAndCount(inActDataStream.head.flatten, inActCountStream.head.flatten).toList
+      val InActAdrStream = inActAdrStream.head
+      val InActDataStream = inActDataStream.head
       println("----- inActReadCycle = " + InActAdrStream.length)
       println("----------------- test begin -----------------")
       println(s"--------  theInActStreamNum = $inActStreamNum")
@@ -480,12 +476,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theClock = theGLB.clock
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
-      val theInActAdrStreams = inActAdrStream.take(inActRouterNum).map(_.flatten.toList)
-      //val theInActDataStreams = inActDataStream.take(inActRouterNum).map(_.flatten.toList)
-      val theInActDataStreams = inActDataStream.take(inActRouterNum).zip(inActCountStream.take(inActRouterNum)).map({ case (seq, seq1) =>
-        combineDataAndCount(seq.flatten, seq1.flatten).toList
-      })
-      val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
+      val theInActAdrStreams = inActAdrStream.take(inActRouterNum)
+      val theInActDataStreams = inActDataStream.take(inActRouterNum)
+      val thePSumDataStreams = pSumStream.take(pSumRouterNum)
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
       val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
       require(pSumStartIdx + pSumOneSPadNum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
@@ -599,15 +592,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val pSumDataIO = theTopIO.dataPath.pSumIO
       val inActDataIO = theTopIO.dataPath.inActIO
       val weightDataIO = theTopIO.dataPath.weightIO
-      val theInActAdrStreams = inActAdrStream.take(inActRouterNum).map(_.flatten.toList)
-      val theInActDataStreams = inActDataStream.take(inActRouterNum).zip(inActCountStream.take(inActRouterNum)).map({ case (seq, seq1) =>
-        combineDataAndCount(seq.flatten, seq1.flatten).toList
-      })
-      val theWeightAdrStreams = weightAdrStream.take(weightRouterNum).map(_.flatten.toList)
-      val theWeightDataStreams = weightDataStream.take(weightRouterNum).zip(weightCountStream.take(weightRouterNum)).map({ case (seq, seq1) =>
-        combineDataAndCount(seq.flatten, seq1.flatten).toList
-      })
-      val thePSumDataStreams = pSumStream.take(pSumRouterNum).map(_.flatten)
+      val theInActAdrStreams = inActAdrStream.take(inActRouterNum)
+      val theInActDataStreams = inActDataStream.take(inActRouterNum)
+      val theWeightAdrStreams = weightAdrStream.take(weightRouterNum)
+      val theWeightDataStreams = weightDataStream.take(weightRouterNum)
+      val thePSumDataStreams = pSumStream.take(pSumRouterNum)
       def writeCSCPECluster(theInIO: StreamBitsIO, theStream: List[Int]): Unit = {
         var idx = 0
         while (theStream(idx) != 0) {

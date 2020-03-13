@@ -1,6 +1,7 @@
 package dla.tests
 
 import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
+import dla.eyerissTop.EyerissTopConfig
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 
@@ -32,7 +33,8 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config {
+class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
+  with ClusterSRAMConfig with EyerissTopConfig {
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
   protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt
   protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt
@@ -136,6 +138,15 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
     dataList = dataList:::List(0)
     Seq(adrList, countList, dataList)
   }
+  protected def toBinary(i: Int, digits: Int = 8): String =
+    String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
+  protected def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = {
+    // input data and count, and combine them together
+    val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
+    val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
+    val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
+    theDataCountDec
+  }
 }
 
 class GenOnePETestData extends GenFunc {
@@ -182,61 +193,178 @@ class GenOnePETestData extends GenFunc {
       error = true
     }
     if (error) {
-      println("[Waring] Ops!!! those are not what you need!!!")
+      print("x")
+      //println("[Waring] Ops!!! those are not what you need!!!")
     } else {
-      println("[Info] Congratulate!!! you've got what you want!!!")
+      print(".")
+      //println("[Info] Congratulate!!! you've got what you want!!!")
     }
     error
   }
 }
 
-class GenOneStreamData extends GenFunc with ClusterSRAMConfig {
+class GenOneStreamData extends GenFunc {
   require(M2 <= N2*F2, s"M2 should less than N2*F2, $M2 <= ${N2*F2} ?")
-  private val oneStream = Seq.fill(max(inActStreamNum, weightStreamNum)){new GenOnePETestData}
-  val inActStream: Seq[List[List[Int]]] = oneStream.take(inActStreamNum).map(x => x.inActList)
-  val inActAdrStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActAdrRand).:+(List(0))
-  val inActCountStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActCountRand).:+(List(0))
-  val inActDataStream: Seq[List[Int]] = oneStream.take(inActStreamNum).map(x => x.inInActDataRand).:+(List(0))
-  val weightStream: Seq[List[List[Int]]] = oneStream.take(weightStreamNum).map(x => x.weightList)
-  val weightAdrStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightAdrRand).:+(List(0))
-  val weightCountStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightCountRand).:+(List(0))
-  val weightDataStream: Seq[List[Int]] = oneStream.take(weightStreamNum).map(x => x.inWeightDataRand).:+(List(0))
-  val outPSumStream: List[List[Int]] = goldenFlatStreamResult()
-  require(inActAdrStream.flatten.length <= inActAdrSRAMSize, s"inActAdrSRAM should fit in all inActAdr, " +
-    s"but ${inActAdrStream.flatten.length} > $inActAdrSRAMSize")
-  require(inActCountStream.flatten.length <= inActDataSRAMSize, s"inActDataSRAM should fit in all inActData, " +
-    s"but ${inActCountStream.flatten.length} > $inActDataSRAMSize")
-  require(outPSumStream.flatten.length <= pSumSRAMSize, s"pSumSRAM should fit in all pSumData, " +
-    s"but ${outPSumStream.flatten.length} > $pSumSRAMSize")
+  private val inActGLBNum = inActStreamNum * inActParNum
+  private val weightGLBNum = weightStreamNum * weightParNum
+  private val pSumGLBNum = pSumStreamNum * pSumParNum
+  private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
+  private val oneStream = Seq.fill(max(inActGLBNum, weightGLBNum)){new GenOnePETestData}
+  print("\n")
+  private val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
+  println(s"the length of inActStream = ${inActStream.flatten.flatten.length}")
+  private val inActAdrStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActAdrRand)
+  println(s"the length of inActAdrStreamTmp = ${inActAdrStreamTmp.flatten.length}")
+  private val inActCountStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActCountRand)
+  private val inActDataStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActDataRand)
+  println(s"the length of inActDataStreamTmp = ${inActDataStreamTmp.flatten.length}")
+  private val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
+  println(s"the length of weightStream = ${weightStream.flatten.flatten.length}")
+  private val weightAdrStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightAdrRand)
+  println(s"the length of weightAdrStreamTmp = ${weightAdrStreamTmp.flatten.length}")
+  private val weightCountStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightCountRand)
+  private val weightDataStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightDataRand)
+  println(s"the length of weightDataStreamTmp = ${weightDataStreamTmp.flatten.length}")
+  /*val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
+  val inActAdrStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActAdrRand).:+(List(0))
+  val inActCountStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActCountRand).:+(List(0))
+  val inActDataStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActDataRand).:+(List(0))
+  val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
+  val weightAdrStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightAdrRand).:+(List(0))
+  val weightCountStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightCountRand).:+(List(0))
+  val weightDataStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightDataRand).:+(List(0))*/
+  val outPSumStreamTmp: List[List[Int]] = goldenFlatStreamResult()
+  println(s"the length of outPSumStreamTmp = ${outPSumStreamTmp.flatten.length}")
+  private val (rightInActAdr, rightInActData, rightWeightAdr, rightWeightData, rightPSumData) = getThingsReady
+  val inActAdrStream: Seq[List[Int]] = rightInActAdr
+  println(s"the length of inActAdrStream = ${inActAdrStream.flatten.length}")
+  val inActDataStream: Seq[List[Int]] = rightInActData // has combined data and count
+  val weightAdrStream: Seq[List[Int]] = rightWeightAdr
+  val weightDataStream: Seq[List[Int]] = rightWeightData // has combined data and count
+  val outPSumStream: List[List[Int]] = rightPSumData.toList
+  private def getThingsReady: (Seq[List[Int]], Seq[List[Int]], Seq[List[Int]], Seq[List[Int]], Seq[List[Int]]) = {
+    require(S1 == 3 && F1 == 4, "you need to correct this data generation function to fit more situations") // TODO: remove
+    var inActAdr: List[List[Int]] = Nil
+    var inActData: List[List[Int]] = Nil // include count
+    var weightAdr: List[List[Int]] = Nil
+    var weightData: List[List[Int]] = Nil // include count
+    var pSumData: List[List[Int]] = Nil
+    for (g1 <- 0 until G1) {
+      for (n1 <- 0 until N1) {
+        for (m1 <- 0 until M1) {
+          for (f1 <- 0 until F1) {
+            for (c1 <- 0 until C1) {
+              for (s1 <- 0 until S1) {
+                var inActAdrTmp: List[List[Int]] = Nil
+                var inActDataTmp: List[List[Int]] = Nil // include count
+                var weightAdrTmp: List[List[Int]] = Nil
+                var weightDataTmp: List[List[Int]] = Nil // include count
+                var pSumDataTmp: List[List[Int]] = Nil
+                for (g2 <- 0 until G2) {
+                  for (n2 <- 0 until N2) {
+                    for (m2 <- 0 until M2) {
+                      for (f2 <- 0 until F2) {
+                        for (c2 <- 0 until C2) {
+                          for (s2 <- 0 until S2) {
+                            val weightIdx = (g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2)*weightParNum +
+                              g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                            val inActIdx: Int = (g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2))*inActParNum +
+                              g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c2*(F1 + S1) + (f1 + s1)
+                            val pSumIdx: Int = (g2*N2*M2*F2 + n2*M2*F2 + m2*F2 + f2)*pSumParNum +
+                              g1*N1*M1*F1 + n1*M1*F1 + m1*F1 + f1
+                            inActAdrTmp = inActAdrTmp:::List(inActAdrStreamTmp(inActIdx):::List(0))
+                            // this is the end of one stream, if we see it from one PE's aspect.
+                            inActDataTmp = inActDataTmp:::List(combineDataAndCount(inActDataStreamTmp(inActIdx),
+                              inActCountStreamTmp(inActIdx):::List(0)).toList)
+                            weightAdrTmp = weightAdrTmp:::List(weightAdrStreamTmp(weightIdx):::List(0))
+                            weightDataTmp = weightDataTmp:::List(combineDataAndCount(weightDataStreamTmp(weightIdx),
+                              weightCountStreamTmp(weightIdx):::List(0)).toList)
+                            pSumDataTmp = pSumDataTmp:::List(outPSumStreamTmp(pSumIdx))
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                println(s"the length of inActAdrTmp = ${inActAdrTmp.flatten.length}")
+                println(s"the length of inActDataTmp = ${inActDataTmp.flatten.length}")
+                println(s"the length of pSumDataTmp = ${pSumDataTmp.flatten.length}")
+                require(inActAdrTmp.flatten.length <= inActAdrSRAMSize, s"current inActAdr should fit in one inActSRAM, " +
+                  s"but ${inActAdrTmp.flatten.length} > $inActAdrSRAMSize")
+                require(inActDataTmp.flatten.length <= inActDataSRAMSize, s"current inActData should fit in one inActDataSRAM, " +
+                  s"but ${inActDataTmp.flatten.length} > $inActDataSRAMSize")
+                require(pSumDataTmp.flatten.length <= pSumSRAMSize, s"current pSumData should fit in one pSumSRAM, " +
+                  s"but ${pSumDataTmp.flatten.length} > $pSumSRAMSize")
+                inActAdr = inActAdr:::List(inActAdrTmp.flatten)
+                inActData = inActData:::List(inActDataTmp.flatten)
+                weightAdr = weightAdr:::List(weightAdrTmp.flatten)
+                weightData = weightData:::List(weightDataTmp.flatten)
+                pSumData = pSumData:::List(pSumDataTmp.flatten)
+              }
+            }
+          }
+        }
+      }
+    }
+    (inActAdr, inActData, weightAdr, weightData, pSumData)
+  }
   private def goldenFlatStreamResult(): List[List[Int]] = {
     var outPSumStream: List[List[Int]] = Nil
     for (g2 <- 0 until G2) {
       for (n2 <- 0 until N2) {
         for (m2 <- 0 until M2) {
           for (f2 <- 0 until F2) {
-            var currentPSum: List[Int] = Nil
-            var currentTempPSum: List[List[Int]] = Nil
+            var currentStreamTempPSum: List[List[List[Int]]] = Nil
             for (c2 <- 0 until C2) {
               for (s2 <- 0 until S2) {
-                val weightIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
-                val inActIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2)
-                val goldFlatPSum = goldenFlatResult(weightStream(weightIdx),
-                  inActStream(inActIdx))
-                currentTempPSum = currentTempPSum:::List(goldFlatPSum)
+                var oneStreamPSum: List[List[Int]] = Nil
+                for (g1 <- 0 until G1) {
+                  for (n1 <- 0 until N1) {
+                    for (m1 <- 0 until M1) {
+                      for (f1 <- 0 until F1) {
+                        var currentParPSum: List[Int] = Nil
+                        var currentParTempPSum: List[List[Int]] = Nil
+                        for (c1 <- 0 until C1) {
+                          for (s1 <- 0 until S1) {
+                            val weightIdx = (g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2)*weightParNum +
+                              g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                            val inActIdx = (g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2))*inActParNum +
+                              g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c2*(F1 + S1) + (f1 + s1)
+                            val goldFlatPSum = goldenFlatResult(weightStream(weightIdx),
+                              inActStream(inActIdx))
+                            currentParTempPSum = currentParTempPSum:::List(goldFlatPSum)
+                          }
+                        }
+                        for (i <- 0 until pSumOneSPadNum) {
+                          var oneCurrentPSum: Int = 0
+                          oneCurrentPSum = currentParTempPSum.map(x => x(i)).sum
+                          currentParPSum = currentParPSum:::List(oneCurrentPSum)
+                        }
+                        oneStreamPSum = oneStreamPSum:::List(currentParPSum) // add this to the end of the Seq
+                      }
+                    }
+                  }
+                }
+                currentStreamTempPSum = currentStreamTempPSum:::List(oneStreamPSum)
               }
             }
-            for (i <- 0 until pSumOneSPadNum) {
-              var oneCurrentPSum: Int = 0
-              oneCurrentPSum = currentTempPSum.map(x => x(i)).sum
-              currentPSum = currentPSum:::List(oneCurrentPSum)
+            for (par <- 0 until pSumParNum) {
+              var oneParSum: List[Int] = Nil
+              for (i <- 0 until pSumOneSPadNum) {
+                var oneCurrentPSum: Int = 0
+                oneCurrentPSum = currentStreamTempPSum.map(x => x(par)).map(y => y(i)).sum
+                oneParSum = oneParSum:::List(oneCurrentPSum)
+              }
+              outPSumStream = outPSumStream:::List(oneParSum)
             }
-            outPSumStream = outPSumStream:::List(currentPSum) // add this to the end of the Seq
           }
         }
       }
     }
-    require(outPSumStream.length == pSumStreamNum, s"the PSum stream should have $pSumStreamNum pSum Lists, but ${outPSumStream.length}.")
-    outPSumStream.foreach(x => require(x.max <= pSumMax, s"each pSum should smaller than max, but ${x.max} is greater than $pSumMax"))
+    require(outPSumStream.length == pSumGLBNum, s"the PSum stream should have $pSumGLBNum pSum Lists, " +
+      s"but ${outPSumStream.length}.")
+    outPSumStream.foreach(x => require(x.max <= pSumMax, s"each pSum should smaller than max, " +
+      s"but ${x.max} is greater than $pSumMax"))
     outPSumStream
   }
 }
