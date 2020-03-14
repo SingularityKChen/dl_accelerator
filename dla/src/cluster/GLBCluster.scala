@@ -128,18 +128,19 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // lookup table
   private val lookupTableWriteIdx = RegInit(0.U(log2Ceil(2*inActStreamNum).W))
   private val readStartIdx = adrLookUpTable.read(io.ctrlPath.readIO.adr)
-  when (RegNext(meetZeroWire.last)) {
+  private val writeMeetZeroReg = RegNext(meetZeroWire.last)
+  when (writeMeetZeroReg) {
     // when meet zero, then next cycle, after the writeIdx reg increase, we need to record the start index of new stream
     adrLookUpTable.write(lookupTableWriteIdx, writeIdxReg)
   }
   lookupTableWriteIdx := Mux(writeDoneWire, 0.U,
-    Mux(RegNext(meetZeroWire.last) && doWriteWire, lookupTableWriteIdx + 1.U, lookupTableWriteIdx)
+    Mux(writeMeetZeroReg && doWriteWire, lookupTableWriteIdx + 1.U, lookupTableWriteIdx)
   ) // it will increase at second write cycle, as reg next be true as default
   // SRAM read write logic
   // if meet two continuous zeros, then the group of data finishes, also write finish
   private val meetTwoZerosWire = Wire(Bool())
   // TODO: add some logic to check whether one SPad of data is a zero matrix, true then jump
-  io.ctrlPath.readIO.done := readDoneWire
+  io.ctrlPath.readIO.done := readDoneWire && zeroState.head =/= oneZero
   io.ctrlPath.writeIO.done := writeDoneWire && writeIdxReg =/= 0.U
   // write logic
   writeLogic(io.dataPath.inIOs.data, enable = io.ctrlPath.writeIO.enable,
@@ -156,7 +157,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
     Mux(nextValidReg, readIdxIncReg + 1.U, readIdxIncReg)
   )
   // do finish?
-  meetZeroWire.head := readOutData === 0.U && waitForRead
+  meetZeroWire.head := readOutData === 0.U
   meetZeroWire.last := writeInData === 0.U
   for (i <- 0 until 2) {
     switch(zeroState(i)) {
@@ -166,10 +167,22 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
         }
       }
       is (oneZero) {
-        when (meetZeroWire(i)) {
-          zeroState(i) := twoZeros
-        } .otherwise {
-          zeroState(i) := noZero
+        if (i == 1) {
+          // when write, then just see current data.
+          when (meetZeroWire(i)) {
+            zeroState(i) := twoZeros
+          } .otherwise {
+            zeroState(i) := noZero
+          }
+        } else {
+          // While read, only waitForRead is true, then we can judge it.
+          when (waitForRead) {
+            when (meetZeroWire(i)) {
+              zeroState(i) := twoZeros
+            } .otherwise {
+              zeroState(i) := noZero
+            }
+          }
         }
       }
       is (twoZeros) {
@@ -177,7 +190,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
       }
     }
   }
-  readDoneWire := zeroState.head === oneZero // or meet one zero
+  readDoneWire := meetZeroWire.head && waitForRead// or meet one zero
   writeDoneWire := meetTwoZerosWire
   meetTwoZerosWire := zeroState.last === twoZeros // that's two zeros, only write need
   // debug io
@@ -265,9 +278,9 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   io.ctrlPath.readIO.done := bothDoneWire.head
   io.ctrlPath.writeIO.done := bothDoneWire.last
   if (debug) {
-    io.debugIO.theState := Mux(io.ctrlPath.readIO.enable, inActState.head, inActState.last)
+    io.debugIO.theState := Mux(!io.ctrlPath.writeIO.enable, inActState.head, inActState.last)
     Seq(io.debugIO.adrDebug, io.debugIO.dataDebug).zip(Seq(adrSRAM, dataSRAM)).foreach({case (topIO, sram) =>
-      topIO.subDone := Mux(io.ctrlPath.readIO.enable, sram.ctrlPath.readIO.done, sram.ctrlPath.writeIO.done)
+      topIO.subDone := Mux(!io.ctrlPath.writeIO.enable, sram.ctrlPath.readIO.done, sram.ctrlPath.writeIO.done)
       topIO.commonDebug <> sram.debugIO
     })
   } else {

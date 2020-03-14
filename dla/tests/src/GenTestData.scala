@@ -225,14 +225,6 @@ class GenOneStreamData extends GenFunc {
   private val weightCountStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightCountRand)
   private val weightDataStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightDataRand)
   println(s"the length of weightDataStreamTmp = ${weightDataStreamTmp.flatten.length}")
-  /*val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
-  val inActAdrStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActAdrRand).:+(List(0))
-  val inActCountStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActCountRand).:+(List(0))
-  val inActDataStream: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActDataRand).:+(List(0))
-  val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
-  val weightAdrStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightAdrRand).:+(List(0))
-  val weightCountStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightCountRand).:+(List(0))
-  val weightDataStream: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightDataRand).:+(List(0))*/
   val outPSumStreamTmp: List[List[Int]] = goldenFlatStreamResult()
   println(s"the length of outPSumStreamTmp = ${outPSumStreamTmp.flatten.length}")
   private val (rightInActAdr, rightInActData, rightWeightAdr, rightWeightData, rightPSumData) = getThingsReady
@@ -260,45 +252,43 @@ class GenOneStreamData extends GenFunc {
                 var weightAdrTmp: List[List[Int]] = Nil
                 var weightDataTmp: List[List[Int]] = Nil // include count
                 var pSumDataTmp: List[List[Int]] = Nil
-                for (g2 <- 0 until G2) {
-                  for (n2 <- 0 until N2) {
-                    for (m2 <- 0 until M2) {
-                      for (f2 <- 0 until F2) {
-                        for (c2 <- 0 until C2) {
-                          for (s2 <- 0 until S2) {
-                            val weightIdx = (g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2)*weightParNum +
-                              g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
-                            val inActIdx: Int = (g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2))*inActParNum +
-                              g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c2*(F1 + S1) + (f1 + s1)
-                            val pSumIdx: Int = (g2*N2*M2*F2 + n2*M2*F2 + m2*F2 + f2)*pSumParNum +
-                              g1*N1*M1*F1 + n1*M1*F1 + m1*F1 + f1
-                            inActAdrTmp = inActAdrTmp:::List(inActAdrStreamTmp(inActIdx):::List(0))
-                            // this is the end of one stream, if we see it from one PE's aspect.
-                            inActDataTmp = inActDataTmp:::List(combineDataAndCount(inActDataStreamTmp(inActIdx),
-                              inActCountStreamTmp(inActIdx):::List(0)).toList)
-                            weightAdrTmp = weightAdrTmp:::List(weightAdrStreamTmp(weightIdx):::List(0))
-                            weightDataTmp = weightDataTmp:::List(combineDataAndCount(weightDataStreamTmp(weightIdx),
-                              weightCountStreamTmp(weightIdx):::List(0)).toList)
-                            pSumDataTmp = pSumDataTmp:::List(outPSumStreamTmp(pSumIdx))
-                          }
-                        }
-                      }
-                    }
-                  }
+                var inActIdxTest: List[Int] = Nil
+                for (i <- 0 until inActStreamNum) {
+                  val inActIdx = i*inActParNum + g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c1*(F1 + S1) + (f1 + s1)
+                  inActIdxTest = inActIdxTest:::List(inActIdx)
+                  inActAdrTmp = inActAdrTmp:::List(inActAdrStreamTmp(inActIdx))
+                  inActDataTmp = inActDataTmp:::List(combineDataAndCount(inActDataStreamTmp(inActIdx),
+                    inActCountStreamTmp(inActIdx)).toList)
                 }
+                for (i <- 0 until weightStreamNum) {
+                  val weightIdx = i*weightParNum + g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                  weightAdrTmp = weightAdrTmp:::List(weightAdrStreamTmp(weightIdx))
+                  weightDataTmp = weightDataTmp:::List(combineDataAndCount(weightDataStreamTmp(weightIdx),
+                    weightCountStreamTmp(weightIdx)).toList)
+                }
+                for (i <- 0 until pSumStreamNum) {
+                  val pSumIdx = i*pSumParNum + g1*N1*M1*F1 + n1*M1*F1 + m1*F1 + f1
+                  pSumDataTmp = pSumDataTmp:::List(outPSumStreamTmp(pSumIdx))
+                }
+                /*
+                println(s"inActAdrTmp = ${inActAdrTmp.flatten:::List(0)}")
+                println(s"inActDataTmp = ${inActDataTmp.flatten:::List(0)}")
+                println(s"pSumDataTmp = ${pSumDataTmp.flatten:::List(0)}")
                 println(s"the length of inActAdrTmp = ${inActAdrTmp.flatten.length}")
                 println(s"the length of inActDataTmp = ${inActDataTmp.flatten.length}")
                 println(s"the length of pSumDataTmp = ${pSumDataTmp.flatten.length}")
+                println(s"inActTest = $inActIdxTest")
+                println(s"the length of inActTest = ${inActIdxTest.length}")*/
                 require(inActAdrTmp.flatten.length <= inActAdrSRAMSize, s"current inActAdr should fit in one inActSRAM, " +
                   s"but ${inActAdrTmp.flatten.length} > $inActAdrSRAMSize")
                 require(inActDataTmp.flatten.length <= inActDataSRAMSize, s"current inActData should fit in one inActDataSRAM, " +
                   s"but ${inActDataTmp.flatten.length} > $inActDataSRAMSize")
                 require(pSumDataTmp.flatten.length <= pSumSRAMSize, s"current pSumData should fit in one pSumSRAM, " +
                   s"but ${pSumDataTmp.flatten.length} > $pSumSRAMSize")
-                inActAdr = inActAdr:::List(inActAdrTmp.flatten)
-                inActData = inActData:::List(inActDataTmp.flatten)
-                weightAdr = weightAdr:::List(weightAdrTmp.flatten)
-                weightData = weightData:::List(weightDataTmp.flatten)
+                inActAdr = inActAdr:::List(inActAdrTmp.flatten:::List(0))
+                inActData = inActData:::List(inActDataTmp.flatten:::List(0))
+                weightAdr = weightAdr:::List(weightAdrTmp.flatten:::List(0))
+                weightData = weightData:::List(weightDataTmp.flatten:::List(0))
                 pSumData = pSumData:::List(pSumDataTmp.flatten)
               }
             }
