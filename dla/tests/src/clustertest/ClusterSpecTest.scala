@@ -15,8 +15,8 @@ import scala.math.max
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config
   with EyerissTopConfig with GNMFCS1Config {
-  //private val printLogDetails = false // true to print more detailed logs
-  private val printLogDetails = true // true to print more detailed logs
+  private val printLogDetails = false // true to print more detailed logs
+  //private val printLogDetails = true // true to print more detailed logs
   private val maxPSumStreamNum: Int = pSumSRAMSize/pSumOneSPadNum
   private val addendRand = Seq.fill(peColNum, pSumOneSPadNum){(new Random).nextInt(10)}
   private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
@@ -572,14 +572,24 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   }
 
   behavior of "test the spec of PE Cluster"
-  it should "work well on PE Controller" in {
+  it should "work well on PE inAct Controller" in {
     test (new PEClusterInAct) { thePEAct =>
       val theTopIO = thePEAct.io
       val theClock = thePEAct.clock
-      val theTopToCtrlIO = theTopIO.inActToArrayData.inActIO // inActRouter number
-      val theCtrlToPEIO = theTopIO.inActToArrayData.muxInActData // (peRow, peCol)
+      val theTopToCtrlDataIO = theTopIO.inActToArrayData.inActIO // inActRouter number
+      val theCtrlToPEDataIO = theTopIO.inActToArrayData.muxInActData // (peRow, peCol)
       val theCtrlIO = theTopIO.inActCtrlSel
       val theDoneIO = theTopIO.inActWriteFinVec // (peRow, peCol)
+      def inActIOPokeHelper(idx: Int): Unit = {
+        println(s"inActIO$idx")
+        theTopToCtrlDataIO(idx).dataIOs.data.bits.poke(idx.U)
+        theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(true.B)
+      }
+      def muxInActPeekHelper(row: Int, col: Int): Unit = {
+        println(s"muxInActIO$row,$col")
+        theCtrlToPEDataIO(row)(col).dataIOs.data.ready.poke(theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek())
+        //theCtrlToPEDataIO(row)(col).dataIOs.data.bits.expect(0.U)
+      }
       println("----------------- test begin -----------------")
       println("----------- PE Cluster Ctrl Spec -------------")
       println("---------- test basic connections-------------")
@@ -588,6 +598,20 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       thePEAct.reset.poke(false.B)
       theClock.step()
       println("--------------- begin to load ----------------")
+      theCtrlIO.inDataSel.poke(false.B) // don't broad-cast
+      fork { // poke via inActIO
+        (1 until inActRouterNum).foldLeft(fork(inActIOPokeHelper(0))) {
+          case (left, right) => left.fork(inActIOPokeHelper(idx = right))
+        } .join()
+      } .fork { // peek via muxInActData
+        (1 until peRowNum).foldLeft((1 until peColNum).foldLeft(fork(muxInActPeekHelper(0, 0))){
+          case (left, right) => left.fork(muxInActPeekHelper(0, col = right))
+        }) {
+          case (left, right) => (1 until peColNum).foldLeft(fork(muxInActPeekHelper(row = right, col = 0))) {
+            case (leftt, rightt) => leftt.fork(muxInActPeekHelper(row = right, col = rightt))
+          }
+        } .join()
+      } .join()
     }
   }
   it should "work well on PE Cluster" in {

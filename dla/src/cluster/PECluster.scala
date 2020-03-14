@@ -159,12 +159,12 @@ class PEClusterInActDataConnections extends HasConnectAllExpRdModule with Cluste
     for (i <- 0 until peRowNum) {
       for (j <- 0 until peColNum) {
         if (i + j == k) {
-          formerAdrWire = formerAdrWire.+:(muxInActDataWire(i)(j).adrIOs.data.ready)
-          formerDataWire = formerDataWire.+:(muxInActDataWire(i)(j).dataIOs.data.ready)
+          formerAdrWire = formerAdrWire.:+(muxInActDataWire(i)(j).adrIOs.data.ready)
+          formerDataWire = formerDataWire.:+(muxInActDataWire(i)(j).dataIOs.data.ready)
         }
         if (i + j == k + inActRouterNum) {
-          laterAdrWire = laterAdrWire.+:(muxInActDataWire(i)(j).adrIOs.data.ready)
-          laterDataWire = laterDataWire.+:(muxInActDataWire(i)(j).dataIOs.data.ready)
+          laterAdrWire = laterAdrWire.:+(muxInActDataWire(i)(j).adrIOs.data.ready)
+          laterDataWire = laterDataWire.:+(muxInActDataWire(i)(j).dataIOs.data.ready)
         }
       }
     }
