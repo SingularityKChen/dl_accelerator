@@ -26,6 +26,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   private val weightAdrStream = oneStreamData.weightAdrStream
   private val weightDataStream = oneStreamData.weightDataStream
   private val pSumStream = oneStreamData.outPSumStream
+  private val theInActAdrStreams = inActAdrStream.take(inActRouterNum) // in actual, it needs s2 + f2
+  private val theInActDataStreams = inActDataStream.take(inActRouterNum)
+  private val theWeightAdrStreams = weightAdrStream.take(weightRouterNum)
+  private val theWeightDataStreams = weightDataStream.take(weightRouterNum)
+  private val thePSumDataStreams = pSumStream.take(pSumRouterNum)
   private def getStreamLookUp(streamData: List[Int]): List[Int] = {
     var lookList: List[Int] = Nil
     lookList = lookList:::List(0)
@@ -479,9 +484,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theClock = theGLB.clock
       val theInActCtrl = theTopIO.ctrlPath.inActIO
       val thePSumCtrl = theTopIO.ctrlPath.pSumIO
-      val theInActAdrStreams = inActAdrStream.take(inActRouterNum)
-      val theInActDataStreams = inActDataStream.take(inActRouterNum)
-      val thePSumDataStreams = pSumStream.take(pSumRouterNum)
       val gnmfcs1Stream = Seq.fill(6){(new Random).nextInt(6) + 1}
       val pSumStartIdx = gnmfcs1Stream.head*N2*M2*F2 + gnmfcs1Stream(1)*M2*F2 + gnmfcs1Stream(2)*F2 + gnmfcs1Stream(3) // FIXME
       require(pSumStartIdx + pSumOneSPadNum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
@@ -581,14 +583,71 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theCtrlIO = theTopIO.inActCtrlSel
       val theDoneIO = theTopIO.inActWriteFinVec // (peRow, peCol)
       def inActIOPokeHelper(idx: Int): Unit = {
-        println(s"inActIO$idx")
-        theTopToCtrlDataIO(idx).dataIOs.data.bits.poke(idx.U)
-        theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(true.B)
+        fork {
+          var pokeIdx: Int = 0
+          while (theInActAdrStreams(idx)(pokeIdx) != 0) {
+            val prefix: String = s"inActIO$idx@Adr@$pokeIdx"
+            println(s"[$prefix] poke ${theInActAdrStreams(idx)(pokeIdx)} now")
+            theTopToCtrlDataIO(idx).adrIOs.data.bits.poke(theInActAdrStreams(idx)(pokeIdx).U)
+            theTopToCtrlDataIO(idx).adrIOs.data.valid.poke(true.B)
+            theClock.step()
+            //theTopToCtrlDataIO(idx).adrIOs.data.ready.expect(true.B)
+            println(s"[$prefix] t + 1, ready = ${theTopToCtrlDataIO(idx).adrIOs.data.ready.peek()}")
+            pokeIdx = pokeIdx + 1
+          }
+          theTopToCtrlDataIO(idx).adrIOs.data.valid.poke(false.B)
+          theClock.step()
+        } .fork {
+          var pokeIdx: Int = 0
+          while (theInActDataStreams(idx)(pokeIdx) != 0) {
+            val prefix: String = s"inActIO$idx@Data@$pokeIdx"
+            println(s"[$prefix] poke ${theInActDataStreams(idx)(pokeIdx)} now")
+            theTopToCtrlDataIO(idx).dataIOs.data.bits.poke(theInActDataStreams(idx)(pokeIdx).U)
+            theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(true.B)
+            theClock.step()
+            //theTopToCtrlDataIO(idx).dataIOs.data.ready.expect(true.B)
+            println(s"[$prefix] t + 1, ready = ${theTopToCtrlDataIO(idx).dataIOs.data.ready.peek()}")
+            pokeIdx = pokeIdx + 1
+          }
+          theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(false.B)
+          theClock.step()
+        } .join()
       }
       def muxInActPeekHelper(row: Int, col: Int): Unit = {
-        println(s"muxInActIO$row,$col")
-        theCtrlToPEDataIO(row)(col).dataIOs.data.ready.poke(theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek())
-        //theCtrlToPEDataIO(row)(col).dataIOs.data.bits.expect(0.U)
+        val inActIdx: Int = (row + col) % inActRouterNum
+        fork {
+          var formerOrLater: Boolean = (row + col) < inActRouterNum
+          var peekIdx: Int = 0
+          var prefix: String = s"muxInActIO@$row@$col@Adr@$peekIdx"
+          while (theInActAdrStreams(inActIdx)(peekIdx) != 0 && formerOrLater) {
+            println(s"[$prefix] now valid = ${theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek()}")
+            while (theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek().litToBoolean) {
+              prefix = s"muxInActIO@$row@$col@Adr@$peekIdx"
+              println(s"[$prefix] peek ${theInActAdrStreams(inActIdx)(peekIdx)} now")
+              theCtrlToPEDataIO(row)(col).adrIOs.data.ready.poke(true.B)
+              theCtrlToPEDataIO(row)(col).adrIOs.data.bits.expect(theInActAdrStreams(inActIdx)(peekIdx).U)
+              theClock.step()
+              peekIdx = peekIdx + 1
+            }
+          }
+          theClock.step()
+        } .fork {
+          var formerOrLater: Boolean = (row + col) < inActRouterNum
+          var peekIdx: Int = 0
+          var prefix: String = s"muxInActIO@$row@$col@Data@$peekIdx"
+          while (theInActDataStreams(inActIdx)(peekIdx) != 0 && formerOrLater) {
+            println(s"[$prefix] now valid = ${theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek()}")
+            while (theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek().litToBoolean) {
+              prefix = s"muxInActIO@$row@$col@Adr@$peekIdx"
+              println(s"[$prefix] peek ${theInActDataStreams(inActIdx)(peekIdx)} now")
+              theCtrlToPEDataIO(row)(col).dataIOs.data.ready.poke(true.B)
+              theCtrlToPEDataIO(row)(col).dataIOs.data.bits.expect(theInActDataStreams(inActIdx)(peekIdx).U)
+              theClock.step()
+              peekIdx = peekIdx + 1
+            }
+            theClock.step()
+          }
+        } .join()
       }
       println("----------------- test begin -----------------")
       println("----------- PE Cluster Ctrl Spec -------------")
@@ -603,7 +662,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         (1 until inActRouterNum).foldLeft(fork(inActIOPokeHelper(0))) {
           case (left, right) => left.fork(inActIOPokeHelper(idx = right))
         } .join()
-      } .fork { // peek via muxInActData
+      } .fork.withRegion(Monitor) { // peek via muxInActData, so we need to use region to peek from another thread
         (1 until peRowNum).foldLeft((1 until peColNum).foldLeft(fork(muxInActPeekHelper(0, 0))){
           case (left, right) => left.fork(muxInActPeekHelper(0, col = right))
         }) {
@@ -611,7 +670,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
             case (leftt, rightt) => leftt.fork(muxInActPeekHelper(row = right, col = rightt))
           }
         } .join()
-      } .join()
+      } .joinAndStep(theClock)
     }
   }
   it should "work well on PE Cluster" in {
@@ -621,11 +680,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val pSumDataIO = theTopIO.dataPath.pSumIO
       val inActDataIO = theTopIO.dataPath.inActIO
       val weightDataIO = theTopIO.dataPath.weightIO
-      val theInActAdrStreams = inActAdrStream.take(inActRouterNum)
-      val theInActDataStreams = inActDataStream.take(inActRouterNum)
-      val theWeightAdrStreams = weightAdrStream.take(weightRouterNum)
-      val theWeightDataStreams = weightDataStream.take(weightRouterNum)
-      val thePSumDataStreams = pSumStream.take(pSumRouterNum)
       def writeCSCPECluster(theInIO: StreamBitsIO, theStream: List[Int]): Unit = {
         var idx = 0
         while (theStream(idx) != 0) {
@@ -659,7 +713,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           println(s"------------ write data $index begin --------------")
           writeCSCPECluster(theCSCIO.dataIOs, theDataStream)
           println(s"------------ write data $index finish -------------")
-        } .join()
+        } .joinAndStep(theClock)
       }
       println("----------------- test begin -----------------")
       println("------------ PE Cluster Top Spec -------------")
@@ -673,18 +727,20 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTopIO.ctrlPath.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
       theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
       theClock.step()
+      val inActRegion = Monitor
+      val weightRegion = Monitor
       fork {
-        (1 until inActSRAMNum).foldLeft( fork(forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
-          theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head))) {
-          case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
-            theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right)))
-        } .join()
+        (1 until inActSRAMNum).foldLeft( fork{forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
+          theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head)}) {
+          case (left, right) => left.fork.withRegion(inActRegion){forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
+            theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right))}
+        } .joinAndStep(theClock)
       } .fork {
-        (1 until weightRouterNum).foldLeft( fork(forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
-          theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head))) {
-          case (left, right) => left.fork(forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
-            theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right)))
-        } .join()
+        (1 until weightRouterNum).foldLeft( fork{forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
+          theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head)}) {
+          case (left, right) => left.fork.withRegion(weightRegion){forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
+            theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right))}
+        } .joinAndStep(theClock)
       } .join()
       // after finish
       //theTopIO.ctrlPath.allCalFin.expect(true.B)
