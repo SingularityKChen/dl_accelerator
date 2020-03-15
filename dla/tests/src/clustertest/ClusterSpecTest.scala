@@ -619,6 +619,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           var formerOrLater: Boolean = (row + col) < inActRouterNum
           var peekIdx: Int = 0
           var prefix: String = s"muxInActIO@$row@$col@Adr@$peekIdx"
+          // while (formerOrLater) {} TODO: when finish, then later ones should begin to peek
           while (theInActAdrStreams(inActIdx)(peekIdx) != 0 && formerOrLater) {
             println(s"[$prefix] now valid = ${theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek()}")
             while (theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek().litToBoolean) {
@@ -730,15 +731,15 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val inActRegion = Monitor
       val weightRegion = Monitor
       fork {
-        (1 until inActSRAMNum).foldLeft( fork{forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
+        (1 until inActSRAMNum).foldLeft( fork.withRegion(inActRegion){forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
           theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head)}) {
-          case (left, right) => left.fork.withRegion(inActRegion){forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
+          case (left, right) => left.fork{forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
             theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right))}
         } .joinAndStep(theClock)
       } .fork {
-        (1 until weightRouterNum).foldLeft( fork{forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
+        (1 until weightRouterNum).foldLeft( fork.withRegion(weightRegion){forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
           theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head)}) {
-          case (left, right) => left.fork.withRegion(weightRegion){forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
+          case (left, right) => left.fork{forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
             theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right))}
         } .joinAndStep(theClock)
       } .join()
@@ -751,6 +752,55 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
   behavior of "test the spec of Router Cluster"
+  it should "work well on PSum Router Cluster" in {
+    test (new PSumRouter) { thePSRouter =>
+      val theTop = thePSRouter.io
+      val theCtrlIO = theTop.ctrlPath
+      val theDataIO = theTop.dataPath
+      val theClock = thePSRouter.clock
+      val randomDelay = (new Random).nextInt(50) + 1
+      println("----------------- test begin -----------------")
+      println("-------------- PSum Router Spec --------------")
+      println("----------- test basic functions -------------")
+      thePSRouter.reset.poke(true.B)
+      theClock.step()
+      thePSRouter.reset.poke(false.B)
+      theClock.step()
+      // always read from PE and send to GLB
+      theCtrlIO.inDataSel.poke(true.B) // read from GLB
+      theCtrlIO.outDataSel.poke(true.B) // send it to PE
+      theTop.pSumLoadEn.poke(true.B) // when true to load data into PE
+      theClock.step()
+      // begin to load PSum from GLB and send it into PEArray,
+      // then back from PEArray and write back to GLB
+      fork {
+        println("------------ begin to poke @ GLB -------------")
+        theDataIO.inIOs(1).bits.poke(1.U)
+        theDataIO.inIOs(1).valid.poke(true.B)
+        //theDataIO.inIOs(1).ready.expect(true.B)
+        println(theDataIO.inIOs(1).ready.peek())
+        theClock.step()
+        println(theDataIO.inIOs(1).ready.peek())
+      } .fork.withRegion(Monitor).withName("PSumReadToPE") {
+        println("---------- begin to peek @ PEArray -----------")
+        theDataIO.outIOs(0).bits.expect(1.U)
+        theDataIO.outIOs(0).valid.expect(true.B)
+        theDataIO.outIOs(0).ready.poke(true.B)
+      } .fork.withRegion(Monitor).withName("PSumBackFromPE") {
+        println("---------- begin to poke @ PEArray -----------")
+        theClock.step(randomDelay)
+        theDataIO.inIOs(0).bits.poke(2.U)
+        theDataIO.inIOs(0).valid.poke(true.B)
+        theDataIO.inIOs(0).ready.expect(true.B)
+      } .fork.withRegion(Monitor).withName("PSumBackToGLB") {
+        println("------------ begin to peek @ GLB -------------")
+        theClock.step(randomDelay)
+        theDataIO.outIOs(1).bits.expect(2.U)
+        theDataIO.outIOs(1).valid.expect(true.B)
+        theDataIO.outIOs(1).ready.poke(true.B)
+      } .joinAndStep(theClock)
+    }
+  }
   it should "work well on Router Cluster" in {
     test (new RouterCluster(true)) { theRCluster =>
       val theTop = theRCluster.io
@@ -759,9 +809,13 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Input))
       theTop.dataPath.routerData.iRIO.head.outIOs.foreach(x =>
         require(DataMirror.directionOf(x.dataIOs.data.bits) == Direction.Output))
+      println("----------------- test begin -----------------")
+      println("---------- Router Cluster Top Spec -----------")
+      println("----------- test basic functions -------------")
       theRCluster.reset.poke(true.B)
       theClock.step()
       theRCluster.reset.poke(false.B)
+      theClock.step()
     }
   }
   behavior of "test the spec of Cluster Group"

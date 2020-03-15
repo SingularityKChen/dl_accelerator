@@ -19,7 +19,7 @@ class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
     o.outIOs.head.suggestName(s"weightRouter${i}ToPECluster")
     o.outIOs.last.suggestName(s"weightRouter${i}ToNeighbor")
   })
-  pSRouters.foreach(_.pSumLoadEn := io.pSumLoadEn)
+  pSRouters.foreach(_.pSumLoadEn := io.pSumLoadEn) // TODO: remove this signal
 }
 
 class InActRouter extends CSCRouter with ClusterConfig {
