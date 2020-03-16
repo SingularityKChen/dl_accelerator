@@ -10,7 +10,7 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import dla.tests.GenOneStreamData
 import org.scalatest._
 import scala.util.Random
-import scala.math.max
+import scala.math.pow
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config
@@ -848,6 +848,40 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       println("---------- expect ready @ PEArray ------------")
       theDataIO.inIOs(0).ready.expect(true.B)
       theDataIO.inIOs.takeRight(2).foreach(x => x.ready.expect(false.B, "not use now, so you should be false"))
+      theClock.step()
+    }
+  }
+  it should "work well on InAct Router Cluster" in {
+    test (new InActRouter) { theInActRouter =>
+      val theTop = theInActRouter.io
+      val theClock = theInActRouter.clock
+      val theDataIO = theTop.dataPath
+      val theCtrlIO = theTop.ctrlPath
+      val randomInIO = (new Random).nextInt(inActPortNum)
+      val randomInAdr = Seq.fill(inActPortNum) {(new Random).nextInt(pow(2, inActAdrWidth).toInt)}
+      println("----------------- test begin -----------------")
+      println("------------- InAct Router Spec --------------")
+      println("------ test uni-cast with random inPort ------")
+      theInActRouter.reset.poke(true.B)
+      theClock.step()
+      theInActRouter.reset.poke(false.B)
+      theClock.step()
+      theCtrlIO.inDataSel.poke(randomInIO.U) // from random port
+      theCtrlIO.outDataSel.poke(0.U) // uni-cast
+      for (inPort <- 0 until inActPortNum) {
+        println(s"peek inActIO$inPort with data ${randomInAdr(inPort)}, valid = ${inPort == randomInIO}")
+        theDataIO.inIOs(inPort).adrIOs.data.bits.poke(randomInAdr(inPort).U)
+        theDataIO.inIOs(inPort).adrIOs.data.valid.poke((inPort == randomInIO).B)
+      }
+      theDataIO.outIOs(0).adrIOs.data.bits.expect(randomInAdr(randomInIO).U)
+      theDataIO.outIOs(0).adrIOs.data.valid.expect(true.B)
+      theDataIO.outIOs.takeRight(inActPortNum - 1).foreach(x => x.adrIOs.data.valid.expect(false.B))
+      theDataIO.outIOs(0).adrIOs.data.ready.poke(true.B)
+      for (inPort <- 0 until inActPortNum) {
+        println(s"expect inActIO$inPort ready = ${inPort == randomInIO}")
+        theDataIO.inIOs(inPort).adrIOs.data.ready.expect((inPort == randomInIO).B, s"randomInIO = $randomInIO" +
+          s"should it ready now?")
+      }
       theClock.step()
     }
   }
