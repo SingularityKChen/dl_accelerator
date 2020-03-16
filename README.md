@@ -9,7 +9,7 @@ And it will extend some custom RISC-V instructions in the near future.
 ### Clone the Project
 
 ```bash
-git https://github.com/SingularityKChen/dl_accelerator.git --recurse-submodules
+git clone https://github.com/SingularityKChen/dl_accelerator.git --recurse-submodules
 ```
 
 ### Install Mill
@@ -42,12 +42,12 @@ You can use `sbt` with `build.sbt` in history versions or other branches.
 
 ## TODO
 
-You can find more at [the project page](https://github.com/SingularityKChen/dl_accelerator/projects/1).
+You can find it at [the project page](https://github.com/SingularityKChen/dl_accelerator/projects/1).
 
 ## Known Bugs
 
 + Meet continuous zero \(more than three\) columns in weight matrix;
-+ The head of address vector or data vector is zero column;
++ The head of address vectors or data vectors is zero column;
 
 ## [Elaboration](./dla/src)
 
@@ -158,7 +158,15 @@ This is the top module of cluster group. It contains one GLB cluster, one Router
 
 #### [GLB Cluster](./dla/src/cluster/GLBCluster.scala)
 
-This is the global buffer cluster module. It contains three input activation SRAM bank, four partial sum SRAM bank.
+This is the global buffer cluster module. It contains `inActSRAMNum` input activation SRAM banks, `pSumSRAMNum` partial sum SRAM banks.
+
+##### InActSRAMBank
+
+You need to poke the value of `g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2)` when reading input activation. Then it will find the real address of input activation's SRAM bank via a lookup table. However, when writing, you don't need to poke any address. It will send back `done` signal to other module when read finishes or write finishes.
+
+##### PSumSRAMBank
+
+You have to poke address into partial sum SRAM banks no matter you want to read or write it. The address will be directly sent to the SRAM, which means it's the address of the SRAM.
 
 #### [PE Cluster](./dla/src/cluster/PECluster.scala)
 
@@ -174,43 +182,50 @@ Each router cluster not only connects to one GLB cluster, one PE cluster, but al
 
 This class is the generator of one input activations router.
 
-- InIOs\(0\): the input activation comes from its corresponding input activations SRAM bank\(GLB Cluster\);
-- InIOs\(1\): the input activation comes from its northern inAct router;
-- InIOs\(2\): the input activation comes from its southern inAct router;
-- InIOs\(3\): the input activation comes from its horizontal inAct router;
-- OutIOs\(0\): send the input activation to PE Array;
-- OutIOs\(1\): send the input activation to northern inAct router;
-- OutIOs\(2\): send the input activation to southern inAct router;
-- OutIOs\(3\): send the input activation to horizontal inAct router;
-- outSelWire: routing mode:
-  - 0: uni-cast
-  - 1: horizontal
-  - 2: vertical 
-  - 3: broadcast
+- dataPath: 
+  - InIOs\(0\): the input activation comes from its corresponding input activations SRAM bank\(GLB Cluster\);
+  - InIOs\(1\): the input activation comes from its northern inAct router;
+  - InIOs\(2\): the input activation comes from its southern inAct router;
+  - InIOs\(3\): the input activation comes from its horizontal inAct router;
+  - OutIOs\(0\): send the input activation to PE Array;
+  - OutIOs\(1\): send the input activation to northern inAct router;
+  - OutIOs\(2\): send the input activation to southern inAct router;
+  - OutIOs\(3\): send the input activation to horizontal inAct router;
+- ctrlPath: 
+  - inSelWire: its value enable the corresponding inIOs, i.e., 0 enables `inIOs(0)`
+  - outSelWire: routing mode:
+    - 0: uni-cast
+    - 1: horizontal
+    - 2: vertical 
+    - 3: broadcast
 
 ##### WeightRouter
 
 This class is the generator of one weight router.
 
-- inIOs\(0\): the weight comes from its corresponding GLB Cluster;
-- inIOs\(1\): the weight comes from its only horizontal neighboring WeightRouter;
-- OutIOs\(0\): send the data to its corresponding PE Array row;
-- OutIOs\(1\): send the data to its only horizontal neighboring WeightRouter;
-- inSelWire: 0 enables inIOs\(0\) and 1 enables inIOs\(1\)
-- OutSelWire: 0 enables outIOs\(0\) and 1 enables outIOs\(1\)
+- dataPath: 
+  - inIOs\(0\): the weight comes from its corresponding GLB Cluster;
+  - inIOs\(1\): the weight comes from its only horizontal neighboring WeightRouter;
+  - OutIOs\(0\): send the data to its corresponding PE Array row;
+  - OutIOs\(1\): send the data to its only horizontal neighboring WeightRouter;
+- ctrlPath
+  - inSelWire: false enables inIOs\(0\) and true enables inIOs\(1\)
+  - OutSelWire: always send to outIOs\(0\) and this signal be true to enables outIOs\(1\)
 
 ##### PSumRouter
 
-This class is the generator of one partial sum router.
+This class is the generator of one partial sum router. `inIOs(0)` connects directly to `outIOs(1)`.
 
-- inIOs\(0\): the output partial sum computed by its corresponding PE Array column;
-- inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
-- inIOs\(2\): the partial sum transferred from its northern neighboring PSumRouter;
-- OutIOs\(0\): send the partial sum to its corresponding PE Array column;
-- OutIOs\(1\): send the partial sum bank to its corresponding partial sum SRAM bank;
-- OutIOs\(2\): send the partial sum to its southern neighboring PSumRouter;
-- inSelWire: its value enable the corresponding inIOs, i.e., 0 enables inIOs\(0\)
-- outSelWire: its value enable the corresponding outIOs, i.e., 0 enables outIOs\(0\)
+- dataPath: 
+  - inIOs\(0\): the output partial sum computed by its corresponding PE Array column;
+  - inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
+  - inIOs\(2\): the partial sum transferred from its northern neighboring PSumRouter;
+  - OutIOs\(0\): send the partial sum to its corresponding PE Array column;
+  - OutIOs\(1\): send the partial sum bank to its corresponding partial sum SRAM bank;
+  - OutIOs\(2\): send the partial sum to its southern neighboring PSumRouter;
+- ctrlPath: 
+  - inSelWire: true for `inIOs(1)` and false for `inIOs(2)`;
+  - outSelWire: true for `outIOs(0)` and false for `outIOs(2)`;
 
 #### [Cluster Config](./dla/src/cluster/ClusterConfig.scala)
 
