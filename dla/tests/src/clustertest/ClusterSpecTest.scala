@@ -58,7 +58,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     )
     debugIO.waitForRead.expect(false.B, s"[$prefix] it should be false as this is the first read cycle")
     theClock.step()
-    outIO.data.bits.expect(theData(idx).U, s"[$prefix] theData($idx) = ${theData(idx)}")
+    outIO.data.bits.expect(theData(idx).U, s"[$prefix] theData($idx) = ${theData(idx)}, current idx = " +
+      s"${debugIO.idx.peek()}")
     outIO.data.valid.expect(true.B, s"$prefix should valid now")
     if (printLogDetails) println(
       s"[$prefix] $idx.5 done = ${doneIO.peek()}\n" +
@@ -769,8 +770,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       // always read from PE and send to GLB
       theCtrlIO.inDataSel.poke(true.B) // read from GLB
       theCtrlIO.outDataSel.poke(true.B) // send it to PE
-      theTop.pSumLoadEn.poke(true.B) // when true to load data into PE
-      theClock.step()
       // begin to load PSum from GLB and send it into PEArray,
       // then back from PEArray and write back to GLB
       fork {
@@ -781,23 +780,28 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         println(theDataIO.inIOs(1).ready.peek())
         theClock.step()
         println(theDataIO.inIOs(1).ready.peek())
+        theClock.step(randomDelay)
       } .fork.withRegion(Monitor).withName("PSumReadToPE") {
         println("---------- begin to peek @ PEArray -----------")
         theDataIO.outIOs(0).bits.expect(1.U)
         theDataIO.outIOs(0).valid.expect(true.B)
         theDataIO.outIOs(0).ready.poke(true.B)
+        theClock.step()
+        theClock.step(randomDelay)
       } .fork.withRegion(Monitor).withName("PSumBackFromPE") {
         println("---------- begin to poke @ PEArray -----------")
         theClock.step(randomDelay)
         theDataIO.inIOs(0).bits.poke(2.U)
         theDataIO.inIOs(0).valid.poke(true.B)
         theDataIO.inIOs(0).ready.expect(true.B)
+        theClock.step()
       } .fork.withRegion(Monitor).withName("PSumBackToGLB") {
         println("------------ begin to peek @ GLB -------------")
         theClock.step(randomDelay)
         theDataIO.outIOs(1).bits.expect(2.U)
         theDataIO.outIOs(1).valid.expect(true.B)
         theDataIO.outIOs(1).ready.poke(true.B)
+        theClock.step()
       } .joinAndStep(theClock)
     }
   }

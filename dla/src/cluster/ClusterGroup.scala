@@ -18,7 +18,6 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   routerCluster.ctrlPath.iRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.inActCtrlSel)
   routerCluster.ctrlPath.wRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.weightCtrlSel)
   routerCluster.ctrlPath.pSumRIO.foreach(_ <> io.ctrlPath.routerClusterCtrl.pSumCtrlSel)
-  routerCluster.pSumLoadEn := clusterCtrl.peCtrlIO.pSumLoadEn
   // peCluster control path
   // true for broad-cast
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl.inActSel

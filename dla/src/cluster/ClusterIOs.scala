@@ -26,7 +26,7 @@ class ClusterGroupCtrlIO extends Bundle {
   val readOutPSum: Bool = Output(Bool()) // true then to read out partial sums from GLB
 }
 
-class RouterClusterIO extends Bundle with HasPSumLoadEnIO {
+class RouterClusterIO extends Bundle {
   val ctrlPath: RouterCtrlIO = Flipped(new RouterCtrlIO) // input
   val dataPath = new RouterClusterDataIO
 }
@@ -45,7 +45,7 @@ class CommonRouterUIntIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int
   val ctrlPath: CommonClusterCtrlTwoUIntIO = Flipped(new CommonClusterCtrlTwoUIntIO)
 }
 
-class PSumRouterIO extends Bundle with ClusterConfig with HasPSumLoadEnIO {
+class PSumRouterIO extends Bundle with ClusterConfig {
   val dataPath = new PSumRouterDataIO(pSumPortNum, psDataWidth)
   val ctrlPath: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
   //  see commends in class RouterClusterCtrlIO
