@@ -39,8 +39,9 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   for (j <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
     io.dataPath.pSumIO.outIOs(j) <> peArray.head(j).dataStream.opsIO
-    peArray.head(j).dataStream.ipsIO <> peArray(1)(j).dataStream.opsIO
-    peArray(1)(j).dataStream.ipsIO <> peArray.last(j).dataStream.opsIO
+    for (row <- 1 until peRowNum) {
+      peArray(row - 1)(j).dataStream.ipsIO <> peArray(row)(j).dataStream.opsIO
+    }
     // connect input partial sum from top IO to the PE at the tail of each column with the signal after Mux
     peArray.last(j).dataStream.ipsIO <> muxInPSumDataWire(j)
     // select ips of the tail of each column, true from router, false from southern PEArray
@@ -210,7 +211,7 @@ class PEClusterInActController extends Module with ClusterConfig {
   inActWriteDoneWireVec.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActWriteDoneWireVec($i)($j)")
     })})
-  // connections of enWires
+  // connections of enWires and write finish wire
   for (i <- 0 until peRowNum) {
     for (j <- 0 until peColNum) {
       io.writeEn(i)(j) := inActWriteEnWires(i)(j)
@@ -232,7 +233,7 @@ class PEClusterInActController extends Module with ClusterConfig {
   inActDataStateJumpWires.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActDataStateJumpWires($i)($j)")})
   })
-  // connections of EnWire
+  // connections of State JumpWire
   for (k <- 0 until inActRouterNum) {
     var wDoneJPZeroWires: Seq[Bool] = Nil
     var wDoneJPOneWires: Seq[Bool] = Nil
