@@ -94,6 +94,7 @@ class InActRouter extends CSCRouter with ClusterConfig {
 
 class WeightRouter extends CSCRouter with ClusterConfig {
   val io: CommonRouterBoolIO = IO(new CommonRouterBoolIO(weightPortNum, weightAdrWidth, weightDataWidth))
+  require(weightPortNum == 2, "or you need to modify this module")
   //io.dataPath.inIOs(0) : weightRouterFromGLB
   //io.dataPath.inIOs(1) : weightRouterFromHorizontal
   //io.dataPath.outIOs(0): weightRouterToPEArray
@@ -101,7 +102,7 @@ class WeightRouter extends CSCRouter with ClusterConfig {
   // inSelWire: 0, receive the data come from GLB Cluster; 1, receive it come from its neighborhood WeightRouter
   private val inSelWire: Bool = Wire(Bool())
   inSelWire.suggestName("weightRouterInSelWire")
-  // outSelWire: 0, send the data to PE Cluster; 1, send it to its neighborhood WeightRouter and PE Cluster
+  // outSelWire: always send the data to PE Cluster; if true, send it to its neighborhood WeightRouter and PE Cluster
   private val outSelWire: Bool = Wire(Bool())
   outSelWire.suggestName("weightRouterOutSelWire")
   private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
@@ -113,11 +114,15 @@ class WeightRouter extends CSCRouter with ClusterConfig {
     internalDataWire <> io.dataPath.inIOs.head
     disableAdrDataReady(io.dataPath.inIOs(1))
   }
-  io.dataPath.outIOs.head <> internalDataWire
+  connectAllExceptReady(io.dataPath.outIOs.head, internalDataWire)
   when (outSelWire) {
-    io.dataPath.outIOs(1) <> internalDataWire
+    connectAllExceptReady(io.dataPath.outIOs(1),internalDataWire)
+    internalDataWire.adrIOs.data.ready := io.dataPath.outIOs.map(x => x.adrIOs.data.ready).reduce(_ && _)
+    internalDataWire.dataIOs.data.ready := io.dataPath.outIOs.map(x => x.dataIOs.data.ready).reduce(_ && _)
   } .otherwise {
-    io.dataPath.outIOs(1) <> DontCare
+    disableAdrDataValid(io.dataPath.outIOs(1))
+    internalDataWire.adrIOs.data.ready := io.dataPath.outIOs.head.adrIOs.data.ready
+    internalDataWire.dataIOs.data.ready := io.dataPath.outIOs.head.dataIOs.data.ready
   }
   // control path
   inSelWire := io.ctrlPath.inDataSel

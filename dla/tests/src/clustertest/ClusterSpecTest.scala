@@ -884,6 +884,47 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       }
       theClock.step()
     }
+    // TODO: add more test case for different cast mode
+  }
+  it should "work well on Weight Router Cluster" in {
+    test (new WeightRouter) { theWeightRouter =>
+      val theTop = theWeightRouter.io
+      val theClock = theWeightRouter.clock
+      val theCtrlIO = theTop.ctrlPath
+      val theDataIO = theTop.dataPath
+      val randomInIO = Seq.fill(2){(new Random).nextInt(weightPortNum)}
+      val randomInAdr = Seq.fill(weightPortNum) {(new Random).nextInt(pow(2, weightAdrWidth).toInt)}
+      println("----------------- test begin -----------------")
+      println("------------- Weight Router Spec -------------")
+      println("---------- test weight connections -----------")
+      println("----------- with random in/OutPort -----------")
+      theWeightRouter.reset.poke(true.B)
+      theClock.step()
+      theWeightRouter.reset.poke(false.B)
+      theClock.step()
+      theCtrlIO.inDataSel.poke((randomInIO.head == 1).B) // true to port 1, false to port 0
+      theCtrlIO.outDataSel.poke((randomInIO.last == 1).B)
+      for (inPort <- 0 until weightPortNum) {
+        val prefix: String = s"weight@inIOsAdr@$inPort"
+        theDataIO.inIOs(inPort).adrIOs.data.bits.poke(randomInAdr(inPort).U)
+        theDataIO.inIOs(inPort).adrIOs.data.valid.poke((inPort == randomInIO.head).B)
+        println(s"[$prefix] bits = ${randomInAdr(inPort)}, valid = ${inPort == randomInIO.head}")
+      }
+      for (outPort <- 0 until weightPortNum) {
+        val prefix: String = s"weight@outIOsAdr@$outPort"
+        println(s"[$prefix] valid = ${outPort === randomInIO.last || outPort == 0}")
+        if (outPort === randomInIO.last || outPort == 0) { // always send to PEArray
+          println(s"[$prefix] bits = ${randomInAdr(outPort)}")
+          theDataIO.outIOs(outPort).adrIOs.data.valid.expect(true.B)
+          theDataIO.outIOs(outPort).adrIOs.data.bits.expect(randomInAdr(randomInIO.head).U)
+          theDataIO.outIOs(outPort).adrIOs.data.ready.poke(true.B)
+        } else {
+          theDataIO.outIOs(outPort).adrIOs.data.valid.expect(false.B)
+        }
+      }
+      theDataIO.inIOs(randomInIO.head).adrIOs.data.ready.expect(true.B)
+      theClock.step()
+    }
   }
   it should "work well on Router Cluster" in {
     test (new RouterCluster(true)) { theRCluster =>
