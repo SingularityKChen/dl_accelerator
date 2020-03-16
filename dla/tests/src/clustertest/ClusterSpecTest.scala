@@ -779,6 +779,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTopIO.ctrlPath.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
       theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
       theClock.step()
+      /*
       val inActRegion = Monitor
       val weightRegion = Monitor
       fork {
@@ -793,6 +794,50 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           case (left, right) => left.fork{forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
             theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right))}
         } .joinAndStep(theClock)
+      } .join()
+      */
+      val theInActAdrLookup: Seq[List[Int]] = theInActAdrStreams.map(x => getStreamLookUp(x))
+      val theInActDataLookup: Seq[List[Int]] = theInActDataStreams.map(x => getStreamLookUp(x))
+      val inActAdrReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
+      val inActDataReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
+      //println(theInActAdrStreams.head)
+      //println(theInActDataStreams.head)
+      fork.withName("inActLoadThread") { // inActLoad
+        fork.withName("inActAdrLoadThread") { // address
+          for (_ <- 0 until theInActAdrLookup.map(x => x(1)).max) {
+            for (inActIdx <- 0 until inActRouterNum) {
+              val prefix: String = s"inAct$inActIdx@AdrLoad@${inActAdrReadIdx(inActIdx)}"
+              if (inActAdrReadIdx(inActIdx) < theInActAdrLookup(inActIdx)(1)) { // until the end of first stream
+                println(s"[$prefix] poke bits = ${theInActAdrStreams(inActIdx)(inActAdrReadIdx(inActIdx))}")
+                inActDataIO(inActIdx).adrIOs.data.bits.poke(theInActAdrStreams(inActIdx)(inActAdrReadIdx(inActIdx)).U)
+                inActDataIO(inActIdx).adrIOs.data.valid.poke(true.B)
+                inActDataIO(inActIdx).adrIOs.data.ready.expect(true.B)
+                inActAdrReadIdx(inActIdx) += 1
+              }
+            }
+            theClock.step()
+          }
+        } .fork.withName("inActDataLoadThread") { //data
+          for (_ <- 0 until theInActDataLookup.map(x => x(1)).max) {
+            for (inActIdx <- 0 until inActRouterNum) {
+              val prefix: String = s"inAct$inActIdx@DataLoad@${inActDataReadIdx(inActIdx)}"
+              if (inActDataReadIdx(inActIdx) < theInActDataLookup(inActIdx)(1)) { // until the end of first stream
+                println(s"[$prefix] poke bits = ${theInActDataStreams(inActIdx)(inActDataReadIdx(inActIdx))}")
+                inActDataIO(inActIdx).dataIOs.data.bits.poke(theInActDataStreams(inActIdx)(inActDataReadIdx(inActIdx)).U)
+                inActDataIO(inActIdx).dataIOs.data.valid.poke(true.B)
+                inActDataIO(inActIdx).dataIOs.data.ready.expect(true.B)
+                inActDataReadIdx(inActIdx) += 1
+              }
+            }
+            theClock.step()
+          }
+        } .join()
+      } .fork.withName("weightLoadThread") { // weightLoad
+        fork.withName("weightAdrLoadThread") {
+
+        } .fork.withName("weightDataLoadThread") {
+
+        } .join()
       } .join()
       // after finish
       //theTopIO.ctrlPath.allCalFin.expect(true.B)
@@ -941,6 +986,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theClock.step()
       theRCluster.reset.poke(false.B)
       theClock.step()
+      // TODO: add some detailed tests on RouterCluster
     }
   }
   behavior of "test the spec of Cluster Group"
