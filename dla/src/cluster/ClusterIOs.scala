@@ -154,4 +154,10 @@ abstract class CSCRouter extends HasConnectAllExpRdModule {
     disabledIO.adrIOs.data.ready := false.B
     disabledIO.dataIOs.data.ready := false.B
   }
+  protected def disableAdrDataValid(disabledIO: CSCStreamIO): Unit = {
+    disabledIO.adrIOs.data.valid := false.B
+    disabledIO.dataIOs.data.valid := false.B
+    disabledIO.adrIOs.data.bits := DontCare
+    disabledIO.dataIOs.data.bits := DontCare
+  }
 }

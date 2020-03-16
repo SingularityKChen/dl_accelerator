@@ -32,10 +32,10 @@ class InActRouter extends CSCRouter with ClusterConfig {
   // io.dataPath.outIOs(2): inActRouterToSouth
   // io.dataPath.outIOs(3): inActRouterToHorizontal
   private val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
-  // outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   inSelWire.suggestName("inActRouterInSelWire")
   private val outSelWire: UInt = Wire(UInt(2.W))
   outSelWire.suggestName("inActRouterOutSelWire")
+  // outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
   private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
   internalDataWire.suggestName("inActInternalDataWire")
   private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
@@ -46,7 +46,7 @@ class InActRouter extends CSCRouter with ClusterConfig {
   private val outSelEqWires = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
   outSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
     bool.suggestName(s"inActOutSelEq${i}Wire")
-    bool := inSelWire === i.asUInt
+    bool := outSelWire === i.asUInt
   })
   when (inSelEqWires.head) { // from GLB
     internalDataWire <> io.dataPath.inIOs(0)
@@ -73,17 +73,17 @@ class InActRouter extends CSCRouter with ClusterConfig {
   }
   when (outSelEqWires.head) { // uni-cast
     io.dataPath.outIOs(0) <> internalDataWire // 0 to PE array
-    io.dataPath.outIOs.takeRight(3).foreach(_ <> DontCare)
+    io.dataPath.outIOs.takeRight(3).foreach(x => disableAdrDataValid(x))
   } .elsewhen (outSelEqWires(1)) { // horizontal
     connectAllExceptReady(io.dataPath.outIOs(0), internalDataWire)
-    io.dataPath.outIOs(1) <> DontCare // not send this time
-    io.dataPath.outIOs(2) <> DontCare // not send this time
+    disableAdrDataValid(io.dataPath.outIOs(1)) // not send this time
+    disableAdrDataValid(io.dataPath.outIOs(2)) // not send this time
     connectAllExceptReady(io.dataPath.outIOs(3), internalDataWire)
     internalDataWire.adrIOs.data.ready := io.dataPath.outIOs(0).adrIOs.data.ready && io.dataPath.outIOs(3).adrIOs.data.ready
     internalDataWire.dataIOs.data.ready := io.dataPath.outIOs(0).dataIOs.data.ready && io.dataPath.outIOs(3).dataIOs.data.ready
   } .elsewhen (outSelEqWires(2)) { // vertical
     io.dataPath.outIOs.take(3).foreach(_ <> internalDataWire)
-    io.dataPath.outIOs(3) <> DontCare// not send this time
+    disableAdrDataValid(io.dataPath.outIOs(3)) // not send this time
   } .otherwise { // broad-cast
     io.dataPath.outIOs.foreach(_ <> internalDataWire)
   }
