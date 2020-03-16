@@ -651,6 +651,39 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           }
         } .join()
       }
+      def singleThreadPokePeek(adrOrData: Int, peekCon: (Int, Int) => Boolean): Unit = {
+        val prefix: Seq[String] = Seq("adr", "data")
+        for (i <- 0 until inActRouterNum) {
+          println(s"[${prefix(adrOrData)}] poke inActPort $i now")
+          val pokeIO = Seq(theTopToCtrlDataIO(i).adrIOs, theTopToCtrlDataIO(i).dataIOs)
+          pokeIO(adrOrData).data.bits.poke(i.U)
+          pokeIO(adrOrData).data.valid.poke(true.B)
+        }
+        for (row <- 0 until peRowNum) {
+          for (col <- 0 until peColNum) {
+            val inActIdx = (row + col) % inActRouterNum
+            val peekIO = Seq(theCtrlToPEDataIO(row)(col).adrIOs, theCtrlToPEDataIO(row)(col).dataIOs)
+            if (peekCon(row, col)) {
+              println(s"[${prefix(adrOrData)}] peek pe[$row][$col] now with data from inAct $inActIdx")
+              peekIO(adrOrData).data.bits.expect(inActIdx.U)
+              peekIO(adrOrData).data.valid.expect(true.B)
+              peekIO(adrOrData).data.ready.poke(true.B)
+            } else {
+              peekIO(adrOrData).data.valid.expect(false.B)
+            }
+          }
+        }
+        println(s"[${prefix(adrOrData)}] peek ready signal now")
+        theTopToCtrlDataIO.foreach(x => x.adrIOs.data.ready.expect(true.B))
+        theClock.step()
+      }
+      def formerCon(row: Int, col: Int): Boolean = {
+        val condition = (row + col) < inActRouterNum
+        condition
+      }
+      def laterCon(row: Int, col: Int): Boolean = {
+        !formerCon(row, col)
+      }
       println("----------------- test begin -----------------")
       println("----------- PE Cluster Ctrl Spec -------------")
       println("---------- test basic connections-------------")
@@ -660,7 +693,24 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theClock.step()
       println("--------------- begin to load ----------------")
       theCtrlIO.inDataSel.poke(false.B) // don't broad-cast
-      fork { // poke via inActIO
+      // test inAct
+      singleThreadPokePeek(0, formerCon)
+      singleThreadPokePeek(1, formerCon)
+      // assume that the first group has been finished
+      for (row <- 0 until peRowNum) {
+        for (col <- 0 until peColNum) {
+          if (row + col < inActRouterNum) {
+            println(s"pe[$row][$col] finishes now")
+            theDoneIO(row)(col).adrWriteFin.poke(true.B)
+            theDoneIO(row)(col).dataWriteFin.poke(true.B)
+          }
+        }
+      }
+      theClock.step() // inActWriteDoneRegVec from false to true, and inActDataStateJumpWires is true now
+      theClock.step() // inActDataIOStateRegs jump from inActLoadFormer to inActLoadLater
+      singleThreadPokePeek(0, laterCon)
+      singleThreadPokePeek(1, laterCon)
+      /*fork { // poke via inActIO
         (1 until inActRouterNum).foldLeft(fork(inActIOPokeHelper(0))) {
           case (left, right) => left.fork(inActIOPokeHelper(idx = right))
         } .join()
@@ -672,7 +722,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
             case (leftt, rightt) => leftt.fork(muxInActPeekHelper(row = right, col = rightt))
           }
         } .join()
-      } .joinAndStep(theClock)
+      } .joinAndStep(theClock)*/
     }
   }
   it should "work well on PE Cluster" in {

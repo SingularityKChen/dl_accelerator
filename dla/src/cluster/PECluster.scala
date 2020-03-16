@@ -216,9 +216,9 @@ class PEClusterInActController extends Module with ClusterConfig {
     for (j <- 0 until peColNum) {
       io.writeEn(i)(j) := inActWriteEnWires(i)(j)
       inActWriteDoneRegVec.head(i)(j) := Mux(io.inActWriteFinVec(i)(j).adrWriteFin,
-        !inActWriteDoneRegVec.head(i)(j), inActWriteDoneRegVec.head(i)(j))
+        true.B, inActWriteDoneRegVec.head(i)(j))
       inActWriteDoneRegVec(1)(i)(j) := Mux(io.inActWriteFinVec(i)(j).dataWriteFin,
-        !inActWriteDoneRegVec(1)(i)(j), inActWriteDoneRegVec(1)(i)(j))
+        true.B, inActWriteDoneRegVec(1)(i)(j))
       inActWriteDoneWireVec(i)(j) := inActWriteDoneRegVec.head(i)(j) && inActWriteDoneRegVec(1)(i)(j)
       val iPlusJMod = (i + j) % inActRouterNum
       if (i + j < inActRouterNum) {
