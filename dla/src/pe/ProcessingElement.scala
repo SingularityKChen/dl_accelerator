@@ -199,7 +199,9 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val inActZeroColumnNumber: UInt = RegInit(0.U(inActAdrIdxWidth.W)) // use for get the right column number
   private val inActDataSPadFirstReadReg: Bool = RegInit(true.B)
   private val inActMatrixRowWire: UInt = Wire(UInt(cscCountWidth.W))
+  inActMatrixRowWire.suggestName("inActMatrixRowWire")
   private val inActMatrixDataWire: UInt = Wire(UInt(cscDataWidth.W))
+  inActMatrixDataWire.suggestName("inActMatrixDataWire")
   // WeightSPad
   private val weightAdrIndexWire: UInt = Wire(UInt(weightAdrIdxWidth.W))
   private val weightAdrDataWire: UInt = Wire(UInt(weightAdrWidth.W))
@@ -259,9 +261,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // Input activation Data Scratch Pad
   inActDataSPad.dataPath.writeInData <> io.dataStream.inActIOs.dataIOs
   inActDataIndexWire := inActDataSPad.dataPath.columnNum
-  private val inActDataCountVec: Seq[Bool] = inActDataSPad.dataPath.readOutData.asBools()
-  inActMatrixDataWire := Cat(inActDataCountVec.reverse.take(cscDataWidth)).asUInt // TODO: figure out why it need reverse
-  inActMatrixRowWire := Cat(inActDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
+  inActMatrixDataWire := inActDataSPad.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
+  inActMatrixRowWire := inActDataSPad.dataPath.readOutData(cscCountWidth - 1, 0)
   io.padWF.inActWriteFin.dataWriteFin := inActDataSPad.ctrlPath.writeFin
   inActDataSPad.ctrlPath.readEn := inActDataSPadReadEnReg
   inActDataSPad.ctrlPath.readInIdx := inActAdrDataWire
