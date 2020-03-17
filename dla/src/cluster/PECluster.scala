@@ -76,6 +76,16 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   }
   io.ctrlPath.allPSumAddFin := allColPSumAddFin
   io.ctrlPath.allCalFin := allCalFinWire
+  if (debug) {
+    io.debugIO.inActWriteFinVec.zip(peArray).foreach({ case (os, os1) => os.zip(os1).foreach({ case (debugWF, peIO) =>
+      debugWF <> peIO.padWF.inActWriteFin
+    })})
+    io.debugIO.eachPETopDebug.zip(peArray).foreach({ case (os, os1) => os.zip(os1).foreach({ case (o, o1) =>
+      o <> o1.debugIO
+    })})
+  } else {
+    io.debugIO <> DontCare
+  }
 }
 
 class PEClusterInAct extends Module with ClusterConfig {
@@ -181,7 +191,6 @@ class PEClusterInActDataConnections extends HasConnectAllExpRdModule with Cluste
 
 class PEClusterInActController extends Module with ClusterConfig {
   val io: PEClusterInActCtrlIO = IO(new PEClusterInActCtrlIO)// state machine of inAct in the PE Cluster
-
   // inActWriteEnWires: inAct address and data writeEn wires, used to `and` with valid data
   private val inActWriteEnWires = Seq.fill(peRowNum, peColNum){Wire(Bool())}
   inActWriteEnWires.zipWithIndex.foreach({ case (bools, i) =>
@@ -282,9 +291,8 @@ class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
   val inActIO: Vec[CSCStreamIO] = Vec(inActRouterNum, Flipped(new CSCStreamIO(inActAdrWidth, inActDataWidth))) // input only
 }
 
-class PEClusterInActIO extends Bundle with ClusterConfig {
+class PEClusterInActIO extends Bundle with HasInActWriteFinVecIO {
   val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
-  val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
   val inActToArrayData = new PEClusterInActToArrayDataIO
 }
 
@@ -292,7 +300,15 @@ class PEClusterInActDataIO extends Bundle with ClusterConfig {
   val inActToArrayData = new PEClusterInActToArrayDataIO
 }
 
-class PEClusterInActCtrlIO extends Bundle with ClusterConfig {
-  val writeEn: Vec[Vec[Bool]] = Vec(peRowNum, Vec(peColNum, Output(Bool())))
+class PEClusterInActCtrlIO extends Bundle with HasInActWriteFinVecIO {
+  val writeEn: Vec[Vec[Bool]] = Output(Vec(peRowNum, Vec(peColNum, Bool())))
+}
+
+trait HasInActWriteFinVecIO extends Bundle with ClusterConfig {
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
+}
+
+class PEClusterDebugIO extends Bundle with ClusterConfig {
+  val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, new CSCWriteFinIO)) // Output
+  val eachPETopDebug: Vec[Vec[PETopDebugIO]] = Vec(peRowNum, Vec(peColNum, new PETopDebugIO))
 }

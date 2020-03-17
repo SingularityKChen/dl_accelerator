@@ -2,7 +2,7 @@ package dla.pe
 
 import chisel3._
 import chisel3.util._
-// TODO: add reset signal for every module
+
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io: ProcessingElementIO = IO(new ProcessingElementIO)
   private val peCtrl = Module(new ProcessingElementControl(debug = debug)).io

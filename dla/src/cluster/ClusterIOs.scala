@@ -91,6 +91,7 @@ class RouterClusterCtrlIO extends Bundle { // output only
 class PEClusterIO extends Bundle with ClusterConfig {
   val dataPath = new PEClusterDataIO
   val ctrlPath = new PEClusterCtrlIO
+  val debugIO = new PEClusterDebugIO
 }
 
 class PEClusterDataIO extends Bundle with ClusterConfig {
