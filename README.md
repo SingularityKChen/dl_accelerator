@@ -261,6 +261,24 @@ This behavior contains several tests related to the GLB cluster's spec, i.e., th
 
 ##### test the spec of Processing Element Cluster
 
+## Instruction Set
+
+### OpCode
+
+As the opcode map of [RISC-V user 2.2](https://github.com/riscv/riscv-isa-manual/blob/riscv-user-2.2/src/opcode-map.tex) shows, I choose the custom space of `custom-1`, so the opcode is `01_010_11`.
+
+  | `INSTRUCTIONS` | `funct7` | `rs2` | `rs1` | `xd` \& `xs1` \& `xs2` | `rd`  | `opcode` |
+  | -------------- | -------- | ----- | ----- | ---------------------- | ----- | -------- |
+  | `LoadPSum` | 0000000 | ????? | ????? | 001                    | ????? | 0101011  |
+  | `InActWeiAddr` | 0000001  | ????? | ????? | 110                    | ????? | 0101011  |
+  | `G2N2M2F2` | 0000010  | ????? | ????? | 110                    | ????? | 0101011  |
+  | `C2S2G1N1` | 0000011  | ????? | ????? | 110                    | ????? | 0101011  |
+  | `M1F1C1S1` | 0000100  | ????? | ????? | 110                    | ????? | 0101011  |
+  | `F0N0C0M0` | 0000101  | ????? | ????? | 110                    | ????? | 0101011  |
+  | `E&R` | 0000110  | ????? | ????? | 110                    | ????? | 0101011  |
+
+Also, we can use one instruction to get all the configure values via HallowCache.
+
 ## Data Flow And Data Format
 
 ### Row-Stationary Plus \(RS+\) DataFlow
