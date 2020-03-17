@@ -13,7 +13,7 @@ class ProcessingElementIO extends Bundle {
 class PETopDebugIO extends Bundle {
   val peControlDebugIO = new PEControlDebugIO
   val peSPadDebugIO = new PESPadDebugIO
-  val writeFinishRegVec: Vec[Bool] = Vec(4, Output(Bool()))
+  val writeFinishRegVec: Vec[Bool] = Output(Vec(4, Bool()))
 }
 
 class PEControlDebugIO extends Bundle {

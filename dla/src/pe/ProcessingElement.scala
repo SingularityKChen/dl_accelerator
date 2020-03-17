@@ -29,7 +29,12 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
     inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin)
   private val writeFinishWire: Bool = Wire(Bool())
-  private val writeFinishRegVec: Vec[Bool] = RegInit(VecInit(Seq.fill(SPadWFSeq.length)(false.B)))
+  writeFinishWire.suggestName("inActAndWeightWFWire")
+  private val writeFinishRegVec = Seq.fill(SPadWFSeq.length){RegInit(false.B)}
+  writeFinishRegVec.head.suggestName("inActAdrWFReg")
+  writeFinishRegVec(1).suggestName("inActDataWFReg")
+  writeFinishRegVec(2).suggestName("weightAdrWFReg")
+  writeFinishRegVec.last.suggestName("weightDataWFReg")
   for (i <- SPadWFSeq.indices) {
     when (SPadWFSeq(i)) {
       writeFinishRegVec(i) := true.B
@@ -38,7 +43,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
       writeFinishRegVec(i) := false.B
     }
   }
-  writeFinishWire := writeFinishRegVec.reduce(_ && _) // when all five Scratch Pads write finished
+  writeFinishWire := writeFinishRegVec.reduce(_ && _) // when inAct and Weight Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
   peCtrl.ctrlTop.writeFinish := writeFinishWire
   pePad.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true, pipe = true)
@@ -60,6 +65,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   // psCal: do MAC computations
   private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
+  stateMac.suggestName("PEStateReg")
   io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
   io.ctrlPad.fromTopIO.pSumEnqEn := io.ctrlTop.pSumEnqEn
   io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
@@ -224,6 +230,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // padWriteBack: write the partial sum back
   private val padIdle :: padInActAdr :: padInActData :: padWeightAdr :: padWeightData1 :: padWeightData2 :: padMpy :: padWriteBack :: Nil = Enum(8)
   private val sPad: UInt = RegInit(padIdle)
+  sPad.suggestName("PESPadStateReg")
   private val padEqIA: Bool = Wire(Bool())
   private val padEqID: Bool = Wire(Bool())
   private val padEqWA: Bool = Wire(Bool())

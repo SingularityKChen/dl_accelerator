@@ -174,7 +174,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
 
   behavior of "test the spec of Processing Element"
 
-  it should "try to run PE with control and CSC SPad module" in {
+  it should "work well on PE Top module" in {
     test(new ProcessingElement(true)) { thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
@@ -284,7 +284,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     }
   }
 
-  it should "try to run PE SPad with CSC compressed data" in {
+  it should "work well on PE SPad with CSC compressed data" in {
     test(new ProcessingElementPad(true)) { thePESPad =>
       val theTopIO = thePESPad.io
       val theClock = thePESPad.clock
@@ -359,7 +359,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     }
   }
 
-  it should "try to read and write data in csc format" in {
+  it should "work well on reading and writing data in csc format" in {
     test(new SimplyCombineAdrDataSPad) { inActSPad =>
       val theTopIO = inActSPad.io
       val theClock = inActSPad.clock
@@ -383,7 +383,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
     }
   }
 
-  it should "write and read data in csc format with continued zero columns" in {
+  it should "work well on reading and writing data in csc format with continued zero columns" in {
     test(new SimplyCombineAdrDataSPad) { inActSPad =>
       val theTopIO = inActSPad.io
       val theClock = inActSPad.clock
