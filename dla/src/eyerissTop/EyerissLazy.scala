@@ -46,6 +46,44 @@ class MyEyerissImp(outer: MyEyeriss)(implicit p: Parameters) extends LazyModuleI
   cGroup.ctrlPath.peClusterCtrl.pSumInSel := true.B // load PSum from Router
 }
 
+class EyerissReader(implicit p: Parameters) extends LazyModule {
+  val node: TLClientNode = TLClientNode(portParams = Seq(TLClientPortParameters(clients = Seq(TLClientParameters(
+    name = "EyerissReader",
+    sourceId = IdRange(0, 1), // means only one channel?
+    supportsGet = TransferSizes(1, 4), // TODO: check
+    supportsPutPartial = TransferSizes(1, 4) // use full or partial?
+  )))))
+  // use channel A to receive inAct and weight
+  // use channel D to write back PSum
+  lazy val module = new EyerissReaderImp(this)
+}
+
+class EyerissReaderImp(outer: EyerissReader)(implicit p: Parameters) extends LazyModuleImp(outer) {
+  (outer.node.in zip outer.node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
+    val writeBackCh = out.d // write back via channel d
+    val readCh = out.a // read via channel a
+    val readAdrReg = RegInit(0.U(32.W)) // TODO: check
+    val writeAdrReg = RegInit(0.U(32.W))
+    when (true.B) {
+      readCh.bits := edgeOut.Get(
+        fromSource = 0.U,
+        toAddress = readAdrReg,
+        lgSize = log2Ceil(32).U
+      )._2 // TODO: why?
+    }
+    when (true.B) {
+      writeBackCh.bits := edgeOut.Put(
+        fromSource = 0.U,
+        toAddress = writeAdrReg,
+        lgSize = log2Ceil(32).U,
+        data = 2.U // FIXME
+      )._2
+    }
+    // in is master, out is this node, slaver
+  }
+
+}
+
 case class EyerissDecoderParams(address: BigInt, beatBytes: Int) // whether need beatBytes?
 
 trait EyerissDecoderImp extends HasRegMap {
@@ -63,9 +101,9 @@ trait EyerissDecoderImp extends HasRegMap {
   private val instructionReg = RegInit(0.U(instructionWidth.W)) // store instructions from CPU TODO: check bits
   regmap(
     0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg,
-      desc = new RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
+      desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
     0x08 -> Seq(RegField.r(n = 1, r = compReg,
-      desc = new RegFieldDesc(name = "compReg", desc = "for CPU to know whether the dla finishes this instruction")))
+      desc = RegFieldDesc(name = "compReg", desc = "for CPU to know whether the dla finishes this instruction")))
   )
   private val func3 = Wire(UInt(3.W))
   private val rs1 = Wire(UInt(5.W))
@@ -76,7 +114,6 @@ trait EyerissDecoderImp extends HasRegMap {
   private val pSumStrAdr = RegInit(0.U(5.W))
   private val gnmfcsRegVec = Seq.fill(12){RegInit(0.U(3.W))}
   private val fnercmRegVec = Seq.fill(6){RegInit(0.U(3.W))}
-  // TODO: use other instruction format rather than RoCC instruction format
   imm := instructionReg(31, 20)
   rs1 := instructionReg(19, 15)
   func3 := instructionReg(14, 12)
