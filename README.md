@@ -6,6 +6,18 @@ And it will extend some custom RISC-V instructions in the near future.
 
 ## Run
 
+Thanks to [Sequencer](https://github.com/sequencer), this project is integrated in [`rocket-playground` environment](https://github.com/sequencer/rocket-playground), you can clone the whole environment and run inside, or you can only test the module under `ClusterGroup`.
+
+### Clone Rocket-Playground With This Project
+
+```bash
+git clone https://github.com/SingularityKChen/rocket-playground.git -b dla
+cd rocket-chip/
+mill mill.scalalib.GenIdea/idea
+```
+
+And then you can develop and test this project in Intellij.
+
 ### Clone the Project
 
 ```bash
@@ -172,6 +184,22 @@ You have to poke address into partial sum SRAM banks no matter you want to read 
 
 This is the processing element cluster module. It is a PE Array which contains `peArrayColumnNum` columns and `peArrayRowNum` rows.
 
++ dataPath:
+  + inActIO: all the inAct data will be sent to `PEClusterInAct` module and sort them out.
+  + weightIO
+  + pSumIO
++ ctrlPath: 
+  + inActSel
+    + inDataSel: true for broad-cast and false for uni-cast
+    + outDataSel: when in broad-cast, this signal will determine which port of inAct will be sent broad-cast.
+  + pSumSel: 
+    + inDataSel: true load PSum from GLB, false load from the southern PE.
+    + OutDataSel: is assigned to `DontCare`.
+    
+##### PEClusterInAct
+
+This class is designed to sort the inAct out. Input `inActRouterNum` inAct Data and come out the sorted inAct data corresponding to each PE, i.e., `peRow` * `peCol`.
+
 #### [Router Cluster](./dla/src/cluster/RouterCluster.scala)
 
 This is the router cluster module. It contains `inActRouterNum` input activations router, `weightRouterNum` weight router, `pSumRouterNum` partial sum router.
@@ -183,14 +211,14 @@ Each router cluster not only connects to one GLB cluster, one PE cluster, but al
 This class is the generator of one input activations router.
 
 - dataPath: 
-  - InIOs\(0\): the input activation comes from its corresponding input activations SRAM bank\(GLB Cluster\);
-  - InIOs\(1\): the input activation comes from its northern inAct router;
-  - InIOs\(2\): the input activation comes from its southern inAct router;
-  - InIOs\(3\): the input activation comes from its horizontal inAct router;
-  - OutIOs\(0\): send the input activation to PE Array;
-  - OutIOs\(1\): send the input activation to northern inAct router;
-  - OutIOs\(2\): send the input activation to southern inAct router;
-  - OutIOs\(3\): send the input activation to horizontal inAct router;
+  - `InIOs(0)`: the input activation comes from its corresponding input activations SRAM bank\(GLB Cluster\);
+  - `InIOs(1)`: the input activation comes from its northern inAct router;
+  - `InIOs(2)`: the input activation comes from its southern inAct router;
+  - `InIOs(3)`: the input activation comes from its horizontal inAct router;
+  - `OutIOs(0)`: send the input activation to PE Array;
+  - `OutIOs(1)`: send the input activation to northern inAct router;
+  - `OutIOs(2)`: send the input activation to southern inAct router;
+  - `OutIOs(3)`: send the input activation to horizontal inAct router;
 - ctrlPath: 
   - inSelWire: its value enable the corresponding inIOs, i.e., 0 enables `inIOs(0)`
   - outSelWire: routing mode:
@@ -204,25 +232,25 @@ This class is the generator of one input activations router.
 This class is the generator of one weight router.
 
 - dataPath: 
-  - inIOs\(0\): the weight comes from its corresponding GLB Cluster;
-  - inIOs\(1\): the weight comes from its only horizontal neighboring WeightRouter;
-  - OutIOs\(0\): send the data to its corresponding PE Array row;
-  - OutIOs\(1\): send the data to its only horizontal neighboring WeightRouter;
+  - `inIOs(0)`: the weight comes from its corresponding GLB Cluster;
+  - `inIOs(1)`: the weight comes from its only horizontal neighboring WeightRouter;
+  - `OutIOs(0)`: send the data to its corresponding PE Array row;
+  - `OutIOs(1)`: send the data to its only horizontal neighboring WeightRouter;
 - ctrlPath
-  - inSelWire: false enables inIOs\(0\) and true enables inIOs\(1\)
-  - OutSelWire: always send to outIOs\(0\) and this signal be true to enables outIOs\(1\)
+  - inSelWire: false enables `inIOs(0)` and true enables `inIOs(1)`
+  - OutSelWire: always send to `outIOs(0)` and this signal be true to enables `outIOs(1)`
 
 ##### PSumRouter
 
 This class is the generator of one partial sum router. `inIOs(0)` connects directly to `outIOs(1)`.
 
 - dataPath: 
-  - inIOs\(0\): the output partial sum computed by its corresponding PE Array column;
-  - inIOs\(1\): the partial sum read from its corresponding partial sum SRAM bank;
-  - inIOs\(2\): the partial sum transferred from its northern neighboring PSumRouter;
-  - OutIOs\(0\): send the partial sum to its corresponding PE Array column;
-  - OutIOs\(1\): send the partial sum bank to its corresponding partial sum SRAM bank;
-  - OutIOs\(2\): send the partial sum to its southern neighboring PSumRouter;
+  - `inIOs(0)`: the output partial sum computed by its corresponding PE Array column;
+  - `inIOs(1)`: the partial sum read from its corresponding partial sum SRAM bank;
+  - `inIOs(2)`: the partial sum transferred from its northern neighboring PSumRouter;
+  - `OutIOs(0)`: send the partial sum to its corresponding PE Array column;
+  - `OutIOs(1)`: send the partial sum back to its corresponding partial sum SRAM bank;
+  - `OutIOs(2)`: send the partial sum to its southern neighboring PSumRouter;
 - ctrlPath: 
   - inSelWire: true for `inIOs(1)` and false for `inIOs(2)`;
   - outSelWire: true for `outIOs(0)` and false for `outIOs(2)`;
@@ -266,6 +294,7 @@ This behavior contains several tests related to the GLB cluster's spec, i.e., th
 ### OpCode
 
 As the opcode map of [RISC-V user 2.2](https://github.com/riscv/riscv-isa-manual/blob/riscv-user-2.2/src/opcode-map.tex) shows, I choose the custom space of `custom-1`, so the opcode is `01_010_11`.
+If I use `RoCC` interface, I have to use the following instructions: 
 
   | `INSTRUCTIONS` | `funct7` | `rs2` | `rs1` | `xd` \& `xs1` \& `xs2` | `rd`  | `opcode` |
   | -------------- | -------- | ----- | ----- | ---------------------- | ----- | -------- |
@@ -277,7 +306,15 @@ As the opcode map of [RISC-V user 2.2](https://github.com/riscv/riscv-isa-manual
   | `F0N0C0M0` | 0000101  | ????? | ????? | 110                    | ????? | 0101011  |
   | `E&R` | 0000110  | ????? | ????? | 110                    | ????? | 0101011  |
 
-Also, we can use one instruction to get all the configure values via HallowCache.
+However, if I decide to get the configurations and instructions via mapped register, then the instruction set can be more flexible. I try to design the instruction set based on **I-type**.
+
+| `INSTRUCTIONS` | `imm[11:0]` | `rs1` | `func3` | `rd` | `opcode`|
+| --- | --- | --- | --- | --- | --- |
+| `LoadPart0` | `G2N2M2F2` | `inActAdr` | 000 | `weightAdr` | 0101011 |
+| `LoadPart1` | `C2S2G1N1` | --- | 001 | --- | 0101011 |
+| `LoadPart2` | `M1F1C1S1` | --- | 010 | --- | 0101011 |
+| `LoadPart3` | `F0N0C0M0` | `E` | 011 |`R` | 0101011 |
+| `LoadPSum` | --- | --- | 100 | `PSumAdr` | 0101011 |
 
 ## Data Flow And Data Format
 
