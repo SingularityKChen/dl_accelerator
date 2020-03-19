@@ -22,24 +22,25 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   // true for broad-cast
   peCluster.ctrlPath.inActCtrlSel <> io.ctrlPath.peClusterCtrl.inActSel
   peCluster.ctrlPath.pSumCtrlSel.inDataSel := io.ctrlPath.peClusterCtrl.pSumInSel
-  // we can disable the outDataSel, as output of pSum is connected directly to router and outside
+  /** we can disable the outDataSel, as output of pSum is connected directly to router and outside*/
   peCluster.ctrlPath.pSumCtrlSel.outDataSel := DontCare // unused
   // doEn
   peCluster.ctrlPath.doEn := clusterCtrl.peCtrlIO.peLoadEn // to load inAct and weight // TODO: check
   peCluster.ctrlPath.pSumLoadEn := clusterCtrl.peCtrlIO.pSumLoadEn
   // GLB control path
   glbCluster.ctrlPath.pSumIO.zip(clusterCtrl.glbPSumCtrlIOs).foreach({ case (o, o1) => o <> o1})
-  // glbCluster.ctrlPath.pSumIO.writeOrRead: true when glbLoad or write back from PEArray
+  /** glbCluster.ctrlPath.pSumIO.writeOrRead: true when glbLoad or write back from PEArray */
   glbCluster.ctrlPath.inActIO.zip(clusterCtrl.glbInActCtrlIOs).foreach({ case (o, o1) => o <> o1})
   // clusterCtrl
   clusterCtrl.topIO.readOutPSum := io.ctrlPath.readOutPSum
   clusterCtrl.topIO.cgEnable := io.ctrlPath.readOutPSum // FIXME
+  io.ctrlPath.calFin := clusterCtrl.topIO.calFin
   clusterCtrl.allPSumAddFin := peCluster.ctrlPath.allPSumAddFin
   clusterCtrl.allCalFin := peCluster.ctrlPath.allCalFin
   // connections of data path
   // input activations
   for (i <- 0 until inActRouterNum) {
-    // port 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+    /** port 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal*/
     // top connections
     glbCluster.dataPath.inActIO(i).inIOs <> io.dataPath.glbDataPath.inActIO(i).inIOs
     io.dataPath.glbDataPath.inActIO(i).outIOs <> DontCare // disable this IO
@@ -47,9 +48,9 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
       routerCluster.dataPath.routerData.iRIO(i).inIOs(j) <> io.dataPath.cgDataPath.iRIO(i).inIOs(j)
       io.dataPath.cgDataPath.iRIO(i).outIOs(j) <> routerCluster.dataPath.routerData.iRIO(i).outIOs(j)
     }
-    // the inActRouter in port zero comes from GLB, so we can disable the GroupIO's inAct port zero
+    /** the inActRouter in port zero comes from GLB, so we can disable the GroupIO's inAct port zero*/
     io.dataPath.cgDataPath.iRIO(i).inIOs.head <> DontCare
-    // the inActRouter out port zero connected to peCluster, so disable the GroupIO's inAct port zero
+    /** the inActRouter out port zero connected to peCluster, so disable the GroupIO's inAct port zero*/
     io.dataPath.cgDataPath.iRIO(i).outIOs.head <> DontCare
     // inner connections
     routerCluster.dataPath.routerData.iRIO(i).inIOs.head <> glbCluster.dataPath.inActIO(i).outIOs
@@ -59,8 +60,9 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   require(io.dataPath.cgDataPath.wRIO.head.inIOs.length == 2, "the number of ports in weight router should be 2 " +
     "or you should correct the code")
   for (i <- 0 until weightRouterNum) {
-    // input: port 0 from GLB Cluster, 1 from neighboring weight router
-    // output: port 0 to PE Cluster, 1 to neighboring weight router
+    /** input: port 0 from GLB Cluster, 1 from neighboring weight router
+      * output: port 0 to PE Cluster, 1 to neighboring weight router
+      * */
     // top connections
     // GLB Cluster
     glbCluster.dataPath.weightIO(i).inIOs <> io.dataPath.glbDataPath.weightIO(i).inIOs
@@ -139,11 +141,12 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     reg := Mux(glbWriteFinWire, false.B, Mux(doneIO, true.B, reg))
   })
   glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
-  // cluster group state machine
-  // cgLoadGLB: load inAct and PSum from outside CG into GLBCluster
-  // cgLoadPE: load inAct, weight from outside PECluster (from GLB and outside CG)
-  // cgCal: PE doing computations
-  // cgRead: PE read PSum into the tails of PEArray to accumulate them and get out put PSum
+  /** cluster group state machine
+    * cgLoadGLB: load inAct and PSum from outside CG into GLBCluster
+    * cgLoadPE: load inAct, weight from outside PECluster (from GLB and outside CG)
+    * cgCal: PE doing computations cgRead: PE read PSum into the tails of PEArray to
+    * accumulate them and get out put PSum
+    * */
   private val cgIdle :: cgLoadGLB :: cgLoadPE :: cgCal :: cgRead :: Nil = Enum(5)
   private val cgStateReg = RegInit(cgIdle)
   switch (cgStateReg) {
@@ -224,6 +227,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   io.pSumAdd := cgReadWire
   io.peCal := cgStateReg === cgCal
   io.glbLoadEn := cgLoadGLB
+  io.topIO.calFin := cgStateReg === cgRead && configG2Wrap
 }
 
 class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS2Config {
@@ -240,6 +244,7 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
   val topIO = new Bundle {
     val readOutPSum: Bool = Input(Bool())
     val cgEnable: Bool = Input(Bool())
+    val calFin: Bool = Output(Bool())
   }
   val glbLoadEn: Bool = Output(Bool())
 }

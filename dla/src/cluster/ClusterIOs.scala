@@ -5,25 +5,29 @@ import chisel3.util._
 import dla.pe.CSCStreamIO
 
 class ClusterGroupIO extends Bundle {
-  val ctrlPath: ClusterGroupCtrlIO = Flipped(new ClusterGroupCtrlIO) // now, input them
+  val ctrlPath: ClusterGroupCtrlIO = new ClusterGroupCtrlIO // now, input them
   val dataPath = new ClusterGroupDataIO
 }
 
 class ClusterGroupDataIO extends Bundle with ClusterConfig {
   val glbDataPath = new GLBClusterDataIO // through top to GLB
   val cgDataPath = new RouterDataIO // communicate with other cluster groups
-  // pSumDataVerticalIOs.outIOs for translating partial sum from each head in PE array to each tail of its northern PE Array
-  // pSumDataVerticalIOs.inIOs, on the other hand, receive partial sum from the head of its southern PE Array
+  /** pSumDataVerticalIOs.outIOs
+    * for translating partial sum from each head in PE array to each tail of its northern PE Array
+    * pSumDataVerticalIOs.inIOs
+    * on the other hand, receive partial sum from the head of its southern PE Array
+    * */
   val pSumDataVerticalIOs = new PSumRouterDataIO(pSumRouterNum, psDataWidth) // input and output
 }
 
 class ClusterGroupCtrlIO extends Bundle {
   val peClusterCtrl = new Bundle {
-    val inActSel = new CommonClusterCtrlBoolUIntIO
-    val pSumInSel: Bool = Output(Bool())
+    val inActSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
+    val pSumInSel: Bool = Input(Bool())
   } // output select signals to PE Cluster
-  val routerClusterCtrl: RouterClusterCtrlIO = new RouterClusterCtrlIO // output select signals to Router Cluster
-  val readOutPSum: Bool = Output(Bool()) // true then to read out partial sums from GLB
+  val routerClusterCtrl: RouterClusterCtrlIO = Flipped(new RouterClusterCtrlIO) // output select signals to Router Cluster
+  val readOutPSum: Bool = Input(Bool()) // true then to read out partial sums from GLB
+  val calFin: Bool = Output(Bool())
 }
 
 class RouterClusterIO extends Bundle {
@@ -74,17 +78,27 @@ class CommonRouterDataIO(val portNum: Int, val adrWidth: Int, val dataWidth: Int
 }
 
 class RouterClusterCtrlIO extends Bundle { // output only
-  // uni-cast, horizontal, vertical, broad-cast
-  // inActCtrlSel.inDataSel: 0 for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
-  // inActCtrlSel.outDataSel 0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal
+  /** uni-cast, horizontal, vertical, broad-cast
+    *  inActCtrlSel.inDataSel:
+    *  0 for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+    *  inActCtrlSel.outDataSel:
+    *  0 for PE Cluster, 1 for north, 2 for south, 3 for horizontal*/
   val inActCtrlSel = new CommonClusterCtrlTwoUIntIO
-  // Weight Models: broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
-  // weightCtrlSel.inDataSel: true for broad-cast and multi-cast, false for uni-cast
-  // weightCtrlSel.outDataSel: 0, send the data to PE Cluster; 1, send it to its neighboring WeightRouter and PE Cluster
+  /** Weight Models:
+    * broad-cast, multi-cast, uni-cast, but the first two seems the same inner weight cluster
+    * weightCtrlSel.inDataSel:
+    * true for broad-cast and multi-cast, false for uni-cast
+    * weightCtrlSel.outDataSel:
+    * 0, send the data to PE Cluster;
+    * 1, send it to its neighboring WeightRouter and PE Cluster
+    * */
   val weightCtrlSel = new CommonClusterCtrlTwoBoolIO
-  // inData from PECluster will connect directly to outData to GLBCluster
-  // pSumCtrlSel.inDataSel: true for GLB Cluster, false for vertical
-  // pSumCtrlSel.outDataSel: true for PE Cluster, false for vertical
+  /** inData from PECluster will connect directly to outData to GLBCluster
+    * pSumCtrlSel.inDataSel:
+    * true for GLB Cluster, false for vertical
+    * pSumCtrlSel.outDataSel:
+    * true for PE Cluster, false for vertical
+    * */
   val pSumCtrlSel = new CommonClusterCtrlTwoBoolIO
 }
 
@@ -103,11 +117,14 @@ class PEClusterDataIO extends Bundle with ClusterConfig {
 }
 
 class PEClusterCtrlIO extends Bundle with HasPSumLoadEnIO {
-  // inActCtrlSel.inDataSel: true for broad-cast, false for others
-  // inActCtrlSel.outDataSel: the value indicates the index of router
+  /** inActCtrlSel.inDataSel: true for broad-cast, false for others
+    * inActCtrlSel.outDataSel: the value indicates the index of router
+    */
   val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
-  // pSumCtrlSel.inDataSel: true, then receive data from PSumRouter, false then receive data from its southern PE Array
-  // pSumCtrlSel.outDataSel: unused
+  /** pSumCtrlSel.inDataSel:
+    * true, then receive data from PSumRouter, false then receive data from its southern PE Array
+    * pSumCtrlSel.outDataSel: unused
+    */
   val pSumCtrlSel: CommonClusterCtrlTwoBoolIO = Flipped(new CommonClusterCtrlTwoBoolIO)
   val doEn: Bool = Input(Bool()) // load inAct and weight
   val allPSumAddFin: Bool = Output(Bool()) // true when all columns of PEs have finished accumulating PSum

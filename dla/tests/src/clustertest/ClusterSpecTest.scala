@@ -750,6 +750,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val pSumDataIO = theTopIO.dataPath.pSumIO
       val inActDataIO = theTopIO.dataPath.inActIO
       val weightDataIO = theTopIO.dataPath.weightIO
+      val theInActAdrLookup: Seq[List[Int]] = theInActAdrStreams.map(x => getStreamLookUp(x))
+      val theInActDataLookup: Seq[List[Int]] = theInActDataStreams.map(x => getStreamLookUp(x))
+      val theWeightAdrLookup: Seq[List[Int]] = theWeightAdrStreams.map(x => getStreamLookUp(x))
+      val theWeightDataLookup: Seq[List[Int]] = theWeightDataStreams.map(x => getStreamLookUp(x))
+      val inActAdrReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
+      val inActDataReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
+      val weightAdrReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
+      val weightDataReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
       def writeCSCPECluster(theInIO: StreamBitsIO, theStream: List[Int]): Unit = {
         var idx = 0
         while (theStream(idx) != 0) {
@@ -899,14 +907,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         } .joinAndStep(theClock)
       } .join()
       */
-      val theInActAdrLookup: Seq[List[Int]] = theInActAdrStreams.map(x => getStreamLookUp(x))
-      val theInActDataLookup: Seq[List[Int]] = theInActDataStreams.map(x => getStreamLookUp(x))
-      val theWeightAdrLookup: Seq[List[Int]] = theWeightAdrStreams.map(x => getStreamLookUp(x))
-      val theWeightDataLookup: Seq[List[Int]] = theWeightDataStreams.map(x => getStreamLookUp(x))
-      val inActAdrReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
-      val inActDataReadIdx: Array[Int] = Array.fill(inActRouterNum){0}
-      val weightAdrReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
-      val weightDataReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
       fork.withName("inActLoadThread") { // inActLoad
         val prefixNeedContainsInAct = new Regex("(I|i)nAct") // used for require statements
         fork.withName("inActAdrLoadThread") { // address
@@ -925,7 +925,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
             s"'inAct' or 'InAct', but $thePrefix.")
           singleThreadWriteOneSCS(theDataIO, theInActDataLookup, inActDataReadIdx,
             theInActDataStreams, inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
-          theDebugIO.inActDataIOState.foreach(x => x.expect(1.U, "inAct should be later now"))
           expectInActWF(theRFRegVecIdx = 0, formerCon,
             conMessage = "former PEs have finished data", elseMessage = "later PEs haven't begin poke data yet")
         } .join()

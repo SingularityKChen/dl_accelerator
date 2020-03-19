@@ -36,35 +36,32 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
 
   //@todo chisel logic
   // LazyModuleImp:
-  lazy val module = new LazyModuleImp(this) {
-    val cGroup = Module(new ClusterGroup(false)).io
-    // 1. Decoder -> chiselModule
+  lazy val module: LazyModuleImp = new LazyModuleImp(this) {
     val instructionWidth = 32
-    /** if `compReg = false`, that's idle, then CPU sends one instruction, then compReg becomes true,
-      * one means busy, and the dla will process this instruction.
-      * After this instruction is done, then it becomes false again.
-      * In this case, after configuration and get inAct and weight address, this reg will be assigned
-      * to true, to show it is computing, and when it finishes, it will be false, and wait for read PSum.
-      * When reading PSum, compReg will be assigned to true until it finishes write back.
-      * */
-    // store instructions from CPU TODO: check bits
-    val instructionReg = RegInit(0.U(instructionWidth.W))
+    /** store instructions from CPU */
+    private val instructionReg = RegInit(0.U(instructionWidth.W))
+    instructionReg.suggestName("instructionReg")
     regmap(
-      0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg, desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
+      0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg,
+        desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
     )
-    val decoder = Module(new Decoder).io
-    decoder.instruction := instructionReg
 
+    private val cGroup = Module(new ClusterGroup(false)).io
+    /** Decoder */
+    private val decoder = Module(new Decoder).io
+    decoder.suggestName("decoderIO")
     // 2. TileLink access -> write/read memory.
     // (@todo DMA3)
     val (memBundle, memEdge) = node.out.head
     // 3. Int
     // (@todo add Int)
     val (intBundle, intEdge) = intnode.out.head
-
+    /** decoder connections*/
+    decoder.instruction := instructionReg
+    decoder.calFin := cGroup.ctrlPath.calFin
     // cGroup data path
     // @todo add ports to TL
-    // @todo cGroup ctrl path
+    // cGroup ctrl path
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel := 0.U // from inAct SRAM bank
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.outDataSel := 0.U // uni-cast
     cGroup.ctrlPath.routerClusterCtrl.weightCtrlSel.inDataSel := false.B // from GLB Cluster
