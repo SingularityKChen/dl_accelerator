@@ -53,26 +53,23 @@ class EyerissReader(implicit p: Parameters) extends LazyModule {
     supportsGet = TransferSizes(1, 4), // TODO: check
     supportsPutPartial = TransferSizes(1, 4) // use full or partial?
   )))))
-  // use channel A to receive inAct and weight
-  // use channel D to write back PSum
+  // use channel A to receive inAct and weight, and write back PSum
   lazy val module = new EyerissReaderImp(this)
 }
 
 class EyerissReaderImp(outer: EyerissReader)(implicit p: Parameters) extends LazyModuleImp(outer) {
   (outer.node.in zip outer.node.out) foreach { case ((in, edgeIn), (out, edgeOut)) =>
-    val writeBackCh = out.d // write back via channel d
-    val readCh = out.a // read via channel a
     val readAdrReg = RegInit(0.U(32.W)) // TODO: check
     val writeAdrReg = RegInit(0.U(32.W))
     when (true.B) {
-      readCh.bits := edgeOut.Get(
+      out.a.bits := edgeOut.Get(
         fromSource = 0.U,
         toAddress = readAdrReg,
         lgSize = log2Ceil(32).U
       )._2 // TODO: why?
     }
     when (true.B) {
-      writeBackCh.bits := edgeOut.Put(
+      out.a.bits := edgeOut.Put(
         fromSource = 0.U,
         toAddress = writeAdrReg,
         lgSize = log2Ceil(32).U,
@@ -80,6 +77,7 @@ class EyerissReaderImp(outer: EyerissReader)(implicit p: Parameters) extends Laz
       )._2
     }
     // in is master, out is this node, slaver
+    // edgeIn can access channel D, and edgeOut can access channel A
   }
 
 }
