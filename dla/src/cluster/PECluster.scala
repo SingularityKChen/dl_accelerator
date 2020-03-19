@@ -17,7 +17,7 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   peArray.zipWithIndex.foreach({case (pe, idx) =>
     pe.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"pe($idx)($i)")
     })})
-  private val peClusterInAct = Module(new PEClusterInAct).io
+  private val peClusterInAct = Module(new PEClusterInAct(debug = debug)).io
   peClusterInAct.suggestName("peClusterInAct")
   // connections of peClusterInAct
   peClusterInAct.inActCtrlSel <> io.ctrlPath.inActCtrlSel
@@ -60,8 +60,10 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
     }
     for (i <- 0 until peRowNum) {
       connectAllExceptReady(peArray(i)(j).dataStream.weightIOs, io.dataPath.weightIO(i))
-      io.dataPath.weightIO(i).adrIOs.data.ready := peArray(i).map(x => x.dataStream.weightIOs.adrIOs.data.ready).reduce(_ && _)
-      io.dataPath.weightIO(i).dataIOs.data.ready := peArray(i).map(x => x.dataStream.weightIOs.dataIOs.data.ready).reduce(_ && _)
+      io.dataPath.weightIO(i).adrIOs.data.ready := peArray(i).map(x =>
+        x.dataStream.weightIOs.adrIOs.data.ready).reduce(_ && _)
+      io.dataPath.weightIO(i).dataIOs.data.ready := peArray(i).map(x =>
+        x.dataStream.weightIOs.dataIOs.data.ready).reduce(_ && _)
       peArray(i)(j).dataStream.inActIOs <> peClusterInAct.inActToArrayData.muxInActData(i)(j)
       peArray(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
       // pSumControl
@@ -77,21 +79,26 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   io.ctrlPath.allPSumAddFin := allColPSumAddFin
   io.ctrlPath.allCalFin := allCalFinWire
   if (debug) {
-    io.debugIO.inActWriteFinVec.zip(peArray).foreach({ case (os, os1) => os.zip(os1).foreach({ case (debugWF, peIO) =>
-      debugWF <> peIO.padWF.inActWriteFin
-    })})
-    io.debugIO.eachPETopDebug.zip(peArray).foreach({ case (os, os1) => os.zip(os1).foreach({ case (o, o1) =>
-      o <> o1.debugIO
-    })})
+    for (row <- 0 until peRowNum) {
+      for (col <- 0 until peColNum) {
+        io.debugIO.eachPEInActValid.head(row)(col) :=
+          peClusterInAct.inActToArrayData.muxInActData(row)(col).adrIOs.data.valid
+        io.debugIO.eachPEInActValid.last(row)(col) :=
+          peClusterInAct.inActToArrayData.muxInActData(row)(col).dataIOs.data.valid
+        io.debugIO.inActWriteFinVec(row)(col) <> peArray(row)(col).padWF.inActWriteFin
+        io.debugIO.eachPETopDebug(row)(col) <> peArray(row)(col).debugIO
+      }
+    }
+    io.debugIO.inActDataIOState <> peClusterInAct.debugIO.inActDataIOState
   } else {
     io.debugIO <> DontCare
   }
 }
 
-class PEClusterInAct extends Module with ClusterConfig {
+class PEClusterInAct(debug: Boolean) extends Module with ClusterConfig {
   val io: PEClusterInActIO = IO(new PEClusterInActIO)
   private val dataPart = Module(new PEClusterInActDataConnections).io
-  private val ctrlPart = Module(new PEClusterInActController).io// connections of enWires
+  private val ctrlPart = Module(new PEClusterInActController(debug)).io// connections of enWires
   io.inActWriteFinVec <> ctrlPart.inActWriteFinVec
   for (i <- 0 until peRowNum) {
     for (j <- 0 until peColNum) {
@@ -125,17 +132,24 @@ class PEClusterInAct extends Module with ClusterConfig {
         case (o, i) => i.asUInt -> o.dataIOs.data.valid}))
     })
     io.inActToArrayData.inActIO.zipWithIndex.foreach({case (x, idx1) =>
-      x.adrIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B, Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
+      x.adrIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B,
+        Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
         if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.adrIOs.data.ready).reduce(_ && _)
         else idx.asUInt -> false.B
       }))
-      x.dataIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B, Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
+      x.dataIOs.data.ready := MuxLookup(io.inActCtrlSel.outDataSel, false.B,
+        Seq.fill(inActRouterNum){1}.zipWithIndex.map({ case (_, idx) =>
         if (idx1 == idx) idx.asUInt -> dataPart.inActToArrayData.inActIO.map(y => y.dataIOs.data.ready).reduce(_ && _)
         else idx.asUInt -> false.B
       }))
     })
   } .otherwise {
     dataPart.inActToArrayData.inActIO <> io.inActToArrayData.inActIO
+  }
+  if (debug) {
+    io.debugIO <> ctrlPart.debugIO
+  } else {
+    io.debugIO <> DontCare
   }
 }
 
@@ -189,7 +203,7 @@ class PEClusterInActDataConnections extends HasConnectAllExpRdModule with Cluste
   })})
 }
 
-class PEClusterInActController extends Module with ClusterConfig {
+class PEClusterInActController(debug: Boolean) extends Module with ClusterConfig {
   val io: PEClusterInActCtrlIO = IO(new PEClusterInActCtrlIO)// state machine of inAct in the PE Cluster
   // inActWriteEnWires: inAct address and data writeEn wires, used to `and` with valid data
   private val inActWriteEnWires = Seq.fill(peRowNum, peColNum){Wire(Bool())}
@@ -282,6 +296,11 @@ class PEClusterInActController extends Module with ClusterConfig {
       }
     }
   }
+  if (debug) {
+    io.debugIO.inActDataIOState <> inActDataIOStateRegs
+  } else {
+    io.debugIO <> DontCare
+  }
 }
 
 class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
@@ -294,6 +313,7 @@ class PEClusterInActToArrayDataIO extends Bundle with ClusterConfig {
 class PEClusterInActIO extends Bundle with HasInActWriteFinVecIO {
   val inActCtrlSel: CommonClusterCtrlBoolUIntIO = Flipped(new CommonClusterCtrlBoolUIntIO)
   val inActToArrayData = new PEClusterInActToArrayDataIO
+  val debugIO = new Bundle with HasPEClusterInActControllerDebugIO
 }
 
 class PEClusterInActDataIO extends Bundle with ClusterConfig {
@@ -302,13 +322,20 @@ class PEClusterInActDataIO extends Bundle with ClusterConfig {
 
 class PEClusterInActCtrlIO extends Bundle with HasInActWriteFinVecIO {
   val writeEn: Vec[Vec[Bool]] = Output(Vec(peRowNum, Vec(peColNum, Bool())))
+  val debugIO = new Bundle with HasPEClusterInActControllerDebugIO
 }
 
 trait HasInActWriteFinVecIO extends Bundle with ClusterConfig {
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, Flipped(new CSCWriteFinIO))) // input
 }
 
-class PEClusterDebugIO extends Bundle with ClusterConfig {
+trait HasPEClusterInActControllerDebugIO extends Bundle with ClusterConfig {
+  val inActDataIOState: Vec[UInt] = Output(Vec(inActRouterNum, UInt(1.W)))
+  //val inActDoneReg
+}
+
+class PEClusterDebugIO extends Bundle with ClusterConfig with HasPEClusterInActControllerDebugIO {
   val inActWriteFinVec: Vec[Vec[CSCWriteFinIO]] = Vec(peRowNum, Vec(peColNum, new CSCWriteFinIO)) // Output
   val eachPETopDebug: Vec[Vec[PETopDebugIO]] = Vec(peRowNum, Vec(peColNum, new PETopDebugIO))
+  val eachPEInActValid: Vec[Vec[Vec[Bool]]] = Output(Vec(2, Vec(peRowNum, Vec(peColNum, Bool()))))
 }

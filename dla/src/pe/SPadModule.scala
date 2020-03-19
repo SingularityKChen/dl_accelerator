@@ -81,10 +81,12 @@ class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
   protected val writeWrapWire: Bool = Wire(Bool())
   protected val readWrapWire: Bool = Wire(Bool())
   protected val readIndexInc: Bool = Wire(Bool()) // true, then read index increase
-  writeWrapWire := decoupledDataIO.bits === 0.U && io.ctrlPath.writeEn
+  protected val dataValid: Bool = Wire(Bool())
+  dataValid := decoupledDataIO.valid && io.ctrlPath.writeEn
+  writeWrapWire := decoupledDataIO.bits === 0.U && dataValid
   readWrapWire := dataWire === 0.U && readIndexInc
   // write logic 1
-  when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
+  when (dataValid) {
     decoupledDataIO.ready := true.B
     padWriteIndexReg := padWriteIndexReg + 1.U
     when (writeWrapWire) {

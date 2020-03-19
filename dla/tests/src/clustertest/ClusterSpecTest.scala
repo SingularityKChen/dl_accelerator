@@ -10,6 +10,7 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import dla.tests.GenOneStreamData
 import org.scalatest._
 import scala.util.Random
+import scala.util.matching.Regex
 import scala.math.pow
 
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
@@ -59,7 +60,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     debugIO.waitForRead.expect(false.B, s"[$prefix] it should be false as this is the first read cycle")
     theClock.step()
     outIO.data.bits.expect(theData(idx).U, s"[$prefix] theData($idx) = ${theData(idx)}, current idx = " +
-      s"${debugIO.idx.peek()}")
+      s"${debugIO.idx.peek()}, data length = ${theData.length}")
     outIO.data.valid.expect(true.B, s"$prefix should valid now")
     if (printLogDetails) println(
       s"[$prefix] $idx.5 done = ${doneIO.peek()}\n" +
@@ -121,7 +122,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       x.theState.expect(0.U, "every inActSRAMBank still needs to be idle")
     })
   }
-  private def topReadPSum(theTopIO: GLBClusterIO, dataStream: Seq[List[Int]], startIndexes: Seq[Int], theClock: Clock): Unit = {
+  private def topReadPSum(theTopIO: GLBClusterIO, dataStream: Seq[List[Int]], startIndexes: Seq[Int],
+                          theClock: Clock): Unit = {
     val theCtrlIO = theTopIO.ctrlPath.pSumIO.map(x => x.readIO)
     val thePSumDebugIOs = theTopIO.debugIO.pSumDebugIO
     val theOutIOs = theTopIO.dataPath.pSumIO.map(x => x.outIOs)
@@ -300,8 +302,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       println(s"[$prefix] $i PASS")
     }
   }
-  private def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool, theData: List[Int],
-                         theClock: Clock, prefix: String) : Unit = {
+  private def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO,
+                         doneIO: Bool, theData: List[Int], theClock: Clock, prefix: String) : Unit = {
     for (i <- theData.indices) {
       println(s"------------- $i-th $prefix write cycle ----------")
       inIO.data.bits.poke(theData(i).U)
@@ -576,13 +578,14 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
 
   behavior of "test the spec of PE Cluster"
   it should "work well on PE inAct Controller" in {
-    test (new PEClusterInAct) { thePEAct =>
+    test (new PEClusterInAct(debug = true)) { thePEAct =>
       val theTopIO = thePEAct.io
       val theClock = thePEAct.clock
       val theTopToCtrlDataIO = theTopIO.inActToArrayData.inActIO // inActRouter number
       val theCtrlToPEDataIO = theTopIO.inActToArrayData.muxInActData // (peRow, peCol)
       val theCtrlIO = theTopIO.inActCtrlSel
       val theDoneIO = theTopIO.inActWriteFinVec // (peRow, peCol)
+      val theDebugIO = theTopIO.debugIO
       def inActIOPokeHelper(idx: Int): Unit = {
         fork {
           var pokeIdx: Int = 0
@@ -694,22 +697,34 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       println("--------------- begin to load ----------------")
       theCtrlIO.inDataSel.poke(false.B) // don't broad-cast
       // test inAct
+      theDebugIO.inActDataIOState.foreach( x => x.expect(0.U, "inAct should be former now"))
       singleThreadPokePeek(0, formerCon)
       singleThreadPokePeek(1, formerCon)
       // assume that the first group has been finished
       for (row <- 0 until peRowNum) {
         for (col <- 0 until peColNum) {
-          if (row + col < inActRouterNum) {
+          if (formerCon(row, col)) {
             println(s"pe[$row][$col] finishes now")
             theDoneIO(row)(col).adrWriteFin.poke(true.B)
             theDoneIO(row)(col).dataWriteFin.poke(true.B)
           }
         }
       }
+      theDebugIO.inActDataIOState.foreach( x => x.expect(0.U, "inAct should be former now"))
       theClock.step() // inActWriteDoneRegVec from false to true, and inActDataStateJumpWires is true now
       theClock.step() // inActDataIOStateRegs jump from inActLoadFormer to inActLoadLater
+      theDebugIO.inActDataIOState.foreach( x => x.expect(1.U, "inAct should be later now"))
       singleThreadPokePeek(0, laterCon)
       singleThreadPokePeek(1, laterCon)
+      for (row <- 0 until peRowNum) {
+        for (col <- 0 until peColNum) {
+          if (laterCon(row, col)) {
+            println(s"pe[$row][$col] finishes now")
+            theDoneIO(row)(col).adrWriteFin.poke(true.B)
+            theDoneIO(row)(col).dataWriteFin.poke(true.B)
+          }
+        }
+      }
       /*fork { // poke via inActIO
         (1 until inActRouterNum).foldLeft(fork(inActIOPokeHelper(0))) {
           case (left, right) => left.fork(inActIOPokeHelper(idx = right))
@@ -772,24 +787,67 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       }
       def singleThreadWriteOneSCS(thePokeIO: IndexedSeq[DecoupledIO[UInt]], theLookup: Seq[List[Int]],
                                   theStreamReadIdx: Array[Int], thePokeStream: Seq[List[Int]],
-                                  theRouterNumber: Int,
+                                  theRouterNumber: Int, conFunc: (Int, Int) => Boolean,
                                   thePrefix: String): Unit = {
+        val regInActOrWeight = new Regex("(I|i)nAct")
+        val regDataOrAdr = new Regex("(D|d)ata")
+        val itIsInAct = regInActOrWeight.pattern.matcher(thePrefix).find()
+        val itIsData = regDataOrAdr.pattern.matcher(thePrefix).find()
         for (_ <- 0 until theLookup.map(x => x(1)).max) {
+          if (regInActOrWeight.pattern.matcher(thePrefix).find()) {
+            theDebugIO.inActDataIOState.zipWithIndex.foreach({ case (int, i) =>
+              if (conFunc(0, 0)) { // if 0 + 0 ? InActRouter == true, then it's former
+                int.expect(0.U, s"[$thePrefix@R$i] should it be former or later?")
+              } else {
+                int.expect(1.U, s"[$thePrefix@R$i] should it be former or later?")
+              }
+            })
+          }
           for (routerIdx <- 0 until theRouterNumber) {
-            val prefix: String = s"$thePrefix@$routerIdx@${theStreamReadIdx(routerIdx)}"
+            val prefix: String = s"$thePrefix@Router$routerIdx@Idx${theStreamReadIdx(routerIdx)}"
             if (theStreamReadIdx(routerIdx) < theLookup(routerIdx)(1)) { // until the end of first stream
               println(s"[$prefix] poke bits = ${thePokeStream(routerIdx)(theStreamReadIdx(routerIdx))}")
               thePokeIO(routerIdx).bits.poke(thePokeStream(routerIdx)(theStreamReadIdx(routerIdx)).U)
               thePokeIO(routerIdx).valid.poke(true.B)
               thePokeIO(routerIdx).ready.expect(true.B)
+              theDebugIO.eachPETopDebug.zipWithIndex.foreach({ case (os, row) =>
+                os.zipWithIndex.foreach({ case (o, col) =>
+                  if (row + col % inActRouterNum == routerIdx && itIsInAct && itIsData)
+                    timescope {
+                      theClock.step()
+                      o.writeFinishRegVec.head.expect((thePokeStream(routerIdx)(theStreamReadIdx(routerIdx)) == 0).B,
+                        s"[$prefix] current data = ${thePokeStream(routerIdx)(theStreamReadIdx(routerIdx))}, " +
+                          s"should it done?")
+                    }
+                })})
               theStreamReadIdx(routerIdx) += 1
             } else {
               thePokeIO(routerIdx).valid.poke(false.B)
+              theDebugIO.eachPETopDebug.zipWithIndex.foreach({ case (os, row) =>
+                os.zipWithIndex.foreach({ case (o, col) =>
+                  if (row + col % inActRouterNum == routerIdx && itIsInAct && itIsData)
+                    o.writeFinishRegVec.head.expect(true.B, s"[$prefix] should it done?")
+                })})
               println(s"[$thePrefix@$routerIdx] have poked ${theStreamReadIdx(routerIdx) - 1} data, the last one is " +
                 s"${thePokeStream(routerIdx)(theStreamReadIdx(routerIdx) - 1)}")
             }
           }
           theClock.step()
+          if (itIsInAct) {
+            for (row <- 0 until peRowNum) {
+              for (col <- 0 until peColNum) {
+                if (itIsData) { // true for data
+                  theDebugIO.eachPEInActValid.last(row)(col).expect(conFunc(row, col).B,
+                    s"[$thePrefix@Row$row@Col$col] should Data Valid now?")
+                  //println(s"[$thePrefix@Row$row@Col$col] DataValid ${theDebugIO.eachPEInActValid.last(row)(col).peek()}")
+                } else {
+                  theDebugIO.eachPEInActValid.head(row)(col).expect(conFunc(row, col).B,
+                    s"[$thePrefix@Row$row@Col$col] should Adr Valid now?")
+                  //println(s"[$thePrefix@Row$row@Col$col] AdrValid ${theDebugIO.eachPEInActValid.head(row)(col).peek()}")
+                }
+              }
+            }
+          }
         }
         println(s"[$thePrefix] poke finishes now")
       }
@@ -798,9 +856,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         for (row <- 0 until peRowNum) {
           for (col <- 0 until peColNum) {
             if (conFunc(row, col)) {
-              theDebugIO.eachPETopDebug(row)(col).writeFinishRegVec(theRFRegVecIdx).expect(true.B, s"$conMessage")
+              theDebugIO.eachPETopDebug(row)(col).writeFinishRegVec(theRFRegVecIdx).expect(true.B, conMessage)
             } else {
-              theDebugIO.eachPETopDebug(row)(col).writeFinishRegVec(theRFRegVecIdx).expect(false.B, s"$elseMessage")
+              theDebugIO.eachPETopDebug(row)(col).writeFinishRegVec(theRFRegVecIdx).expect(false.B, elseMessage)
             }
           }
         }
@@ -820,9 +878,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       thePECluster.reset.poke(false.B)
       theClock.step()
       println("--------------- begin to load ----------------")
-      theTopIO.ctrlPath.pSumCtrlSel.inDataSel.poke(true.B) // receive data from PSum Router
-      theTopIO.ctrlPath.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
-      theTopIO.ctrlPath.doEn.poke(true.B) // begin to load inAct and weight, then cal
+      theCtrlIO.pSumCtrlSel.inDataSel.poke(true.B) // receive data from PSum Router
+      theCtrlIO.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
+      theCtrlIO.doEn.poke(true.B) // begin to load inAct and weight, then cal
       theClock.step()
       /*
       val inActRegion = Monitor
@@ -850,16 +908,24 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val weightAdrReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
       val weightDataReadIdx: Array[Int] = Array.fill(weightRouterNum){0}
       fork.withName("inActLoadThread") { // inActLoad
+        val prefixNeedContainsInAct = new Regex("(I|i)nAct") // used for require statements
         fork.withName("inActAdrLoadThread") { // address
           val theAdrIO = inActDataIO.map(x => x.adrIOs.data)
+          val thePrefix = "inActAdr"
+          require(prefixNeedContainsInAct.pattern.matcher(thePrefix).find(), "the prefix need contains " +
+            s"'inAct' or 'InAct', but $thePrefix.")
           singleThreadWriteOneSCS(theAdrIO, theInActAdrLookup, inActAdrReadIdx,
-            theInActAdrStreams, inActRouterNum, thePrefix = "inActAdr")
+            theInActAdrStreams, inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
           expectInActWF(theRFRegVecIdx = 0, formerCon,
             conMessage = "former PEs have finished address", elseMessage = "later PEs haven't begin poke address yet")
         } .fork.withName("inActDataLoadThread") { //data
           val theDataIO = inActDataIO.map(x => x.dataIOs.data)
+          val thePrefix = "inActData"
+          require(prefixNeedContainsInAct.pattern.matcher(thePrefix).find(), "the prefix need contains " +
+            s"'inAct' or 'InAct', but $thePrefix.")
           singleThreadWriteOneSCS(theDataIO, theInActDataLookup, inActDataReadIdx,
-            theInActDataStreams, inActRouterNum, thePrefix = "inActData")
+            theInActDataStreams, inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
+          theDebugIO.inActDataIOState.foreach(x => x.expect(1.U, "inAct should be later now"))
           expectInActWF(theRFRegVecIdx = 0, formerCon,
             conMessage = "former PEs have finished data", elseMessage = "later PEs haven't begin poke data yet")
         } .join()
@@ -867,18 +933,18 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         fork.withName("weightAdrLoadThread") {
           val theAdrIO = weightDataIO.map(x => x.adrIOs.data)
           singleThreadWriteOneSCS(theAdrIO, theWeightAdrLookup, weightAdrReadIdx,
-            theWeightAdrStreams, weightRouterNum, thePrefix = "weightAdr")
+            theWeightAdrStreams, weightRouterNum, conFunc = formerCon, thePrefix = "weightAdr")
         } .fork.withName("weightDataLoadThread") {
           val theDataIO = weightDataIO.map(x => x.dataIOs.data)
           singleThreadWriteOneSCS(theDataIO, theWeightDataLookup, weightDataReadIdx,
-            theWeightDataStreams, weightRouterNum, thePrefix = "weightData")
+            theWeightDataStreams, weightRouterNum, conFunc = formerCon, thePrefix = "weightData")
         } .join()
       } .join()
-      theDebugIO.eachPETopDebug.flatten.foreach(x => x.peControlDebugIO.peState.expect(2.U, "after finish, each " +
-        "pe should do computing now"))
+      theDebugIO.eachPETopDebug.flatten.foreach(x => x.peControlDebugIO.peState.expect(2.U,
+        "after finish, each pe should do computing now"))
       // after finish
-      //theTopIO.ctrlPath.allCalFin.expect(true.B)
-      theTopIO.ctrlPath.pSumLoadEn.poke(true.B) // begin to accumulate PSum
+      //theCtrlIO.allCalFin.expect(true.B)
+      theCtrlIO.pSumLoadEn.poke(true.B) // begin to accumulate PSum
       (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {
         case (left, right) => left.fork(forkPSumHelper(idx = right))
       }.join()
