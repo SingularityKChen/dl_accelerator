@@ -211,14 +211,14 @@ class GenOneStreamData extends GenFunc {
   private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
   private val oneStream = Seq.fill(max(inActGLBNum, weightGLBNum)){new GenOnePETestData}
   print("\n")
-  private val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
+  val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
   println(s"the length of inActStream = ${inActStream.flatten.flatten.length}")
   private val inActAdrStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActAdrRand)
   println(s"the length of inActAdrStreamTmp = ${inActAdrStreamTmp.flatten.length}")
   private val inActCountStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActCountRand)
   private val inActDataStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActDataRand)
   println(s"the length of inActDataStreamTmp = ${inActDataStreamTmp.flatten.length}")
-  private val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
+  val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
   println(s"the length of weightStream = ${weightStream.flatten.flatten.length}")
   private val weightAdrStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightAdrRand)
   println(s"the length of weightAdrStreamTmp = ${weightAdrStreamTmp.flatten.length}")

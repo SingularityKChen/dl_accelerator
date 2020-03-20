@@ -27,8 +27,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   private val weightAdrStream = oneStreamData.weightAdrStream
   private val weightDataStream = oneStreamData.weightDataStream
   private val pSumStream = oneStreamData.outPSumStream
-  private val theInActAdrStreams = inActAdrStream.take(inActRouterNum) // in actual, it needs s2 + f2
-  private val theInActDataStreams = inActDataStream.take(inActRouterNum)
+  private val theInActAdrStreams = inActAdrStream.take(inActRouterNum*2) // in actual, it needs s2 + f2
+  private val theInActDataStreams = inActDataStream.take(inActRouterNum*2)
   private val theWeightAdrStreams = weightAdrStream.take(weightRouterNum)
   private val theWeightDataStreams = weightDataStream.take(weightRouterNum)
   private val thePSumDataStreams = pSumStream.take(pSumRouterNum)
@@ -790,8 +790,16 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       }
       def forkPSumHelper(idx: Int): Unit = {
         theClock.step((new Random).nextInt(10) + 1)
-        pSumDataIO.inIOs(idx).valid.poke(true.B)
-        pSumDataIO.inIOs(idx).bits.poke(addendRand(idx).head.U) // FIXME
+        var pSumList: List[Int] = Nil
+        for (pSumRdIdx <- 0 until pSumOneSPadNum) {
+          pSumDataIO.inIOs(idx).valid.poke(true.B)
+          pSumDataIO.inIOs(idx).bits.poke(addendRand(idx)(pSumRdIdx).U)
+          pSumDataIO.outIOs(idx).ready.poke(true.B)
+          //println(s"[pSumOut@Router$idx]readOutData$pSumRdIdx = ${pSumDataIO.outIOs(idx).bits.peek()}")
+          pSumList = pSumList:::List(pSumDataIO.outIOs(idx).bits.peek().litValue().toInt)
+          theClock.step()
+        }
+        println(s"pSum$idx = $pSumList")
         println(s"-------- $idx-th Column PEs receive all inPSum")
       }
       def forkWriteCSCHelper(index: Int, theCSCIO: CSCStreamIO, theAdrStream: List[Int],
@@ -987,8 +995,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           val thePrefix = "inActAdr"
           require(prefixNeedContainsInAct.pattern.matcher(thePrefix).find(), "the prefix need contains " +
             s"'inAct' or 'InAct', but $thePrefix.")
-          singleThreadWriteOneSCS(theAdrIO, theInActAdrLookup, inActAdrReadIdx.take(inActRouterNum),
-            theInActAdrStreams, inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
+          singleThreadWriteOneSCS(theAdrIO, theInActAdrLookup.take(inActRouterNum),
+            inActAdrReadIdx.take(inActRouterNum), theInActAdrStreams.take(inActRouterNum),
+            inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
           expectInActWF(theRFRegVecIdx = 0, formerCon,
             conMessage = "former PEs have finished address", elseMessage = "later PEs haven't begin poke address yet")
         } .fork.withName("inActDataLoadThread") { //data
@@ -996,8 +1005,9 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           val thePrefix = "inActData"
           require(prefixNeedContainsInAct.pattern.matcher(thePrefix).find(), "the prefix need contains " +
             s"'inAct' or 'InAct', but $thePrefix.")
-          singleThreadWriteOneSCS(theDataIO, theInActDataLookup, inActDataReadIdx.take(inActRouterNum),
-            theInActDataStreams, inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
+          singleThreadWriteOneSCS(theDataIO, theInActDataLookup.take(inActRouterNum),
+            inActDataReadIdx.take(inActRouterNum), theInActDataStreams.take(inActRouterNum),
+            inActRouterNum, conFunc = formerCon, thePrefix = thePrefix)
           expectInActWF(theRFRegVecIdx = 1, formerCon,
             conMessage = "former PEs have finished data", elseMessage = "later PEs haven't begin poke data yet")
         } .joinAndStep(theClock) // wait a cycle for inActState jump to later
@@ -1010,14 +1020,16 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           val theAdrIO = inActDataIO.map(x => x.adrIOs.data)
           val thePrefix = "inActAdr"
           println("------------ inActAdr Poke Later -------------")
-          singleThreadWriteOneSCS(theAdrIO, theInActAdrLookup, inActAdrReadIdx.takeRight(inActRouterNum),
-            theInActAdrStreams, inActRouterNum, conFunc = laterCon, thePrefix = thePrefix)
+          singleThreadWriteOneSCS(theAdrIO, theInActAdrLookup.takeRight(inActRouterNum),
+            inActAdrReadIdx.takeRight(inActRouterNum), theInActAdrStreams.takeRight(inActRouterNum),
+            inActRouterNum, conFunc = laterCon, thePrefix = thePrefix)
         } .fork {
           val theDataIO = inActDataIO.map(x => x.dataIOs.data)
           val thePrefix = "inActData"
           println("------------ inActData Poke Later ------------")
-          singleThreadWriteOneSCS(theDataIO, theInActDataLookup, inActDataReadIdx.takeRight(inActRouterNum),
-            theInActDataStreams, inActRouterNum, conFunc = laterCon, thePrefix = thePrefix)
+          singleThreadWriteOneSCS(theDataIO, theInActDataLookup.takeRight(inActRouterNum),
+            inActDataReadIdx.takeRight(inActRouterNum), theInActDataStreams.takeRight(inActRouterNum),
+            inActRouterNum, conFunc = laterCon, thePrefix = thePrefix)
         } .join()
       } .fork.withName("weightLoadThread") { // weightLoad
         fork.withName("weightAdrLoadThread") {
@@ -1038,12 +1050,41 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       })
       theDebugIO.eachPETopDebug.flatten.foreach(x => x.peControlDebugIO.peState.expect(2.U,
         "after finish, each pe should do computing now"))
-      // after finish
-      //theCtrlIO.allCalFin.expect(true.B)
+      while (!theCtrlIO.allCalFin.peek().litToBoolean) {
+        theDebugIO.eachPETopDebug.zipWithIndex.foreach({ case (ios, row) =>
+          ios.zipWithIndex.foreach({ case (debugIO, col) =>
+            val prefix: String = s"pe@Row$row@Col$col"
+            println(s"[$prefix] SPad State = ${debugIO.peSPadDebugIO.sPadState.peek()}")
+            println(s"[$prefix] pSumResult = ${debugIO.peSPadDebugIO.pSumResult.peek()}")
+          })})
+        theClock.step()
+      }
+      /** After all the PEs finish compution, then begin to read out pSum*/
+      println("----------- begin to readout PSum ------------")
       theCtrlIO.pSumLoadEn.poke(true.B) // begin to accumulate PSum
       (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {
         case (left, right) => left.fork(forkPSumHelper(idx = right))
       }.join()
+      val theOrWeights = oneStreamData.weightStream
+      val theOrInActs = oneStreamData.inActStream
+      for (i <- 0 until pSumRouterNum) {
+        println(s"pSum$i = ")
+        var realColPSum: List[Int] = Nil
+        for (pSumRow <- theOrWeights.head.indices) {
+          for (pSumCol <- theOrInActs.head.head.indices) {
+            var pSum = 0
+            for (addTimes <- theOrInActs.head.indices) {
+              for (row <- 0 until peRowNum) {
+                pSum += theOrWeights(row)(pSumRow)(addTimes) * theOrInActs(row+i)(addTimes)(pSumCol)
+              }
+            }
+            pSum += addendRand(i)(pSumRow*theOrInActs.head.head.length + pSumCol)
+            realColPSum = realColPSum:::List(pSum)
+          }
+        }
+        println(realColPSum)
+        println(realColPSum.length)
+      }
     }
   }
 
