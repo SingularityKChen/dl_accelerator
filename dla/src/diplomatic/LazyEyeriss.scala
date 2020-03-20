@@ -55,13 +55,14 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     val (memBundle, memEdge) = node.out.head
     // 3. Int
     // (@todo add Int)
-    val (intBundle, intEdge) = intnode.out.head
+    interrupts.head := decoder.valid
+    // params.intNode := intXing(params.intXType) // todo: check
     /** decoder connections*/
     decoder.instruction := instructionReg
     decoder.calFin := cGroup.ctrlPath.calFin
     // cGroup data path
     // @todo add ports to TL
-    // cGroup ctrl path
+    /** cGroup ctrl path*/
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel := 0.U // from inAct SRAM bank
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.outDataSel := 0.U // uni-cast
     cGroup.ctrlPath.routerClusterCtrl.weightCtrlSel.inDataSel := false.B // from GLB Cluster
