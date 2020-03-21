@@ -1067,8 +1067,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       }.join()
       val theOrWeights = oneStreamData.weightStream
       val theOrInActs = oneStreamData.inActStream
+      def getData(stream: Seq[List[Int]]): Seq[List[Int]] = {
+        val dataStream: Seq[List[Int]] = stream.map(x => x.map(y => Integer.parseInt(y.toBinaryString.take(8), 2)))
+        dataStream
+      }
       for (i <- 0 until pSumRouterNum) {
-        println(s"pSum$i = ")
         var realColPSum: List[Int] = Nil
         for (pSumRow <- theOrWeights.head.indices) {
           for (pSumCol <- theOrInActs.head.head.indices) {
@@ -1082,9 +1085,13 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
             realColPSum = realColPSum:::List(pSum)
           }
         }
+        println(s"pSum$i = ")
         println(realColPSum)
-        println(realColPSum.length)
       }
+      theOrInActs.take(inActRouterNum*2).zipWithIndex.foreach({ case (list, i) => println(s"goldenInAct$i = $list")})
+      println(s"pokeInAct = ${getData(theInActDataStreams).zip(theInActAdrStreams)}")
+      theOrWeights.take(peRowNum).zipWithIndex.foreach({ case (list, i) => println(s"goldenWeight$i = $list")})
+      println(s"pokeWeight = ${getData(theWeightDataStreams).zip(theWeightAdrStreams)}")
     }
   }
 

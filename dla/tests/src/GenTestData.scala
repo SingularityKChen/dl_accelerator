@@ -319,7 +319,7 @@ class GenOneStreamData extends GenFunc {
                             val weightIdx = (g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2)*weightParNum +
                               g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
                             val inActIdx = (g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2))*inActParNum +
-                              g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c2*(F1 + S1) + (f1 + s1)
+                              g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c1*(F1 + S1) + (f1 + s1)
                             val goldFlatPSum = goldenFlatResult(weightStream(weightIdx),
                               inActStream(inActIdx))
                             currentParTempPSum = currentParTempPSum:::List(goldFlatPSum)
