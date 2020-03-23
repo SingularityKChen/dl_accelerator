@@ -6,9 +6,23 @@ import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.interrupts.HasInterruptSources
 import freechips.rocketchip.regmapper.{RegField, RegFieldDesc, RegisterRouter, RegisterRouterParams}
+import freechips.rocketchip.subsystem.BaseSubsystem
 import freechips.rocketchip.tilelink._
 
-case class EyerissParams(address: BigInt, beatBytes: Int) // whether need beatBytes?
+trait HasEyeriss { this: BaseSubsystem =>
+  implicit val p: Parameters
+  private val address = 0x2000 // address: 4 hex, 16-bits
+  private val portName = "Eyeriss"
+  val eyeriss: LazyEyeriss = LazyModule(new LazyEyeriss(EyerissParams(address, pbus.beatBytes))(p))
+  /** attach control reg at periphery bus */
+  pbus.coupleTo(name = portName) { eyeriss.controlXing(NoCrossing) := TLFragmenter(pbus) := _ }
+  /** attach interrupt signal */
+  ibus.fromSync := eyeriss.intXing(NoCrossing) // or use fromAsync
+  /** attach EyerissSRAMNodes at memory bus*/
+  mbus.coupleTo(name = "EyerissSRAMs") { eyeriss.memNode := TLFragmenter(mbus) := _} // := is read only, use :=* instead
+}
+
+case class EyerissParams(address: BigInt, beatBytes: Int)
 
 class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends RegisterRouter(
   RegisterRouterParams(
@@ -21,19 +35,10 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
   override def nInterrupts: Int = 1
 
   /** memory access node. */
-  val node: TLClientNode = TLClientNode(
+  val memNode: TLClientNode = TLClientNode(
     portParams = Seq(
       TLClientPortParameters(
-        clients = Seq(TLClientParameters(
-          name = "EyerissReader",
-          // @todo
-          sourceId = IdRange(0, 1),
-          // @todo
-          supportsGet = TransferSizes(1, 4),
-          // @todo
-          supportsPutPartial = TransferSizes(1, 4) // use full or partial?
-        )))))
-
+        clients = Seq(EyerissGetNodeParameters(sramName = "inActSRAM", sourceNum = 1)))))
   //@todo chisel logic
   // LazyModuleImp:
   lazy val module: LazyModuleImp = new LazyModuleImp(this) {
@@ -42,26 +47,22 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val instructionReg = RegInit(0.U(instructionWidth.W))
     instructionReg.suggestName("instructionReg")
     regmap(
-      0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg,
+      0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg, // offset: 2 hex
         desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
     )
-
     private val cGroup = Module(new ClusterGroup(false)).io
     /** Decoder */
     private val decoder = Module(new Decoder).io
     decoder.suggestName("decoderIO")
-    // 2. TileLink access -> write/read memory.
     // (@todo DMA3)
-    val (memBundle, memEdge) = node.out.head
+    // 2. TileLink access -> write/read memory.
+    val (memBundle, memEdge) = memNode.out.head
     // 3. Int
-    // (@todo add Int)
     interrupts.head := decoder.valid
-    // params.intNode := intXing(params.intXType) // todo: check
     /** decoder connections*/
     decoder.instruction := instructionReg
     decoder.calFin := cGroup.ctrlPath.calFin
-    // cGroup data path
-    // @todo add ports to TL
+    /** cGroup data path */
     /** cGroup ctrl path*/
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel := 0.U // from inAct SRAM bank
     cGroup.ctrlPath.routerClusterCtrl.inActCtrlSel.outDataSel := 0.U // uni-cast
