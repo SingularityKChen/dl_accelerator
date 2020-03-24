@@ -282,9 +282,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // Weight Data Scratch Pad
   weightDataSPad.dataPath.writeInData <> io.dataStream.weightIOs.dataIOs
   weightDataIndexWire := weightDataSPad.dataPath.columnNum
-  private val weightDataCountVec: Seq[Bool] = weightDataSPad.dataPath.readOutData.asBools()
-  weightMatrixDataReg := Cat(weightDataCountVec.reverse.take(cscDataWidth)).asUInt
-  weightMatrixRowReg := Cat(weightDataCountVec.reverse.takeRight(cscCountWidth)).asUInt
+  weightMatrixDataReg := weightDataSPad.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
+  weightMatrixRowReg := weightDataSPad.dataPath.readOutData(cscCountWidth - 1, 0)
   io.padWF.weightWriteFin.dataWriteFin := weightDataSPad.ctrlPath.writeFin
   weightDataSPad.ctrlPath.readEn := inActDataSPadReadEnReg
   weightDataSPad.ctrlPath.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAdrDataWire)
