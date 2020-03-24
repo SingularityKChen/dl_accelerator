@@ -2,26 +2,7 @@ package dla.diplomatic
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.diplomacy.{IdRange, TransferSizes}
-import freechips.rocketchip.tilelink.TLClientParameters
-
-case class EyerissGetNodeParameters(sramName: String, sourceNum: Int) extends TLClientParameters(
-  name = s"Eyeriss$sramName",
-  // @todo
-  sourceId = IdRange(0, sourceNum),
-  // @todo
-  supportsGet = TransferSizes(1, 4)
-)
-
-case class EyerissPutGetNodeParameters(sramName: String, sourceNum: Int) extends TLClientParameters(
-  name = s"EyerissPSumSRAM$sramName",
-  // @todo
-  sourceId = IdRange(0, sourceNum),
-  // @todo
-  supportsGet = TransferSizes(1, 4),
-  // @todo
-  supportsPutFull = TransferSizes(1, 4) // avoid using partial to avoid mask
-)
+import freechips.rocketchip.util.leftOR
 
 case class MemCtrlParameters (
                              addressBits: Int,
@@ -62,4 +43,44 @@ class MemCtrlModule(implicit p: MemCtrlParameters) extends Module {
   io.address := readAdrReg
   // size
   io.size := oneInActSRAMSizeReg // TODO: add more cases
+}
+
+class EyerissIDMapGenerator(numIds: Int) extends Module {
+  require(numIds > 0)
+
+  val w = log2Up(numIds)
+  val io = IO(new Bundle {
+    val free: DecoupledIO[UInt] = Flipped(Decoupled(UInt(w.W)))
+    val alloc: DecoupledIO[UInt] = Decoupled(UInt(w.W))
+    val finish: Bool = Output(Bool())
+  })
+
+  io.free.ready := true.B
+
+  // True indicates that the id is available
+  private val reqBitmap: UInt = RegInit(((BigInt(1) << numIds) - 1).U(numIds.W)) // True indicates that the id is available
+  private val respBitmap: UInt = RegInit(0.U(numIds.W)) // false means haven't receive response
+
+  private val select: UInt = (~(leftOR(reqBitmap) << 1)).asUInt & reqBitmap
+  io.alloc.bits := OHToUInt(select)
+  io.alloc.valid := reqBitmap.orR()
+
+  private val clr: UInt = WireDefault(0.U(numIds.W))
+  when(io.alloc.fire()) {
+    clr := UIntToOH(io.alloc.bits)
+  }
+
+  private val set: UInt = WireDefault(0.U(numIds.W))
+  when(io.free.fire()) {
+    set := UIntToOH(io.free.bits) // this is the sourceId that finishes
+  }
+  respBitmap := respBitmap | set
+  reqBitmap := (reqBitmap & (~clr).asUInt)
+  private val finishWire = respBitmap.andR()
+  when (finishWire) {
+    respBitmap := 0.U
+    reqBitmap := ((BigInt(1) << numIds) - 1).U
+  }
+  io.finish := finishWire
+  //assert(!io.free.valid || !(reqBitmap & (~clr).asUInt) (io.free.bits)) // No double freeing
 }

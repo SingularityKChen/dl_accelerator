@@ -33,13 +33,28 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
   with HasInterruptSources {
 
   override def nInterrupts: Int = 1
-
+  /** functions [[eyerissPutNodeParameters]] and [[eyerissGetNodeParameters]] are TLClientParameters*/
+  private def eyerissPutNodeParameters(sramName: String, sourceNum: Int) = Seq(TLClientParameters(
+    /** write only */
+    name = s"EyerissPSumSRAM$sramName",
+    // TODO: change sourceID
+    sourceId = IdRange(0, sourceNum),
+    // @todo
+    supportsPutFull = TransferSizes(1, 4) // avoid using partial to avoid mask
+  ))
+  private def eyerissGetNodeParameters(sramName: String, sourceNum: Int) = Seq(TLClientParameters(
+    /** read only, for inAct and weight */
+    name = s"Eyeriss$sramName",
+    // TODO: change sourceID
+    sourceId = IdRange(0, sourceNum),
+    // TODO: check transferSizes
+    supportsGet = TransferSizes(1, 4)
+  ))
   /** memory access node. */
   val memNode: TLClientNode = TLClientNode(
     portParams = Seq(
       TLClientPortParameters(
-        clients = Seq(EyerissGetNodeParameters(sramName = "inActSRAM", sourceNum = 1)))))
-  //@todo chisel logic
+        eyerissGetNodeParameters(sramName = "inActSRAM", sourceNum = 1))))
   // LazyModuleImp:
   lazy val module: LazyModuleImp = new LazyModuleImp(this) {
     val instructionWidth = 32
