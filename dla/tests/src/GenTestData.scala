@@ -110,7 +110,7 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
     }
     resultList
   }
-  protected def genAdrCountData(listA: List[List[Int]], inActOrWeight: Boolean): Seq[List[Int]] = {
+  def genAdrCountData(listA: List[List[Int]], inActOrWeight: Boolean): Seq[List[Int]] = {
     val zeroCode: Int = if (inActOrWeight) inActZeroColumnCode else weightZeroColumnCode
     var adrList: List[Int] = Nil
     var countList: List[Int] = Nil
@@ -140,7 +140,7 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
   }
   protected def toBinary(i: Int, digits: Int = 8): String =
     String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
-  protected def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = {
+  def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = {
     // input data and count, and combine them together
     val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
     val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
@@ -211,15 +211,15 @@ class GenOneStreamData extends GenFunc {
   private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
   private val oneStream = Seq.fill(max(inActGLBNum, weightGLBNum)){new GenOnePETestData}
   print("\n")
-  val inActStream: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
-  println(s"the length of inActStream = ${inActStream.flatten.flatten.length}")
+  private val inActStreamTmp: Seq[List[List[Int]]] = oneStream.take(inActGLBNum).map(x => x.inActList)
+  println(s"the length of inActStream = ${inActStreamTmp.flatten.flatten.length}")
   private val inActAdrStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActAdrRand)
   println(s"the length of inActAdrStreamTmp = ${inActAdrStreamTmp.flatten.length}")
   private val inActCountStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActCountRand)
   private val inActDataStreamTmp: Seq[List[Int]] = oneStream.take(inActGLBNum).map(x => x.inInActDataRand)
   println(s"the length of inActDataStreamTmp = ${inActDataStreamTmp.flatten.length}")
-  val weightStream: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
-  println(s"the length of weightStream = ${weightStream.flatten.flatten.length}")
+  private val weightStreamTmp: Seq[List[List[Int]]] = oneStream.take(weightGLBNum).map(x => x.weightList)
+  println(s"the length of weightStream = ${weightStreamTmp.flatten.flatten.length}")
   private val weightAdrStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightAdrRand)
   println(s"the length of weightAdrStreamTmp = ${weightAdrStreamTmp.flatten.length}")
   private val weightCountStreamTmp: Seq[List[Int]] = oneStream.take(weightGLBNum).map(x => x.inWeightCountRand)
@@ -227,17 +227,23 @@ class GenOneStreamData extends GenFunc {
   println(s"the length of weightDataStreamTmp = ${weightDataStreamTmp.flatten.length}")
   val outPSumStreamTmp: List[List[Int]] = goldenFlatStreamResult()
   println(s"the length of outPSumStreamTmp = ${outPSumStreamTmp.flatten.length}")
-  private val (rightInActAdr, rightInActData, rightWeightAdr, rightWeightData, rightPSumData) = getThingsReady
+  private val (rightOrInAct, rightInActAdr, rightInActData,
+  rightOrWeight, rightWeightAdr, rightWeightData, rightPSumData) = getThingsReady
+  val inActStream: Seq[List[List[Int]]] = rightOrInAct
   val inActAdrStream: Seq[List[Int]] = rightInActAdr
   println(s"the length of inActAdrStream = ${inActAdrStream.flatten.length}")
   val inActDataStream: Seq[List[Int]] = rightInActData // has combined data and count
+  val weightStream: Seq[List[List[Int]]] = rightOrWeight
   val weightAdrStream: Seq[List[Int]] = rightWeightAdr
   val weightDataStream: Seq[List[Int]] = rightWeightData // has combined data and count
   val outPSumStream: List[List[Int]] = rightPSumData.toList
-  private def getThingsReady: (Seq[List[Int]], Seq[List[Int]], Seq[List[Int]], Seq[List[Int]], Seq[List[Int]]) = {
+  private def getThingsReady: (Seq[List[List[Int]]], Seq[List[Int]], Seq[List[Int]], Seq[List[List[Int]]],
+    Seq[List[Int]], Seq[List[Int]], Seq[List[Int]]) = {
     require(S1 == 3 && F1 == 4, "you need to correct this data generation function to fit more situations") // TODO: remove
+    var inActOrStream: List[List[List[Int]]] = Nil
     var inActAdr: List[List[Int]] = Nil
     var inActData: List[List[Int]] = Nil // include count
+    var weightOrStream: List[List[List[Int]]] = Nil
     var weightAdr: List[List[Int]] = Nil
     var weightData: List[List[Int]] = Nil // include count
     var pSumData: List[List[Int]] = Nil
@@ -256,12 +262,14 @@ class GenOneStreamData extends GenFunc {
                 for (i <- 0 until inActStreamNum) {
                   val inActIdx = i*inActParNum + g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c1*(F1 + S1) + (f1 + s1)
                   inActIdxTest = inActIdxTest:::List(inActIdx)
+                  inActOrStream = inActOrStream:::List(inActStreamTmp(inActIdx))
                   inActAdrTmp = inActAdrTmp:::List(inActAdrStreamTmp(inActIdx))
                   inActDataTmp = inActDataTmp:::List(combineDataAndCount(inActDataStreamTmp(inActIdx),
                     inActCountStreamTmp(inActIdx)).toList)
                 }
                 for (i <- 0 until weightStreamNum) {
                   val weightIdx = i*weightParNum + g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                  weightOrStream = weightOrStream:::List(weightStreamTmp(weightIdx))
                   weightAdrTmp = weightAdrTmp:::List(weightAdrStreamTmp(weightIdx))
                   weightDataTmp = weightDataTmp:::List(combineDataAndCount(weightDataStreamTmp(weightIdx),
                     weightCountStreamTmp(weightIdx)).toList)
@@ -296,7 +304,7 @@ class GenOneStreamData extends GenFunc {
         }
       }
     }
-    (inActAdr, inActData, weightAdr, weightData, pSumData)
+    (inActOrStream, inActAdr, inActData, weightOrStream, weightAdr, weightData, pSumData)
   }
   private def goldenFlatStreamResult(): List[List[Int]] = {
     var outPSumStream: List[List[Int]] = Nil
@@ -320,8 +328,8 @@ class GenOneStreamData extends GenFunc {
                               g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
                             val inActIdx = (g2*N2*C2*(F2 + S2) + n2*C2*(F2 + S2) + c2*(F2 + S2) + (f2 + s2))*inActParNum +
                               g1*N1*C1*(F1 + S1) + n1*C1*(F1 + S1) + c1*(F1 + S1) + (f1 + s1)
-                            val goldFlatPSum = goldenFlatResult(weightStream(weightIdx),
-                              inActStream(inActIdx))
+                            val goldFlatPSum = goldenFlatResult(weightStreamTmp(weightIdx),
+                              inActStreamTmp(inActIdx))
                             currentParTempPSum = currentParTempPSum:::List(goldFlatPSum)
                           }
                         }
