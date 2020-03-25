@@ -167,8 +167,8 @@ class GenOnePETestData extends GenFunc {
     var weightSeq: Seq[List[Int]] = Nil
     var outPSumRand: List[Int] = Nil
     while (error) {
-      inActList = genSparse(cols = F0*N0*E, rows = R*C0, max = scsDataMax, ratio =  0.845)
-      weightList = genSparse(cols = R*C0, rows = M0, max = scsDataMax, ratio =  0.6)
+      inActList = genSparse(cols = inActMatrixWidth, rows = inActMatrixHeight, max = scsDataMax, ratio =  0.845)
+      weightList = genSparse(cols = weightMatrixWidth, rows = weightMatrixHeight, max = scsDataMax, ratio =  0.6)
       inActSeq = genAdrCountData(inActList, inActOrWeight = true)
       weightSeq = genAdrCountData(weightList, inActOrWeight = false)
       outPSumRand = goldenFlatResult(weightList, inActList)

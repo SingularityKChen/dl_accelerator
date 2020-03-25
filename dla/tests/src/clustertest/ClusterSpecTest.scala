@@ -1059,7 +1059,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           })})
         theClock.step()
       }
-      /** After all the PEs finish compution, then begin to read out pSum*/
+      /** After all the PEs finish computation, then begin to read out pSum*/
       println("----------- begin to readout PSum ------------")
       theCtrlIO.pSumLoadEn.poke(true.B) // begin to accumulate PSum
       (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {

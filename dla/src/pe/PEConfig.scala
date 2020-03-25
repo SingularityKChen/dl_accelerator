@@ -12,6 +12,8 @@ trait MCRENFConfig { // contains some scala values
     * [[N0]]: the number of partial sum
     * [[F0]]: one row of partial sum
     * [[pSumOneSPadNum]]: the size of one matrix of PSum
+    * [[inActMatrixWidth]] and [[inActMatrixHeight]]: the size of input activation Toeplitz Matrix
+    * [[weightMatrixWidth]] and [[weightMatrixHeight]]: the size of weight Toeplitz Matrix
     * */
   protected val M0: Int = 4
   protected val C0: Int = 2
@@ -20,6 +22,10 @@ trait MCRENFConfig { // contains some scala values
   protected val N0: Int = 3
   protected val F0: Int = 1
   protected val pSumOneSPadNum: Int = M0*E*N0*F0
+  protected val inActMatrixWidth: Int = F0*N0*E
+  protected val inActMatrixHeight: Int = R*C0
+  protected val weightMatrixWidth: Int = inActMatrixHeight
+  protected val weightMatrixHeight: Int = M0
   // C0*R0 < iacAdrSize = 9
   // C0*R0*E0*N0*F0 <
 }
