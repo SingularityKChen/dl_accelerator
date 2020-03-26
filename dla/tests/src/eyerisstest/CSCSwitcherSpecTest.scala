@@ -24,9 +24,11 @@ class CSCSwitcherSpecTest  extends FlatSpec with ChiselScalatestTester with Matc
   it should "compress common data" in {
     test (new CSCSwitcher(adrWidth = inActAdrWidth, debug = true)) { theSwitcher =>
       val theTopIO = theSwitcher.io
+      val theDebugIO = theTopIO.debugIO
       val theClock = theSwitcher.clock
       var outAdr: List[Int] = Nil
       var outData: List[Int] = Nil
+      theTopIO.inData.setSourceClock(theClock)
       theSwitcher.reset.poke(true.B)
       theClock.step()
       theSwitcher.reset.poke(false.B)
@@ -36,49 +38,125 @@ class CSCSwitcherSpecTest  extends FlatSpec with ChiselScalatestTester with Matc
       theTopIO.matrixHeight.poke(inActMatrixHeight.U)
       theTopIO.matrixWidth.poke(inActMatrixWidth.U)
       theTopIO.vectorNum.poke(inActStreamNum.U)
+      require(inActStreamNum == oneStreamInActInData.length, "inActStreamNum should eq oneStreamInActInData.length")
+      require(inActMatrixHeight == oneStreamInActInData.head.length)
+      require(inActMatrixWidth == oneStreamInActInData.head.head.length)
       theClock.step()
-      for (streamNum <- oneStreamInActInData.indices) {
+      var streamNum = 0
+      var adrIdx = 0 // the out address vector index
+      var dataIdx = 0
+      while (streamNum < oneStreamInActInData.length) {
         val oneInActInData = oneStreamInActInData(streamNum).zipWithIndex.map({ case (ints, row) =>
-            ints.zipWithIndex.map({ case (data, col) => (data, row, col)})})
-        for (col <- oneInActInData.head.indices) { // each column
-          for (row <- oneInActInData.indices) {
-            val postfix: String = s"@stream$streamNum@row$row@col$col"
-            theTopIO.inData.valid.poke(true.B)
-            theTopIO.inData.bits.poke(oneInActInData(row)(col)._1.U)
-            println(s"[inData$postfix] inData = (${oneInActInData(row)(col)}, ${theTopIO.inData.ready.peek()})")
-            if (oneInActInData(row)(col)._1 != 0)
-              println(s"[inData$postfix] inDataBinary = ${oneInActInData(row)(col)._1.toBinaryString}")
+          ints.zipWithIndex.map({ case (data, col) => (data, row, col)})})
+        println(s"------------ begin $streamNum matrix now ------------")
+        for (i <- oneStreamInActInData.head.indices) {
+          oneStreamInActInData(streamNum)(i).foreach(x => print(s"$x\t\t"))
+          println()
+        }
+        var col = 0
+        while (col < oneInActInData.head.length) {
+          var row = 0
+          while (row < oneInActInData.length) {
             theTopIO.outData.dataIOs.data.ready.poke(true.B)
             theTopIO.outData.adrIOs.data.ready.poke(true.B)
+            theTopIO.inData.valid.poke(true.B)
+            val inPostfix: String = s"inData@stream$streamNum@row$row@col$col"
+            val outCol = theDebugIO.columnCounter.peek().litValue()
+            val outRow = theDebugIO.currentRow.peek().litValue()
+            val outStreamNum = theDebugIO.currentStreamNum.peek().litValue()
+            val outPostfix: String = s"@stream$outStreamNum@row$outRow@col$outCol"
+            if (theTopIO.inData.ready.peek().litToBoolean) {
+              theTopIO.inData.bits.poke(oneInActInData(row)(col)._1.U)
+              if (oneInActInData(row)(col)._1 != 0) {
+                println(s"[$inPostfix] inData = (${oneInActInData(row)(col)}, ${theTopIO.inData.ready.peek()})")
+                println(s"[$inPostfix] inDataBinary = ${oneInActInData(row)(col)._1.toBinaryString}")
+              } else {
+                println(".")
+              }
+              row += 1
+            } else {
+              println(s"[!!!!!WARNING] inData is not ready now!!!")
+              println(s"endFlag = ${theDebugIO.endFlag.peek()}")
+              println(s"currentRow = $outRow")
+            }
             if (theTopIO.outData.adrIOs.data.valid.peek().litToBoolean) {
+              theTopIO.outData.adrIOs.data.bits.expect(oneInActAdrStream(adrIdx).U)
               val adrOut = theTopIO.outData.adrIOs.data.bits.peek().litValue()
-              println(s"[outData$postfix] adr = ($adrOut," +
-                s" ${theTopIO.outData.adrIOs.data.valid.peek()}, firstNone ${theTopIO.debugIO.firstNoneZero.peek()}, " +
-                s"zeroCol = ${theTopIO.debugIO.zeroColReg.peek()})")
+              println(s"[outAdr$outPostfix] adr = ($adrOut," +
+                s" ${theTopIO.outData.adrIOs.data.valid.peek()}, firstNone ${theDebugIO.firstNoneZero.peek()}, " +
+                s"zeroCol = ${theDebugIO.zeroColReg.peek()})")
               outAdr = outAdr:::List(adrOut.toInt)
+              if (adrOut == 0) {
+                println(s"[outAdr$outPostfix] oneColFin ${theDebugIO.oneColFin.peek()} " +
+                  s"oneVecFin ${theDebugIO.oneVecFin.peek()}\n" +
+                  s"allVecFin ${theDebugIO.allVecFin.peek()} " +
+                  s"vecNum $outStreamNum")
+              }
+              adrIdx += 1
             }
             if (theTopIO.outData.dataIOs.data.valid.peek().litToBoolean) {
+              theTopIO.outData.dataIOs.data.bits.expect(oneInActDataStream(dataIdx).U)
               val dataOut = theTopIO.outData.dataIOs.data.bits.peek().litValue()
-              println(s"[outData$postfix] data = " +
-                s"(${dataOut.toInt.toBinaryString.take(cscDataWidth)}," +
+              println(s"[outData$outPostfix] data&&Count = " +
+                s"(${dataOut.toInt.toBinaryString}," +
                 s" ${theTopIO.outData.dataIOs.data.valid.peek()})")
               outData = outData:::List(dataOut.toInt)
-              println(s"firstNone = ${theTopIO.debugIO.firstNoneZero.peek()}")
+              dataIdx += 1
             }
-            println(s"endFlag = ${theTopIO.debugIO.endFlag.peek()}")
             theClock.step()
-            println(s"one cycle later, cscAdrReg = ${theTopIO.debugIO.cscAdrReg.peek()}")
-            println(s"columnCounter = ${theTopIO.debugIO.columnCounter.peek()}")
           }
+          col += 1
           println("[info] finish one column")
         }
+        streamNum += 1
       }
-      for (i <- oneStreamInActInData.head.indices) {
-        oneStreamInActInData.head(i).foreach(x => print(s"$x\t\t"))
-        println()
-      }
-      println(s"[info] goldenAdr Vs. outAdr = ${oneInActAdrStream.zip(outAdr)}")
-      println(s"[info] goldenData Vs. outData = ${oneInActDataStream.zip(outData)}")
+      fork {
+        for (_ <- 0 until 3) {
+          while (!theTopIO.outData.adrIOs.data.valid.peek().litToBoolean) {
+            theClock.step()
+          }
+          if (theTopIO.outData.adrIOs.data.valid.peek().litToBoolean) {
+            val adrOut = theTopIO.outData.adrIOs.data.bits.peek().litValue()
+            println(s"adr = ($adrOut," +
+              s" ${theTopIO.outData.adrIOs.data.valid.peek()}, firstNone ${theDebugIO.firstNoneZero.peek()}, " +
+              s"zeroCol = ${theDebugIO.zeroColReg.peek()})")
+            outAdr = outAdr:::List(adrOut.toInt)
+            if (adrOut == 0) {
+              println(s"oneColFin ${theDebugIO.oneColFin.peek()}\n" +
+                s"oneVecFin ${theDebugIO.oneVecFin.peek()}\n" +
+                s"allVecFin ${theDebugIO.allVecFin.peek()}\n")
+            }
+            theClock.step()
+          }
+        }
+      } .fork {
+        for (_ <- 0 until 3) {
+          while (!theTopIO.outData.dataIOs.data.valid.peek().litToBoolean) {
+            theClock.step()
+          }
+          if (theTopIO.outData.dataIOs.data.valid.peek().litToBoolean) {
+            val dataOut = theTopIO.outData.dataIOs.data.bits.peek().litValue()
+            println(s"data&&Count = " +
+              s"(${dataOut.toInt.toBinaryString}," +
+              s" ${theTopIO.outData.dataIOs.data.valid.peek()})")
+            outData = outData:::List(dataOut.toInt)
+            theClock.step()
+          }
+        }
+      } .join()
+      println(s"[info] goldenAdr Vs. outAdr = ")
+      oneInActAdrStream.zip(outAdr).foreach({ case (golden, out) =>
+        if (golden == out) print(s"$golden\t\t\t")
+        else print(s"$golden, $out\t\t")
+        if (golden == 0) println()
+      })
+      println()
+      println(s"[info] goldenData Vs. outData = ")
+      oneInActDataStream.zip(outData).foreach({ case (golden, out) =>
+        if (golden == out) print(s"$golden\t")
+        else print(s"$golden, $out\t")
+        if (golden == 0) println()
+      })
     }
   }
 }
