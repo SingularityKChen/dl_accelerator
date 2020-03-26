@@ -1251,7 +1251,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theCGCtrl.reset.poke(false.B)
     }
   }
-  
+
   it should "work well on reading and writing via inner SRAM" in {
     test (new ClusterGroup(true)) { theCG =>
       val theTop = theCG.io

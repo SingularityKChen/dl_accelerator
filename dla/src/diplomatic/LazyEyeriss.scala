@@ -88,5 +88,7 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     cGroup.ctrlPath.peClusterCtrl.inActSel.inDataSel := false.B // don't broad-cast inAct
     cGroup.ctrlPath.peClusterCtrl.inActSel.outDataSel := DontCare
     cGroup.ctrlPath.peClusterCtrl.pSumInSel := true.B // load PSum from Router
+    //cGroup.ctrlPath.readOutPSum :=
+    //cGroup.ctrlPath.doMacEn :=
   }
 }

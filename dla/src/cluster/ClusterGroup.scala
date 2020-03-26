@@ -33,7 +33,7 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   glbCluster.ctrlPath.inActIO.zip(clusterCtrl.glbInActCtrlIOs).foreach({ case (o, o1) => o <> o1})
   // clusterCtrl
   clusterCtrl.topIO.readOutPSum := io.ctrlPath.readOutPSum
-  clusterCtrl.topIO.cgEnable := io.ctrlPath.readOutPSum // FIXME
+  clusterCtrl.topIO.cgEnable := io.ctrlPath.doMacEn // TODO: check
   io.ctrlPath.calFin := clusterCtrl.topIO.calFin
   clusterCtrl.allPSumAddFin := peCluster.ctrlPath.allPSumAddFin
   clusterCtrl.allCalFin := peCluster.ctrlPath.allCalFin
@@ -140,7 +140,8 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   glbPSumWriteFinReg.zip(io.glbPSumCtrlIOs.map(x => x.writeIO.done)).foreach({case (reg, doneIO) =>
     reg := Mux(glbWriteFinWire, false.B, Mux(doneIO, true.B, reg))
   })
-  glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
+  glbWriteFinWire := glbInActWriteFinReg.reduce(_ && _) // TODO: check
+  //glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
   /** cluster group state machine
     * cgLoadGLB: load inAct and PSum from outside CG into GLBCluster
     * cgLoadPE: load inAct, weight from outside PECluster (from GLB and outside CG)
@@ -161,7 +162,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
       }
     }
     is (cgLoadPE) {
-      when (true.B) { // when all write finish
+      when (glbWriteFinWire) { // when all write finish TODO: check
         cgStateReg := cgCal
       }
     }
