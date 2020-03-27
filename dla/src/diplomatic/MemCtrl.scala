@@ -11,7 +11,7 @@ case class MemCtrlParameters (
                              nIds: Int // the number of source id
                              )
 
-class MemCommonIO()(implicit p: MemCtrlParameters) extends Bundle {
+class EyerissMemCommonIO()(implicit val p: MemCtrlParameters) extends Bundle {
   val address: UInt = Output(UInt(p.addressBits.W))
   val size: UInt = Output(UInt(p.sizeBits.W))
   val source: UInt = Output(UInt(log2Ceil(p.nIds).W))
@@ -23,8 +23,8 @@ class MemCommonIO()(implicit p: MemCtrlParameters) extends Bundle {
   val onePSumSRAMSize: UInt = Input(UInt(p.sizeBits.W))
 }
 
-class MemCtrlModule(implicit p: MemCtrlParameters) extends Module {
-  val io: MemCommonIO = IO(new MemCommonIO()(p))
+class EyerissMemCtrlModule(implicit val p: MemCtrlParameters) extends Module {
+  val io: EyerissMemCommonIO = IO(new EyerissMemCommonIO()(p))
   private val inActStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val weightStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val pSumStarAdrReg = RegInit(0.U(p.addressBits.W))
@@ -45,10 +45,10 @@ class MemCtrlModule(implicit p: MemCtrlParameters) extends Module {
   io.size := oneInActSRAMSizeReg // TODO: add more cases
 }
 
-class EyerissIDMapGenerator(numIds: Int) extends Module {
+class EyerissIDMapGenerator(val numIds: Int) extends Module {
   require(numIds > 0)
 
-  val w = log2Up(numIds)
+  private val w = log2Up(numIds)
   val io = IO(new Bundle {
     val free: DecoupledIO[UInt] = Flipped(Decoupled(UInt(w.W)))
     val alloc: DecoupledIO[UInt] = Decoupled(UInt(w.W))
@@ -57,13 +57,18 @@ class EyerissIDMapGenerator(numIds: Int) extends Module {
 
   io.free.ready := true.B
 
-  // True indicates that the id is available
+  /** [[reqBitmap]] true indicates that the id hasn't send require signal;
+    * [[respBitmap]] true indicates that the id has received response;
+    * both of them have [[numIds]] bits, and each bit represents one id;
+    * */
   private val reqBitmap: UInt = RegInit(((BigInt(1) << numIds) - 1).U(numIds.W)) // True indicates that the id is available
   private val respBitmap: UInt = RegInit(0.U(numIds.W)) // false means haven't receive response
-
+  /** [[select]] is the oneHot code which represents the lowest bit that equals to true;
+    * Then use `OHToUInt` to get its binary value.
+    * */
   private val select: UInt = (~(leftOR(reqBitmap) << 1)).asUInt & reqBitmap
   io.alloc.bits := OHToUInt(select)
-  io.alloc.valid := reqBitmap.orR()
+  io.alloc.valid := reqBitmap.orR() // valid when there is any id hasn't sent require signal
 
   private val clr: UInt = WireDefault(0.U(numIds.W))
   when(io.alloc.fire()) {
@@ -76,6 +81,7 @@ class EyerissIDMapGenerator(numIds: Int) extends Module {
   }
   respBitmap := respBitmap | set
   reqBitmap := (reqBitmap & (~clr).asUInt)
+  /** when all the sources receive response*/
   private val finishWire = respBitmap.andR()
   when (finishWire) {
     respBitmap := 0.U
