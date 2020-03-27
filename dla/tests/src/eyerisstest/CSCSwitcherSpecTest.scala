@@ -146,15 +146,15 @@ class CSCSwitcherSpecTest  extends FlatSpec with ChiselScalatestTester with Matc
       } .join()
       println(s"[info] goldenAdr Vs. outAdr = ")
       oneInActAdrStream.zip(outAdr).foreach({ case (golden, out) =>
-        if (golden == out) print(s"$golden\t\t\t")
-        else print(s"$golden, $out\t\t")
+        if (golden == out) print(s"$golden   \t")
+        else print(s"$golden, " + Console.RED + s"$out   \t" + Console.RESET)
         if (golden == 0) println()
       })
       println()
       println(s"[info] goldenData Vs. outData = ")
       oneInActDataStream.zip(outData).foreach({ case (golden, out) =>
-        if (golden == out) print(s"$golden\t")
-        else print(s"$golden, $out\t")
+        if (golden == out) print(s"$golden   \t")
+        else print(s"$golden, " + Console.RED + s"$out   \t" + Console.RESET)
         if (golden == 0) println()
       })
     }

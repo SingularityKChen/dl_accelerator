@@ -80,7 +80,7 @@ class CSCSwitcher(private val adrWidth: Int, debug: Boolean) extends Module
   inData.ready := !endFlag && ((outData.ready && outAdr.ready) || !meetNoneZeroWire)
   /** and both csc data and address will be zero when endFlag is true */
   outAdr.bits := Mux(endFlag, 0.U, Mux(currentZeroColumn, zeroCode.U, cscAdrReg))
-  outData.bits := Mux(endFlag, 0.U, Cat(inData.bits | 0.U(cscDataWidth.W), cscCountReg | 0.U(cscCountWidth.W)))
+  outData.bits := Mux(endFlag, 0.U, Cat(inData.bits, cscCountReg))
   /** when [[oneVectorFinRegNext]] equals to true, then pad number should add one */
   vectorNumCounter := Mux(oneStreamFinRegNext, 0.U, Mux(oneVectorFinRegNext, vectorNumPlusOne, vectorNumCounter))
   outData.valid := Mux(endFlag, true.B, outDataShouldValid)
