@@ -1,7 +1,8 @@
 package dla.diplomatic
 
 import chisel3._
-import dla.cluster.ClusterGroup
+import dla.cluster.{ClusterConfig, ClusterGroup}
+import dla.pe.PESizeConfig
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.interrupts.HasInterruptSources
@@ -19,7 +20,7 @@ trait HasEyeriss { this: BaseSubsystem =>
   /** attach interrupt signal */
   ibus.fromSync := eyeriss.intXing(NoCrossing) // or use fromAsync
   /** attach EyerissSRAMNodes at memory bus*/
-  mbus.coupleTo(name = "EyerissSRAMs") { eyeriss.memNode := TLFragmenter(mbus) := _} // := is read only, use :=* instead
+  mbus.coupleTo(name = "EyerissSRAMs") { eyeriss.memGetNode := TLFragmenter(mbus) := _} // := is read only, use :=* instead
 }
 
 case class EyerissParams(address: BigInt, beatBytes: Int)
@@ -30,7 +31,10 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     compat = Seq("eyeriss"),
     base = params.address)
 ) with HasTLControlRegMap
-  with HasInterruptSources {
+  with HasInterruptSources
+  with PESizeConfig with ClusterConfig {
+  private val getSourceNum = inActRouterNum + weightRouterNum
+  private val putSourceNum = pSumRouterNum
 
   override def nInterrupts: Int = 1
   /** functions [[eyerissPutNodeParameters]] and [[eyerissGetNodeParameters]] are TLClientParameters*/
@@ -51,10 +55,10 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     supportsGet = TransferSizes(1, 4)
   ))
   /** memory access node. */
-  val memNode: TLClientNode = TLClientNode(
+  val memGetNode: TLClientNode = TLClientNode(
     portParams = Seq(
       TLClientPortParameters(
-        eyerissGetNodeParameters(sramName = "inActSRAM", sourceNum = 1))))
+        eyerissGetNodeParameters(sramName = "inActAndWeight", sourceNum = getSourceNum))))
   // LazyModuleImp:
   lazy val module: LazyModuleImp = new LazyModuleImp(this) {
     val instructionWidth = 32
@@ -66,12 +70,37 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
         desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
     )
     private val cGroup = Module(new ClusterGroup(false)).io
+    cGroup.suggestName("ClusterGroupIO")
     /** Decoder */
     private val decoder = Module(new Decoder).io
     decoder.suggestName("decoderIO")
+    private val memCtrl = Module(new EyerissMemCtrlModule()(EyerissMemCtrlParameters(
+      addressBits = params.address.bitLength, // TODO: check
+      sizeBits = 16, // TODO
+      dataBits = cscDataWidth,
+      nIds = getSourceNum // TODO
+    ))).io
+    memCtrl.suggestName("EyerissMemCtrlIO")
+    private val getSourceId = memCtrl.dataPath.sourceAlloc.bits
+    private val getAddress = memCtrl.dataPath.address
+    private val getSize = memCtrl.dataPath.size
     // (@todo DMA3)
     // 2. TileLink access -> write/read memory.
-    val (memBundle, memEdge) = memNode.out.head
+    val (memBundle, memEdge) = memGetNode.out.head
+    val (getLegal, getBits) = memEdge.Get(getSourceId, getAddress, getSize)
+    private val legalDest = memEdge.manager.containsSafe(getAddress)
+    private val legal = legalDest && getLegal
+    private val (getReqFirst, getReqLast, getReqDone) = memEdge.firstlast(memBundle.a)
+    private val (getRespFirst, getRespLast, getRespDone) = memEdge.firstlast(memBundle.d)
+    memBundle.a.valid := legal && (!getReqFirst || memCtrl.dataPath.sourceAlloc.valid)
+    memCtrl.dataPath.sourceAlloc.ready := legal && getReqFirst && memBundle.a.ready
+    memCtrl.dataPath.sourceFree.valid := getRespFirst && memBundle.d.fire()
+    memCtrl.dataPath.sourceFree.bits := memBundle.d.bits.source
+    memBundle.a.bits := getBits // TODO: check
+    memBundle.b.ready := true.B // TODO: why?
+    memBundle.c.valid := false.B
+    memBundle.d.ready := true.B
+    memBundle.e.valid := false.B
     // 3. Int
     interrupts.head := decoder.valid
     /** decoder connections*/

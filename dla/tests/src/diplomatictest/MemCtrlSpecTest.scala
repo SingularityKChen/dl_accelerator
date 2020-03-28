@@ -3,7 +3,7 @@ package dla.tests.diplomatictest
 import chisel3._
 import chisel3.tester._
 import dla.cluster.ClusterConfig
-import dla.diplomatic.{EyerissIDMapGenerator, EyerissMemCtrlModule, MemCtrlParameters}
+import dla.diplomatic.{EyerissIDMapGenerator, EyerissMemCtrlModule, EyerissMemCtrlParameters}
 import org.scalatest._
 import scala.util.Random
 
@@ -13,8 +13,8 @@ class MemCtrlSpecTest extends FlatSpec with ChiselScalatestTester
   private val putSourceNum = pSumRouterNum
   behavior of "test the spec of diplomatic memory controller"
   it should "work well on MemCtrlModule" in {
-    implicit val p: MemCtrlParameters =
-      MemCtrlParameters(addressBits = 5, sizeBits = 10, dataBits = 8, nIds = getSourceNum)
+    implicit val p: EyerissMemCtrlParameters =
+      EyerissMemCtrlParameters(addressBits = 5, sizeBits = 10, dataBits = 8, nIds = getSourceNum)
     test(new EyerissMemCtrlModule()(p)) { theMemCtrl =>
       val theTopIO = theMemCtrl.io
       val theClock = theMemCtrl.clock

@@ -2,29 +2,37 @@ package dla.diplomatic
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.util.leftOR
+import freechips.rocketchip.util._
 
-case class MemCtrlParameters (
+case class EyerissMemCtrlParameters(
                              addressBits: Int,
                              sizeBits: Int,
                              dataBits: Int,
                              nIds: Int // the number of source id
                              )
 
-class EyerissMemCommonIO()(implicit val p: MemCtrlParameters) extends Bundle {
-  val address: UInt = Output(UInt(p.addressBits.W))
-  val size: UInt = Output(UInt(p.sizeBits.W))
-  val source: UInt = Output(UInt(log2Ceil(p.nIds).W))
-  val inActStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of inAct
-  val weightStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of weight
-  val pSumStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of PSum
-  val oneInActSRAMSize: UInt = Input(UInt(p.sizeBits.W))
-  val oneWeightSize: UInt = Input(UInt(p.sizeBits.W))
-  val onePSumSRAMSize: UInt = Input(UInt(p.sizeBits.W))
+class EyerissMemCommonIO()(implicit val p: EyerissMemCtrlParameters) extends Bundle {
+  val ctrlPath = new Bundle {
+    val putEn: Bool = Input(Bool())
+  }
+  val dataPath = new Bundle {
+    val address: UInt = Output(UInt(p.addressBits.W))
+    val size: UInt = Output(UInt(p.sizeBits.W))
+    val sourceAlloc: DecoupledIO[UInt] = Decoupled(UInt(log2Ceil(p.nIds).W))
+    val sourceFree: DecoupledIO[UInt] = Flipped(Decoupled(UInt(log2Ceil(p.nIds).W)))
+    val inActStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of inAct
+    val weightStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of weight
+    val pSumStarAdr: UInt = Input(UInt(p.addressBits.W)) // the start address of PSum
+    val oneInActSRAMSize: UInt = Input(UInt(p.sizeBits.W))
+    val oneWeightSize: UInt = Input(UInt(p.sizeBits.W))
+    val onePSumSRAMSize: UInt = Input(UInt(p.sizeBits.W))
+  }
 }
 
-class EyerissMemCtrlModule(implicit val p: MemCtrlParameters) extends Module {
+class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends Module {
   val io: EyerissMemCommonIO = IO(new EyerissMemCommonIO()(p))
+  private val idMap = Module(new EyerissIDMapGenerator(p.nIds)).io
+  // TODO: add one more idMap for put
   private val inActStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val weightStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val pSumStarAdrReg = RegInit(0.U(p.addressBits.W))
@@ -34,15 +42,17 @@ class EyerissMemCtrlModule(implicit val p: MemCtrlParameters) extends Module {
   private val oneWeightSizeReg = RegInit(0.U(p.sizeBits.W))
   private val onePSumSRAMSizeReg = RegInit(0.U(p.sizeBits.W))
   // source
-  io.source := 0.U // TODO
+  io.dataPath.sourceAlloc <> idMap.alloc
+  io.dataPath.sourceFree <> idMap.free
   // address
   /** the address of read inAct */
-  inActStarAdrReg := io.inActStarAdr
-  oneInActSRAMSizeReg := io.oneInActSRAMSize
+  inActStarAdrReg := io.dataPath.inActStarAdr
+  oneInActSRAMSizeReg := io.dataPath.oneInActSRAMSize.holdUnless(io.dataPath.sourceAlloc.ready)
+  oneWeightSizeReg := io.dataPath.oneWeightSize.holdUnless(io.dataPath.sourceAlloc.ready)
   readAdrReg := inActStarAdrReg + (oneInActSRAMSizeReg << 3).asUInt // TODO: check and add holdUnless
-  io.address := readAdrReg
+  io.dataPath.address := readAdrReg
   // size
-  io.size := oneInActSRAMSizeReg // TODO: add more cases
+  io.dataPath.size := oneInActSRAMSizeReg // TODO: add more cases, such as weight, inAct, data and address
 }
 
 class EyerissIDMapGenerator(val numIds: Int) extends Module {
