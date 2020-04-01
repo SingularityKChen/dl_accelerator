@@ -5,7 +5,6 @@ import chisel3.util._
 import dla.pe._
 
 class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterConfig {
-  val diagnNum: Int = peColNum + peRowNum - 1
   val io: PEClusterIO = IO(new PEClusterIO)
   // io.dataPath.pSumDataFromSouthernIO: pSum from southern PE Array
   // io.dataPath.pSumDataFromSouthernIO: data from pSumRouter

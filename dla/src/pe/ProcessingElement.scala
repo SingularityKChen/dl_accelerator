@@ -19,7 +19,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
     pePad.dataStream.weightIOs <> io.dataStream.weightIOs
  }
   private val inActAndWeightWFIOs = Seq(pePad.padWF.inActWriteFin, pePad.padWF.weightWriteFin)
-  val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
+  private val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
   inActAndWeightWFIOs.zip(inActAndWeightTopWFIOs).foreach{case (x, y) => y <> x}
   io.padWF.pSumAddFin := pePad.padWF.pSumAddFin
   peCtrl.ctrlPad <> pePad.padCtrl
