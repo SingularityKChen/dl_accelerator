@@ -3,12 +3,15 @@ package dla.tests.clustertest
 import Chisel.DecoupledIO
 import chisel3._
 import chisel3.experimental.{DataMirror, Direction}
+import chisel3.stage._
 import chisel3.tester._
 import dla.cluster._
 import dla.eyerissTop.EyerissTopConfig
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import dla.tests.GenOneStreamData
+import firrtl.options.TargetDirAnnotation
 import org.scalatest._
+
 import scala.util.Random
 import scala.util.matching.Regex
 import scala.math.pow
@@ -1241,14 +1244,40 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
   behavior of "test the spec of Cluster Group"
-  //chisel3.Driver.emitVerilog(new ClusterGroup(false))
   it should "work well on Cluster Group Controller" in {
     test (new ClusterGroupController(debug = true)) { theCGCtrl =>
       val theTop = theCGCtrl.io
       val theClock = theCGCtrl.clock
+      def randomGiveFin(pokeIO: Bool, prefix: String): Unit = {
+        theClock.step((new Random).nextInt(15))
+        pokeIO.poke(true.B)
+        println(s"[$prefix] poke true now")
+      }
       theCGCtrl.reset.poke(true.B)
       theClock.step()
       theCGCtrl.reset.poke(false.B)
+      println("----------------- test begin -----------------")
+      println("-------- ClusterGroup Controller Spec --------")
+      println("----------- test basic functions -------------")
+      theTop.allPSumAddFin.poke(false.B)
+      theTop.allCalFin.poke(false.B)
+      theTop.topIO.cgEnable.poke(true.B)
+      theClock.step()
+      theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
+      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(theTop.glbInActCtrlIOs.head.writeIO.done, "inActWrite0")}) {
+        case (left, right) =>
+          left.fork {randomGiveFin(theTop.glbInActCtrlIOs(right).writeIO.done, prefix = s"inActWrite$right")}
+      }.joinAndStep(theClock) // wait for register
+      theClock.step() // wait for state machine
+      theTop.peCtrlIO.peLoadEn.expect(true.B, "should load data into PE now")
+      theTop.glbInActCtrlIOs.foreach({x =>
+        x.writeIO.enable.expect(false.B, "should not write data into GLB now")
+        x.readIO.enable.expect(true.B, "should read data from GLB now")
+      })
+      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(theTop.glbInActCtrlIOs.head.readIO.done, "inActRead0")}) {
+        case (left, right) =>
+          left.fork {randomGiveFin(theTop.glbInActCtrlIOs(right).readIO.done, prefix = s"inActRead$right")}
+      }.joinAndStep(theClock)
     }
   }
 
@@ -1327,3 +1356,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 }
+/*
+object emitClusterGroup extends App {
+  (new ChiselStage).run(Seq(
+    ChiselGeneratorAnnotation(() => new ClusterGroup(debug = false)),
+    TargetDirAnnotation(directory = "test_run_dir")
+  ))
+}
+*/
