@@ -19,8 +19,8 @@ import scala.math.pow
 class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   with ClusterSRAMConfig with MCRENFConfig with SPadSizeConfig with GNMFCS2Config
   with EyerissTopConfig with GNMFCS1Config {
-  private val printLogDetails = false // true to print more detailed logs
-  //private val printLogDetails = true // true to print more detailed logs
+  //private val printLogDetails = false // true to print more detailed logs
+  private val printLogDetails = true // true to print more detailed logs
   private val maxPSumStreamNum: Int = pSumSRAMSize/pSumOneSPadNum
   private val addendRand = Seq.fill(peColNum, pSumOneSPadNum){(new Random).nextInt(10)}
   private val peNum = peRowNum * peColNum * cgRowNum * cgColNum
@@ -1247,11 +1247,21 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
   it should "work well on Cluster Group Controller" in {
     test (new ClusterGroupController(debug = true)) { theCGCtrl =>
       val theTop = theCGCtrl.io
+      val theDebugIO = theTop.debugIO
       val theClock = theCGCtrl.clock
-      def randomGiveFin(pokeIO: Bool, prefix: String): Unit = {
+      def randomGiveFin(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
         theClock.step((new Random).nextInt(15))
-        pokeIO.poke(true.B)
-        println(s"[$prefix] poke true now")
+        pokeIO(idx).poke(true.B)
+        println(s"[$prefix$idx] poke true now")
+        theClock.step()
+        expectIO(idx).expect(true.B, s"[$prefix$idx] one cycle later, the reg should be true")
+        if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek()}")
+      }
+      def inActReadHelper(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
+        println(s"[$prefix] adr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
+        //theTop.glbInActCtrlIOs(idx).readIO.adr.expect()
+        randomGiveFin(pokeIO, expectIO, idx, prefix)
+        theTop.glbInActCtrlIOs(idx).readIO.enable.expect(false.B, s"as inAct $idx has been read from GLB")
       }
       theCGCtrl.reset.poke(true.B)
       theClock.step()
@@ -1264,23 +1274,46 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTop.topIO.cgEnable.poke(true.B)
       theClock.step()
       theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
-      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(theTop.glbInActCtrlIOs.head.writeIO.done, "inActWrite0")}) {
+      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(
+        pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
+        expectIO = theDebugIO.inActWriteFinVecIO,
+        idx = 0, prefix =  s"inActWrite")}) {
         case (left, right) =>
-          left.fork {randomGiveFin(theTop.glbInActCtrlIOs(right).writeIO.done, prefix = s"inActWrite$right")}
-      }.joinAndStep(theClock) // wait for register
+          left.fork {randomGiveFin(
+            pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
+            expectIO = theDebugIO.inActWriteFinVecIO,
+            idx = right , prefix = s"inActWrite")}
+      }.join()
       theClock.step() // wait for state machine
+      if (printLogDetails) println(s"[oneCycleLater] cgState = ${theDebugIO.cgState.peek()}")
+      theDebugIO.cgState.expect(2.U, "cgState should be 2 now to load PE")
       theTop.peCtrlIO.peLoadEn.expect(true.B, "should load data into PE now")
       theTop.glbInActCtrlIOs.foreach({x =>
         x.writeIO.enable.expect(false.B, "should not write data into GLB now")
         x.readIO.enable.expect(true.B, "should read data from GLB now")
       })
-      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(theTop.glbInActCtrlIOs.head.readIO.done, "inActRead0")}) {
+      (1 until inActSRAMNum).foldLeft( fork {
+        inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+          expectIO = theDebugIO.inActReadFinVecIO,
+          idx = 0, prefix = "inActRead")
+      }) {
         case (left, right) =>
-          left.fork {randomGiveFin(theTop.glbInActCtrlIOs(right).readIO.done, prefix = s"inActRead$right")}
+          left.fork {
+            inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+              expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"inActRead")
+          }
       }.joinAndStep(theClock)
+      theDebugIO.cgState.expect(3.U, "after read inAct from GLB, it should do computation")
+      theClock.step((new Random).nextInt(15))
+      println(s"state = ${theDebugIO.cgState.peek()}")
+      theTop.allCalFin.poke(true.B)
+      theClock.step()
+      theTop.allCalFin.poke(false.B)
+      println(s"state = ${theDebugIO.cgState.peek()}")
+      theDebugIO.cgState.expect(2.U, "after one computation, it should load PE again")
     }
   }
-
+/*
   it should "work well on reading and writing via inner SRAM" in {
     test (new ClusterGroup(true)) { theCG =>
       val theTop = theCG.io
@@ -1354,7 +1387,7 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           })
         } .join()
     }
-  }
+  }*/
 }
 /*
 object emitClusterGroup extends App {

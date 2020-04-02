@@ -244,6 +244,13 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   //io.peCal := cgStateReg === cgCal
   io.glbLoadEn := cgLoadGLBWire
   io.topIO.calFin := cgReadWire && configG2Wrap
+  if (debug) {
+    io.debugIO.cgState := cgStateReg
+    io.debugIO.inActWriteFinVecIO := glbInActWriteFinReg
+    io.debugIO.inActReadFinVecIO := glbInActReadFinReg
+  } else {
+    io.debugIO <> DontCare
+  }
 }
 
 class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS2Config {
@@ -263,4 +270,9 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
     val calFin: Bool = Output(Bool())
   }
   val glbLoadEn: Bool = Output(Bool())
+  val debugIO = new Bundle {
+    val cgState: UInt = Output(UInt(3.W))
+    val inActWriteFinVecIO: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
+    val inActReadFinVecIO: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
+  }
 }
