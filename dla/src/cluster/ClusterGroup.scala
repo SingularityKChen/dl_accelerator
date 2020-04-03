@@ -128,7 +128,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val (configF2Val, configF2Wrap) = Counter(configIncWireSeq(3), configFixValSeq(3))
   private val (configC2Val, configC2Wrap) = Counter(configIncWireSeq(4), configFixValSeq(4))
   private val (configS2Val, configS2Wrap) = Counter(configIncWireSeq(5), configFixValSeq(5))
-  private val configWarpWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
+  private val configWrapWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
   //private val configValWireVec = Seq(configG2Val, configN2Val, configM2Val, configF2Val, configC2Val, configS2Val)
   // 0g, 1n, 2m, 3f, 4c, 5s
   private val glbInActWriteFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
@@ -182,7 +182,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
       /** every time s2Inc, that means cal finish*/
       when (configIncWireSeq(5)) {
         /** when c2Wrap, we need to read out PSum without change the values of f2, etc. */
-        when(configWarpWireSeq(4)) {
+        when(configWrapWireSeq(4)) {
           cgStateReg := cgRead
         }.otherwise { // or we need to load new InAct and Weight BUT PSum
           cgStateReg := cgLoadPE
@@ -201,7 +201,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   }
   // logic
   private val c2WrapReg = RegInit(false.B)
-  when (configWarpWireSeq(4)) { // c2 warp, then f2 will increase
+  when (configWrapWireSeq(4)) { // c2 warp, then f2 will increase
     c2WrapReg := true.B
   } .elsewhen (configIncWireSeq(3)) { // after use this value
     c2WrapReg := false.B
@@ -209,10 +209,10 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     c2WrapReg := c2WrapReg
   }
   configIncWireSeq(5) := io.allCalFin
-  configIncWireSeq(4) := configWarpWireSeq(5) // s2Wrap, c2Inc
+  configIncWireSeq(4) := configWrapWireSeq(5) // s2Wrap, c2Inc
   configIncWireSeq(3) := c2WrapReg && io.allPSumAddFin // c2Wrap and read finish all PSum
   for (i <- 1 until 4) {
-    configIncWireSeq(i - 1) := configWarpWireSeq(i)
+    configIncWireSeq(i - 1) := configWrapWireSeq(i)
   }
   // Outputs
   private val pSumAdrL2 = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
@@ -225,7 +225,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val cgReadWire = cgStateReg === cgRead
   io.glbPSumCtrlIOs.foreach({x =>
     x.writeIO.adr := pSumAdrL2 + pSumWriteAdrL4Reg
-    x.writeIO.enable := cgLoadGLBWire || cgReadWire
+    x.writeIO.enable := cgReadWire // TODO:use cgLoadGLBWire to load PSum at the beginning
     pSumWriteAdrL4Reg := Mux(x.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg) // FIXME: need reset, need fire()
     x.readIO.adr := pSumAdrL2 + pSumReadAdrL4Reg
     x.readIO.enable := cgReadWire || io.topIO.readOutPSum
@@ -248,6 +248,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     io.debugIO.cgState := cgStateReg
     io.debugIO.inActWriteFinVecIO := glbInActWriteFinReg
     io.debugIO.inActReadFinVecIO := glbInActReadFinReg
+    io.debugIO.pSumWriteFinVecIO := glbPSumWriteFinReg
   } else {
     io.debugIO <> DontCare
   }
@@ -274,5 +275,6 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
     val cgState: UInt = Output(UInt(3.W))
     val inActWriteFinVecIO: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
     val inActReadFinVecIO: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))
+    val pSumWriteFinVecIO: Vec[Bool] = Output(Vec(pSumSRAMNum, Bool()))
   }
 }

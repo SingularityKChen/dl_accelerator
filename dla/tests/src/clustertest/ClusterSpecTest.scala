@@ -1255,11 +1255,11 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         println(s"[$prefix$idx] poke true now")
         theClock.step()
         expectIO(idx).expect(true.B, s"[$prefix$idx] one cycle later, the reg should be true")
-        if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek()}")
+        if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek().litValue()}")
       }
       def inActReadHelper(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
         println(s"[$prefix] adr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
-        //theTop.glbInActCtrlIOs(idx).readIO.adr.expect()
+        //theTop.glbInActCtrlIOs(idx).readIO.adr.expect() // TODO: check the address
         randomGiveFin(pokeIO, expectIO, idx, prefix)
         theTop.glbInActCtrlIOs(idx).readIO.enable.expect(false.B, s"as inAct $idx has been read from GLB")
       }
@@ -1276,41 +1276,64 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
       (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(
         pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
-        expectIO = theDebugIO.inActWriteFinVecIO,
-        idx = 0, prefix =  s"inActWrite")}) {
+        expectIO = theDebugIO.inActWriteFinVecIO, idx = 0, prefix =  s"inActWrite")
+      }) {
         case (left, right) =>
           left.fork {randomGiveFin(
             pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
-            expectIO = theDebugIO.inActWriteFinVecIO,
-            idx = right , prefix = s"inActWrite")}
-      }.join()
-      theClock.step() // wait for state machine
-      if (printLogDetails) println(s"[oneCycleLater] cgState = ${theDebugIO.cgState.peek()}")
-      theDebugIO.cgState.expect(2.U, "cgState should be 2 now to load PE")
-      theTop.peCtrlIO.peLoadEn.expect(true.B, "should load data into PE now")
-      theTop.glbInActCtrlIOs.foreach({x =>
-        x.writeIO.enable.expect(false.B, "should not write data into GLB now")
-        x.readIO.enable.expect(true.B, "should read data from GLB now")
-      })
-      (1 until inActSRAMNum).foldLeft( fork {
-        inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
-          expectIO = theDebugIO.inActReadFinVecIO,
-          idx = 0, prefix = "inActRead")
-      }) {
-        case (left, right) =>
-          left.fork {
-            inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
-              expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"inActRead")
+            expectIO = theDebugIO.inActWriteFinVecIO, idx = right , prefix = s"inActWrite")
           }
-      }.joinAndStep(theClock)
-      theDebugIO.cgState.expect(3.U, "after read inAct from GLB, it should do computation")
-      theClock.step((new Random).nextInt(15))
-      println(s"state = ${theDebugIO.cgState.peek()}")
-      theTop.allCalFin.poke(true.B)
-      theClock.step()
-      theTop.allCalFin.poke(false.B)
-      println(s"state = ${theDebugIO.cgState.peek()}")
-      theDebugIO.cgState.expect(2.U, "after one computation, it should load PE again")
+      }.joinAndStep(theClock) // wait for state machine
+      for (n2 <-0 until N2) {
+        for (m2 <- 0 until M2) {
+          for (f2 <- 0 until F2) {
+            for (c2 <- 0 until C2) {
+              for (s2 <- 0 until S2) {
+                if (printLogDetails) println(s"[$c2,$s2] cgState = ${theDebugIO.cgState.peek().litValue()}")
+                theDebugIO.cgState.expect(2.U, s"[$c2,$s2] cgState should be 2 to load PE")
+                theTop.peCtrlIO.peLoadEn.expect(true.B, s"[$c2,$s2] should load data into PE")
+                theTop.glbInActCtrlIOs.foreach({x =>
+                  x.writeIO.enable.expect(false.B, s"[$c2,$s2] should not write data into GLB")
+                  x.readIO.enable.expect(true.B, s"[$c2,$s2] should read data from GLB")
+                })
+                (1 until inActSRAMNum).foldLeft( fork {
+                  inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                    expectIO = theDebugIO.inActReadFinVecIO, idx = 0, prefix = s"($c2,$s2)@inActRead")
+                }) {
+                  case (left, right) =>
+                    left.fork {
+                      inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                        expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"$c2$s2@inActRead")
+                    }
+                }.joinAndStep(theClock)
+                theDebugIO.cgState.expect(3.U, s"[$c2,$s2] after read inAct from GLB, it should do computation")
+                theClock.step((new Random).nextInt(15))
+                //println(s"state = ${theDebugIO.cgState.peek()}") // it should be 3.U
+                theTop.allCalFin.poke(true.B)
+                theClock.step()
+                theTop.allCalFin.poke(false.B)
+              } // end of S2 loop
+            } // end of C2 loop
+            println(s"state = ${theDebugIO.cgState.peek()}")
+            theDebugIO.cgState.expect(4.U, s"after S2 = $S2 computations, it should read PSum Now")
+            theTop.glbPSumCtrlIOs.foreach(_.readIO.enable.expect(true.B, s"[] Should read PSum out from GLB now"))
+            (1 until pSumSRAMNum).foldLeft( fork {
+              randomGiveFin( pokeIO = theTop.glbPSumCtrlIOs.map(x =>x.writeIO.done),
+                expectIO = theDebugIO.pSumWriteFinVecIO, idx = 0, prefix = s"@pSumWrite")
+            }) {
+              case (left, right) =>
+                left.fork {
+                  randomGiveFin( pokeIO = theTop.glbPSumCtrlIOs.map(x =>x.writeIO.done),
+                    expectIO = theDebugIO.pSumWriteFinVecIO, idx = right, prefix = s"@pSumWrite")
+                  theDebugIO.cgState.expect(4.U, "it should be cgRead")
+                }
+            }.joinAndStep(theClock) // wait for state machine
+            theDebugIO.cgState.expect(2.U, "it should be PELoad again")
+          } // end of F2 loop
+        } // end of M2 loop
+      } // end of N2 loop
+      // FIXME: what's the difference between allPSumCalFin and glbPSumWriteFinReg
+      println("----------------- test success -----------------")
     }
   }
 /*
