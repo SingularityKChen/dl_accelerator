@@ -18,17 +18,21 @@ class CSCSwitcherDebugIO extends Bundle with PESizeConfig {
   val currentStreamNum: UInt = Output(UInt(5.W))
 }
 
+class CSCSwitcherCtrlIO(private val lgVectorNum: Int) extends Bundle with MCRENFConfig {
+  /** use matrix height and width to increase and wrap csc address and count reg */
+  require(scala.math.max(inActMatrixHeight, weightMatrixHeight) <= scala.math.pow(2, 5))
+  require(scala.math.max(inActMatrixWidth, weightMatrixWidth) <= scala.math.pow(2, 5))
+  val matrixHeight: UInt = Input(UInt(5.W)) // TODO: check the width
+  val matrixWidth: UInt = Input(UInt(5.W))
+  val vectorNum: UInt = Input(UInt(lgVectorNum.W))
+}
+
 class CSCSwitcherIO(private val adrWidth: Int) extends Bundle
-  with PESizeConfig with GNMFCS2Config with MCRENFConfig {
+  with PESizeConfig with GNMFCS2Config {
   private val lgVectorNum = if (adrWidth == inActAdrWidth) log2Ceil(inActStreamNum) else log2Ceil(weightStreamNum)
   val inData: DecoupledIO[UInt] = Flipped(Decoupled(UInt(cscDataWidth.W)))
   val outData = new CSCStreamIO(adrWidth = adrWidth, dataWidth = cscDataWidth + cscCountWidth)
-  /** use matrix height and width to increase and wrap csc address and count reg */
-  val matrixHeight: UInt = Input(UInt(5.W)) // TODO: check the width
-  val matrixWidth: UInt = Input(UInt(5.W))
-  require(scala.math.max(inActMatrixHeight, weightMatrixHeight) <= scala.math.pow(2, 5))
-  require(scala.math.max(inActMatrixWidth, weightMatrixWidth) <= scala.math.pow(2, 5))
-  val vectorNum: UInt = Input(UInt(lgVectorNum.W))
+  val ctrlPath = new CSCSwitcherCtrlIO(lgVectorNum = lgVectorNum)
   val debugIO = new CSCSwitcherDebugIO
 }
 
@@ -57,10 +61,10 @@ class CSCSwitcher(private val adrWidth: Int, debug: Boolean) extends Module
   private val oneColFinWire = Wire(Bool())
   private val oneMatrixFinWire = Wire(Bool())
   private val oneVectorFinRegNext = RegNext(oneColFinWire && oneMatrixFinWire) // true when process one pad data
-  private val oneStreamFinRegNext = RegNext(oneVectorFinRegNext && (io.vectorNum === vectorNumPlusOne))
+  private val oneStreamFinRegNext = RegNext(oneVectorFinRegNext && (io.ctrlPath.vectorNum === vectorNumPlusOne))
   /** when cscCountReg equals to the height of matrix, then current column finishes */
-  oneColFinWire := io.matrixHeight === cscCountPlusOne
-  oneMatrixFinWire := io.matrixWidth === columnCounterPlusOne
+  oneColFinWire := io.ctrlPath.matrixHeight === cscCountPlusOne
+  oneMatrixFinWire := io.ctrlPath.matrixWidth === columnCounterPlusOne
   /** meetNoneZeroWire will be true when current bits is not zero*/
   meetNoneZeroWire := inData.bits =/= 0.U
   /** when meet none a zero element, zeroColReg will be assigned to false, otherwise keep its value

@@ -10,7 +10,7 @@ class ClusterGroupIO extends Bundle {
 }
 
 class ClusterGroupDataIO extends Bundle with ClusterConfig {
-  val glbDataPath = new GLBClusterDataIO // through top to GLB
+  val glbDataPath = new GLBClusterDataIO // through top to GLB TODO: remove unused inAct.out, weight.out
   val cgDataPath = new RouterDataIO // communicate with other cluster groups
   /** pSumDataVerticalIOs.outIOs
     * for translating partial sum from each head in PE array to each tail of its northern PE Array
