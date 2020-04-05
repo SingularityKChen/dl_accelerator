@@ -149,6 +149,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   })
   glbPSumWriteFinReg.zip(io.glbPSumCtrlIOs.map(x => x.writeIO.done)).foreach({case (reg, doneIO) =>
     reg := Mux(glbPSumLoadFinWire, false.B, Mux(doneIO, true.B, reg))
+    // FIXME: writeIO.done is always DontCare
   })
   //glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
   /** cluster group state machine
@@ -223,13 +224,15 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val cgLoadGLBWire = cgStateReg === cgLoadGLB
   private val cgLoadPEWire = cgStateReg === cgLoadPE
   private val cgReadWire = cgStateReg === cgRead
-  io.glbPSumCtrlIOs.foreach({x =>
+  // FIXME: need reset, need fire(), check whether .head is correct
+  pSumReadAdrL4Reg := Mux(io.glbPSumCtrlIOs.head.readIO.done, pSumReadAdrL4Reg + 1.U, pSumReadAdrL4Reg)
+  pSumWriteAdrL4Reg := Mux(io.glbPSumCtrlIOs.head.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg)
+  io.glbPSumCtrlIOs.zipWithIndex.foreach({case (x,idx) =>
     x.writeIO.adr := pSumAdrL2 + pSumWriteAdrL4Reg
-    x.writeIO.enable := cgReadWire // TODO:use cgLoadGLBWire to load PSum at the beginning
-    pSumWriteAdrL4Reg := Mux(x.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg) // FIXME: need reset, need fire()
+    x.writeIO.enable := cgReadWire && glbPSumWriteFinReg(idx) // TODO:use cgLoadGLBWire to load PSum at the beginning
     x.readIO.adr := pSumAdrL2 + pSumReadAdrL4Reg
-    x.readIO.enable := cgReadWire || io.topIO.readOutPSum
-    pSumReadAdrL4Reg := Mux(x.readIO.done, pSumReadAdrL4Reg + 1.U, pSumReadAdrL4Reg) // FIXME: need reset, need fire()
+    /** PSum will be read out from GLB to PE for accumulation or from GLB to outside as a result*/
+    x.readIO.enable := (cgReadWire && glbPSumWriteFinReg(idx)) || io.topIO.readOutPSum
   })
   io.glbInActCtrlIOs.zipWithIndex.foreach({case (x, idx) =>
     x.writeIO.enable := cgLoadGLBWire
@@ -261,14 +264,14 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
     val peLoadEn: Bool = Output(Bool())
     val pSumLoadEn: Bool = Output(Bool())
   }
-  val allPSumAddFin: Bool = Input(Bool())
-  val allCalFin: Bool = Input(Bool())
+  val allPSumAddFin: Bool = Input(Bool()) // all columns of PE have finished accumulated PSum
+  val allCalFin: Bool = Input(Bool()) // all PEs have finished the MAC computation
   val pSumAdd: Bool = Output(Bool())
   //val peCal: Bool = Output(Bool())
   val topIO = new Bundle {
     val readOutPSum: Bool = Input(Bool())
     val cgEnable: Bool = Input(Bool())
-    val calFin: Bool = Output(Bool())
+    val calFin: Bool = Output(Bool()) // current layer has finished all the computations
   }
   val glbLoadEn: Bool = Output(Bool())
   val debugIO = new Bundle {

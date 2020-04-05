@@ -1249,19 +1249,53 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theTop = theCGCtrl.io
       val theDebugIO = theTop.debugIO
       val theClock = theCGCtrl.clock
+      var inActReadAdr: List[Int] = Nil
+      var pSumWriteAdr: List[Int] = Nil
+      var pSumReadAdr: List[Int] = Nil
       def randomGiveFin(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
         theClock.step((new Random).nextInt(15))
         pokeIO(idx).poke(true.B)
         println(s"[$prefix$idx] poke true now")
         theClock.step()
+        pokeIO(idx).poke(false.B)
         expectIO(idx).expect(true.B, s"[$prefix$idx] one cycle later, the reg should be true")
         if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek().litValue()}")
       }
       def inActReadHelper(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
-        println(s"[$prefix] adr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
+        println(s"[$prefix] inActReadAdr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
+        val currentAdr: Int = theTop.glbInActCtrlIOs(idx).readIO.adr.peek().litValue().toInt
+        if (!inActReadAdr.contains(currentAdr)) {
+          inActReadAdr = inActReadAdr:::List(currentAdr)
+        }
         //theTop.glbInActCtrlIOs(idx).readIO.adr.expect() // TODO: check the address
         randomGiveFin(pokeIO, expectIO, idx, prefix)
         theTop.glbInActCtrlIOs(idx).readIO.enable.expect(false.B, s"as inAct $idx has been read from GLB")
+      }
+      def pSumRWHelper(pokeIO: Vec[SRAMCommonCtrlIO], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
+        println(s"[$prefix] pSumReadAdr = ${theTop.glbPSumCtrlIOs(idx).readIO.adr.peek()}")
+        println(s"[$prefix] pSumWriteAdr = ${theTop.glbPSumCtrlIOs(idx).writeIO.adr.peek()}")
+        val readAdr: Int = theTop.glbPSumCtrlIOs(idx).readIO.adr.peek().litValue().toInt
+        val writeAdr: Int = theTop.glbPSumCtrlIOs(idx).writeIO.adr.peek().litValue().toInt
+        if (!pSumReadAdr.contains(readAdr)) {
+          pSumReadAdr = pSumReadAdr:::List(readAdr)
+        }
+        if (!pSumWriteAdr.contains(writeAdr)) {
+          pSumWriteAdr = pSumWriteAdr:::List(writeAdr)
+        }
+        val writeDoneIO = pokeIO.map(x => x.writeIO.done)
+        val readDoneIO = pokeIO.map(x => x.readIO.done)
+        theClock.step((new Random).nextInt(15))
+        readDoneIO(idx).poke(true.B)
+        theClock.step()
+        readDoneIO(idx).poke(false.B)
+        theClock.step((new Random).nextInt(5))
+        writeDoneIO(idx).poke(true.B)
+        println(s"[${prefix}Write$idx] poke true now")
+        theClock.step()
+        writeDoneIO(idx).poke(false.B)
+        expectIO(idx).expect(true.B, s"[${prefix}Write$idx] one cycle later, the reg should be true")
+        theTop.glbPSumCtrlIOs(idx).writeIO.enable.expect(false.B, s"as pSum $idx has been write into GLB")
+        if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek().litValue()}")
       }
       theCGCtrl.reset.poke(true.B)
       theClock.step()
@@ -1308,7 +1342,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
                 }.joinAndStep(theClock)
                 theDebugIO.cgState.expect(3.U, s"[$c2,$s2] after read inAct from GLB, it should do computation")
                 theClock.step((new Random).nextInt(15))
-                //println(s"state = ${theDebugIO.cgState.peek()}") // it should be 3.U
                 theTop.allCalFin.poke(true.B)
                 theClock.step()
                 theTop.allCalFin.poke(false.B)
@@ -1318,21 +1351,26 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
             theDebugIO.cgState.expect(4.U, s"after S2 = $S2 computations, it should read PSum Now")
             theTop.glbPSumCtrlIOs.foreach(_.readIO.enable.expect(true.B, s"[] Should read PSum out from GLB now"))
             (1 until pSumSRAMNum).foldLeft( fork {
-              randomGiveFin( pokeIO = theTop.glbPSumCtrlIOs.map(x =>x.writeIO.done),
+              pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
                 expectIO = theDebugIO.pSumWriteFinVecIO, idx = 0, prefix = s"@pSumWrite")
             }) {
               case (left, right) =>
                 left.fork {
-                  randomGiveFin( pokeIO = theTop.glbPSumCtrlIOs.map(x =>x.writeIO.done),
+                  pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
                     expectIO = theDebugIO.pSumWriteFinVecIO, idx = right, prefix = s"@pSumWrite")
                   theDebugIO.cgState.expect(4.U, "it should be cgRead")
                 }
-            }.joinAndStep(theClock) // wait for state machine
+            }.join()
+            theTop.allPSumAddFin.poke(true.B)
+            theClock.step() // wait for state machine
+            theTop.allPSumAddFin.poke(false.B)
             theDebugIO.cgState.expect(2.U, "it should be PELoad again")
           } // end of F2 loop
         } // end of M2 loop
       } // end of N2 loop
-      // FIXME: what's the difference between allPSumCalFin and glbPSumWriteFinReg
+      println(s"inActReadAdr = \n $inActReadAdr")
+      println(s"pSumWriteAdr = \n $pSumWriteAdr")
+      println(s"pSumReadAdr = \n $pSumReadAdr")
       println("----------------- test success -----------------")
     }
   }
@@ -1412,11 +1450,3 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }*/
 }
-/*
-object emitClusterGroup extends App {
-  (new ChiselStage).run(Seq(
-    ChiselGeneratorAnnotation(() => new ClusterGroup(debug = false)),
-    TargetDirAnnotation(directory = "test_run_dir")
-  ))
-}
-*/
