@@ -14,16 +14,11 @@ class SPadAdrModule(PadSize: Int, val DataWidth: Int)
   private val adrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
   adrSPad.suggestName("addressSPad")
   // write logic 2
-  when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
+  when (writeFire) {
     adrSPad(padWriteIndexReg) := decoupledDataIO.bits
   }
   // read logic 1
-  when (readIndexInc) {
-    padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next clock cycle, increase
-    when (readWrapWire) {
-      padReadIndexReg := 0.U
-    }
-  }
+  regReadLogic1()
   // read logic 2
   dataWire := adrSPad(padReadIndexReg)
   io.dataPath.readOutData := dataWire
@@ -36,35 +31,25 @@ class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
     val dataSPad: SyncReadMem[UInt] = SyncReadMem(PadSize,UInt(DataWidth.W))
     dataSPad.suggestName("dataSPadSRAM")
     // write logic 2
-    when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
+    when (writeFire) {
       dataSPad.write(padWriteIndexReg, decoupledDataIO.bits)
     }
     // read logic 1
     when (io.ctrlPath.readInIdxEn) {
       padReadIndexReg := io.ctrlPath.readInIdx
     } .otherwise {
-      when (readIndexInc) {
-        padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next clock cycle, increase
-        when (readWrapWire) {
-          padReadIndexReg := 0.U
-        }
-      }
+      regReadLogic1()
     }
     // read logic 2
     dataWire := dataSPad.read(padReadIndexReg, io.ctrlPath.readEn)
   }else{
     val dataSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
     dataSPad.suggestName("dataSPadReg")
-    when (decoupledDataIO.valid && io.ctrlPath.writeEn) {
+    when (writeFire) {
       dataSPad(padWriteIndexReg) := decoupledDataIO.bits
     }
     // read logic 1
-    when (readIndexInc) {
-      padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next clock cycle, increase
-      when (readWrapWire) {
-        padReadIndexReg := 0.U
-      }
-    }
+    regReadLogic1()
     // read logic 2
     dataWire := dataSPad(padReadIndexReg)
   }
@@ -81,22 +66,23 @@ class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
   protected val writeWrapWire: Bool = Wire(Bool())
   protected val readWrapWire: Bool = Wire(Bool())
   protected val readIndexInc: Bool = Wire(Bool()) // true, then read index increase
-  protected val dataValid: Bool = Wire(Bool())
-  dataValid := decoupledDataIO.valid && io.ctrlPath.writeEn
-  writeWrapWire := decoupledDataIO.bits === 0.U && dataValid
+  protected val writeFire: Bool = Wire(Bool())
+  writeFire := decoupledDataIO.fire() && io.ctrlPath.writeEn
+  writeWrapWire := decoupledDataIO.bits === 0.U && writeFire
   readWrapWire := dataWire === 0.U && readIndexInc
   // write logic 1
-  when (dataValid) {
-    decoupledDataIO.ready := true.B
-    padWriteIndexReg := padWriteIndexReg + 1.U
-    when (writeWrapWire) {
-      padWriteIndexReg := 0.U
-    }
-  }.otherwise {
-    decoupledDataIO.ready := false.B
-  }
+  decoupledDataIO.ready := true.B // as a memory, its always ready to be wrote in
+  padWriteIndexReg := Mux(writeFire, Mux(writeWrapWire, 0.U, padWriteIndexReg + 1.U), padWriteIndexReg)
   // common IO connections
   io.ctrlPath.writeIdx := padWriteIndexReg
   io.ctrlPath.writeFin := writeWrapWire
   io.dataPath.columnNum := padReadIndexReg
+  def regReadLogic1(): Unit = {
+    when (readIndexInc) {
+      padReadIndexReg := padReadIndexReg + 1.U // when readEn == true.B, then next clock cycle, increase
+      when (readWrapWire) {
+        padReadIndexReg := 0.U
+      }
+    }
+  }
 }
