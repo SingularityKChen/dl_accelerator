@@ -185,6 +185,18 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         outPSum.zip(addendRand).foreach({case (x, addend) =>
           require(x + addend <= pSumMax, "each pSum plus addend should less than the max")})
       }
+      def getSPadState(stateInt: Int): Unit = {
+        var state: String = "idle"
+        if (stateInt == 0) state = "padIdle"
+        if (stateInt == 1) state = "padInActAdr"
+        if (stateInt == 2) state = "padInActData"
+        if (stateInt == 3) state = "padWeightAdr"
+        if (stateInt == 4) state = "padWeightData1"
+        if (stateInt == 5) state = "padWeightData2"
+        if (stateInt == 6) state = "padMpy"
+        if (stateInt == 7) state = "padWriteBack"
+        println(s"----- SPad State   =  $state")
+      }
       println("----------------- test begin -----------------")
       println("----------- Processing Element Module ------------")
       thePE.reset.poke(true.B)
@@ -221,7 +233,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       var i = 0
       while (!theTopIO.topCtrl.calFinish.peek().litToBoolean) {
         println(s"--------------- $i-th MAC cycle -----------")
-        println(s"----- SPad State   =  ${theTopIO.debugIO.peSPadDebugIO.sPadState.peek()}")
+        getSPadState(stateInt = theTopIO.debugIO.peSPadDebugIO.sPadState.peek().litValue().toInt)
         println(s"----- inActMatrix   = ( value = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixData.peek().litValue()}, " +
           s"row = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixRow.peek().litValue()}, " +
           s"column = ${theTopIO.debugIO.peSPadDebugIO.inActMatrixColumn.peek().litValue()})")
@@ -256,8 +268,6 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
       theTopIO.debugIO.peSPadDebugIO.pSumReadIdx.expect(0.U, "when begin to read, the read index should be zero")
       println(s"----- pSumRDIdx = ${theTopIO.debugIO.peSPadDebugIO.pSumReadIdx.peek()}")
       theTopIO.topCtrl.pSumEnqEn.poke(true.B)
-      theTopIO.dataStream.ipsIO.setSourceClock(theClock)
-      theTopIO.dataStream.opsIO.setSinkClock(theClock)
       val nextCycle = (new Random).nextInt(30) + 1
       theClock.step(cycles = nextCycle)
       println(s"------------ $nextCycle Cycle Later ------------")
@@ -280,6 +290,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
         println(s"----- [$inIdx] ips.bit = ${addendRand(inIdx)}")
         println(s"----- pSumReadOut  =  ${theTopIO.dataStream.opsIO.bits.peek()}")
         theClock.step()
+        println(s"----- pSumSPadReadOut = ${theTopIO.debugIO.peSPadDebugIO.pSumLoad.peek().litValue()}")
       }
     }
   }

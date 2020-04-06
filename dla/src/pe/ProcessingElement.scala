@@ -101,10 +101,10 @@ class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeCon
   pSumDataSPadReg.suggestName("pSumDataSPadReg")
   private val readOutDataWire = Wire(UInt(psDataWidth.W))
   readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
-  io.dataPath.ipsIO.ready := io.dataPath.ipsIO.valid
-  io.dataPath.opsIO.valid := io.dataPath.opsIO.ready
-  io.dataPath.opsIO.bits := Mux(io.dataPath.opsIO.ready, readOutDataWire, DontCare)
-  when (io.dataPath.ipsIO.valid) {
+  io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read
+  io.dataPath.opsIO.valid := !io.dataPath.ipsIO.valid // when not write
+  io.dataPath.opsIO.bits := readOutDataWire
+  when (io.dataPath.ipsIO.fire()) {
     pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits
   }
 }
@@ -167,16 +167,22 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     inActMatrixColumnReg := 0.U
   }
   // reg, partial sum scratch pad
-  private val pSumSPad = Module(new PSumSPad(debug = debug)).io
-  pSumSPad.suggestName("pSumSPad")
-  private val inActAdrSPad = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth)).io
-  inActAdrSPad.suggestName("inActAdrSPad")
-  private val inActDataSPad = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false)).io
-  inActDataSPad.suggestName("inActDataSPad")
-  private val weightAdrSPad = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth)).io
-  weightAdrSPad.suggestName("weightAdrSPad")
-  private val weightDataSPad = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true)).io
-  weightDataSPad.suggestName("weightDataSPad")
+  private val pSumSPad = Module(new PSumSPad(debug = debug))
+  pSumSPad.suggestName("pSumSPadModule")
+  private val inActAdrSPad = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
+  inActAdrSPad.suggestName("inActAdrSPadModule")
+  private val inActDataSPad = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
+  inActDataSPad.suggestName("inActDataSPadModule")
+  private val weightAdrSPad = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth))
+  weightAdrSPad.suggestName("weightAdrSPadModule")
+  private val weightDataSPad = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true))
+  weightDataSPad.suggestName("weightDataSPadModule")
+  // get the IOs
+  private val pSumSPadIO = pSumSPad.io
+  private val inActAdrSPadIO = inActAdrSPad.io
+  private val inActDataSPadIO = inActDataSPad.io
+  private val weightAdrSPadIO = weightAdrSPad.io
+  private val weightDataSPadIO = weightDataSPad.io
   // SPadToCtrl
   // several signals which can help to indicate the process
   private val mightInActZeroColumnWire: Bool = Wire(Bool())
@@ -217,7 +223,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val weightDataIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
   private val weightAdrIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
   private val weightMatrixReadFirstColumn: Bool = Wire(Bool())
-  // pSumSPad
+  // pSumSPadIO
   private val productReg: UInt = RegInit(0.U(psDataWidth.W))
   private val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
   private val pSumSPadLoadWire: UInt = Wire(UInt(psDataWidth.W))
@@ -245,50 +251,50 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   padEqID := sPad === padInActData
   weightMatrixReadFirstColumn := inActMatrixRowWire === 0.U
   private val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
-  private val SPadSeq = Seq(inActAdrSPad, inActDataSPad, weightAdrSPad, weightDataSPad)
+  private val SPadSeq = Seq(inActAdrSPadIO, inActDataSPadIO, weightAdrSPadIO, weightDataSPadIO)
   // Connections
   SPadSeq.map(_.ctrlPath.writeEn := io.padCtrl.fromTopIO.doLoadEn)
   io.padCtrl.fromTopIO.writeFinish := DontCare
   // Input activation Address Scratch Pad
-  inActAdrSPad.dataPath.writeInData <> io.dataStream.inActIOs.adrIOs
-  inActAdrIndexWire := inActAdrSPad.dataPath.columnNum
-  inActAdrDataWire := inActAdrSPad.dataPath.readOutData
-  io.padWF.inActWriteFin.adrWriteFin := inActAdrSPad.ctrlPath.writeFin
-  inActAdrSPad.ctrlPath.readEn := inActAdrSPadReadEnReg
-  inActAdrSPad.ctrlPath.readInIdx := DontCare
-  inActAdrSPad.ctrlPath.indexInc := inActAdrSPadIdxIncWire
-  inActAdrSPad.ctrlPath.readInIdxEn := DontCare
+  inActAdrSPadIO.dataPath.writeInData <> io.dataStream.inActIOs.adrIOs
+  inActAdrIndexWire := inActAdrSPadIO.dataPath.columnNum
+  inActAdrDataWire := inActAdrSPadIO.dataPath.readOutData
+  io.padWF.inActWriteFin.adrWriteFin := inActAdrSPadIO.ctrlPath.writeFin
+  inActAdrSPadIO.ctrlPath.readEn := inActAdrSPadReadEnReg
+  inActAdrSPadIO.ctrlPath.readInIdx := DontCare
+  inActAdrSPadIO.ctrlPath.indexInc := inActAdrSPadIdxIncWire
+  inActAdrSPadIO.ctrlPath.readInIdxEn := DontCare
   // Input activation Data Scratch Pad
-  inActDataSPad.dataPath.writeInData <> io.dataStream.inActIOs.dataIOs
-  inActDataIndexWire := inActDataSPad.dataPath.columnNum
-  inActMatrixDataWire := inActDataSPad.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
-  inActMatrixRowWire := inActDataSPad.dataPath.readOutData(cscCountWidth - 1, 0)
-  io.padWF.inActWriteFin.dataWriteFin := inActDataSPad.ctrlPath.writeFin
-  inActDataSPad.ctrlPath.readEn := inActDataSPadReadEnReg
-  inActDataSPad.ctrlPath.readInIdx := inActAdrDataWire
-  inActDataSPad.ctrlPath.indexInc := inActDataSPadIdxIncWire
-  inActDataSPad.ctrlPath.readInIdxEn := DontCare
+  inActDataSPadIO.dataPath.writeInData <> io.dataStream.inActIOs.dataIOs
+  inActDataIndexWire := inActDataSPadIO.dataPath.columnNum
+  inActMatrixDataWire := inActDataSPadIO.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
+  inActMatrixRowWire := inActDataSPadIO.dataPath.readOutData(cscCountWidth - 1, 0)
+  io.padWF.inActWriteFin.dataWriteFin := inActDataSPadIO.ctrlPath.writeFin
+  inActDataSPadIO.ctrlPath.readEn := inActDataSPadReadEnReg
+  inActDataSPadIO.ctrlPath.readInIdx := inActAdrDataWire
+  inActDataSPadIO.ctrlPath.indexInc := inActDataSPadIdxIncWire
+  inActDataSPadIO.ctrlPath.readInIdxEn := DontCare
   // Weight Address Scratch Pad
-  weightAdrSPad.dataPath.writeInData <> io.dataStream.weightIOs.adrIOs
-  weightAdrIndexWire := weightAdrSPad.dataPath.columnNum
-  weightAdrDataWire := weightAdrSPad.dataPath.readOutData
-  io.padWF.weightWriteFin.adrWriteFin := weightAdrSPad.ctrlPath.writeFin
-  weightAdrSPad.ctrlPath.readEn := weightAdrSPadReadEnReg
-  weightAdrSPad.ctrlPath.readInIdx := weightAdrSPadReadIdxWire // the weight address SPad's columns corresponds to
+  weightAdrSPadIO.dataPath.writeInData <> io.dataStream.weightIOs.adrIOs
+  weightAdrIndexWire := weightAdrSPadIO.dataPath.columnNum
+  weightAdrDataWire := weightAdrSPadIO.dataPath.readOutData
+  io.padWF.weightWriteFin.adrWriteFin := weightAdrSPadIO.ctrlPath.writeFin
+  weightAdrSPadIO.ctrlPath.readEn := weightAdrSPadReadEnReg
+  weightAdrSPadIO.ctrlPath.readInIdx := weightAdrSPadReadIdxWire // the weight address SPad's columns corresponds to
                                                           // the inAct address SPad's rows, and it takes one clock cycle
                                                           // for the reg inside SPad to change the index it need
-  weightAdrSPad.ctrlPath.indexInc := weightAdrSPadIdxIncWire
-  weightAdrSPad.ctrlPath.readInIdxEn := weightAdrIdxEnWire
+  weightAdrSPadIO.ctrlPath.indexInc := weightAdrSPadIdxIncWire
+  weightAdrSPadIO.ctrlPath.readInIdxEn := weightAdrIdxEnWire
   // Weight Data Scratch Pad
-  weightDataSPad.dataPath.writeInData <> io.dataStream.weightIOs.dataIOs
-  weightDataIndexWire := weightDataSPad.dataPath.columnNum
-  weightMatrixDataReg := weightDataSPad.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
-  weightMatrixRowReg := weightDataSPad.dataPath.readOutData(cscCountWidth - 1, 0)
-  io.padWF.weightWriteFin.dataWriteFin := weightDataSPad.ctrlPath.writeFin
-  weightDataSPad.ctrlPath.readEn := inActDataSPadReadEnReg
-  weightDataSPad.ctrlPath.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAdrDataWire)
-  weightDataSPad.ctrlPath.indexInc := weightDataSPadIdxIncWire
-  weightDataSPad.ctrlPath.readInIdxEn := weightDataIdxEnWire
+  weightDataSPadIO.dataPath.writeInData <> io.dataStream.weightIOs.dataIOs
+  weightDataIndexWire := weightDataSPadIO.dataPath.columnNum
+  weightMatrixDataReg := weightDataSPadIO.dataPath.readOutData(cscDataWidth + cscCountWidth - 1, cscCountWidth)
+  weightMatrixRowReg := weightDataSPadIO.dataPath.readOutData(cscCountWidth - 1, 0)
+  io.padWF.weightWriteFin.dataWriteFin := weightDataSPadIO.ctrlPath.writeFin
+  weightDataSPadIO.ctrlPath.readEn := inActDataSPadReadEnReg
+  weightDataSPadIO.ctrlPath.readInIdx := Mux(weightMatrixReadFirstColumn, 0.U, weightAdrDataWire)
+  weightDataSPadIO.ctrlPath.indexInc := weightDataSPadIdxIncWire
+  weightDataSPadIO.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
   val pSumAddResultWire: UInt = Mux(io.padCtrl.fromTopIO.pSumEnqEn, pSumSPadLoadWire, pSumSPadLoadReg) +
     Mux(io.padCtrl.fromTopIO.pSumEnqEn, io.dataStream.ipsIO.bits, productReg) // to save adder
@@ -298,27 +304,32 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val pSumPadReadIdxIncWire = Wire(Bool())
   pSumPadReadIdxIncWire.suggestName("pSumPadReadIdxIncWire")
   private val pSumPadReadWrap = Wire(Bool())
+  private val pSumReadOutValid = io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn
   // top connections
   io.padWF.pSumAddFin := pSumPadReadWrap && io.padCtrl.fromTopIO.pSumEnqEn // when need read and wrap
   io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
-  pSumPadReadIdxIncWire := pSumSPad.dataPath.opsIO.valid && io.dataStream.opsIO.ready && io.padCtrl.fromTopIO.pSumEnqEn
-  // only when need enqueue, and pSumSPad has read out data, and io.dataStream.ops has received data,
+  /** the PSumSPad read index only increases when io.dataStream.opsIO gets the updated PSum*/
+  pSumPadReadIdxIncWire := io.dataStream.opsIO.fire()
+  // only when need enqueue, and pSumSPadIO has read out data, and io.dataStream.ops has received data,
   // then increase read index
   io.dataStream.opsIO.bits := pSumAddResultWire
-  io.dataStream.opsIO.valid := pSumSPad.dataPath.opsIO.valid && io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn
-  // once ask for Enq, pSumSPad will wait for io.dataStream.ipsIO.valid, then read out data,
-  // and add the data read out from pSumSPad with io.dataStream.ipsIO.bit.
+  /** io.dataStream.opsIO.valid when it reads one PSum from PSumSPad
+    * AND it can get another PSum from io.dataStream.ipsIO, then can add them together
+    * and get the io.dataStream.opsIO.bits*/
+  io.dataStream.opsIO.valid := pSumSPadIO.dataPath.opsIO.fire() && pSumReadOutValid
+  // once ask for Enq, pSumSPadIO will wait for io.dataStream.ipsIO.valid, then read out data,
+  // and add the data read out from pSumSPadIO with io.dataStream.ipsIO.bit.
   // io.dataStream.opsIO.valid will be true when those two addends valid.
   // The read address will increase after io.dataStream.ops.ready is true, as well as io.dataStream.ips.ready.
   // Because we have Queue, so we don't need to worry about the timing of this combination logic.
-  pSumSPad.dataPath.ipsIO.valid := padEqWB
-  pSumSPad.dataPath.ipsIO.bits := pSumResultWire // only calculate need write back
-  pSumSPadLoadWire := pSumSPad.dataPath.opsIO.bits // for emergence use
+  pSumSPadIO.dataPath.ipsIO.valid := padEqWB
+  pSumSPadIO.dataPath.ipsIO.bits := pSumResultWire // only calculate need write back
+  pSumSPadLoadWire := pSumSPadIO.dataPath.opsIO.bits // for emergence use
   pSumSPadLoadReg := pSumSPadLoadWire // used in calculating
   // when ips valid and Enabled, then need read out PSum
-  pSumSPad.dataPath.opsIO.ready := padEqMpy || (io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn)
-  pSumSPad.ctrlPath.readIdx := pSumPadReadIdxReg
-  pSumSPad.ctrlPath.writeIdx := psDataSPadIdxWire // only calculate need write back
+  pSumSPadIO.dataPath.opsIO.ready := padEqMpy || pSumReadOutValid
+  pSumSPadIO.ctrlPath.readIdx := pSumPadReadIdxReg
+  pSumSPadIO.ctrlPath.writeIdx := psDataSPadIdxWire // only calculate need write back
   when (pSumPadReadWrap) {
     pSumPadReadIdxReg := 0.U
   }
@@ -344,7 +355,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPadIdxIncWire := (padEqWA && !mightWeightZeroColumnWire && !weightDataSPadFirstRead) ||
     (padEqWB && !mightWeightIdxIncWire) // when first read, ask Weight Address Scratch Pad for data index
   weightAdrIdxEnWire := (padEqID || padEqWA) && weightDataSPadFirstRead // read the start and end index from address SPad
-  // then it can read the start index in weightDataSPad, the end index of that will be read otherwise
+  // then it can read the start index in weightDataSPadIO, the end index of that will be read otherwise
   weightDataIdxMuxWire := padEqID && weightDataSPadFirstRead && !weightMatrixReadFirstColumn
   weightAdrSPadReadIdxWire := Mux(weightDataIdxMuxWire, inActMatrixRowWire - 1.U, inActMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
