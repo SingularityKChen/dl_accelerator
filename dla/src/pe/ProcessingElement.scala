@@ -95,35 +95,6 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   }
 }
 
-class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeConfig {
-  val io: PSumSPadIO = IO(new PSumSPadIO)
-  private val pSumDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
-  pSumDataSPadReg.suggestName("pSumDataSPadReg")
-  private val readOutDataWire = Wire(UInt(psDataWidth.W))
-  readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
-  io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read
-  io.dataPath.opsIO.valid := !io.dataPath.ipsIO.valid // when not write
-  io.dataPath.opsIO.bits := readOutDataWire
-  when (io.dataPath.ipsIO.fire()) {
-    pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits
-  }
-}
-
-class PSumSPadIO extends Bundle {
-  val dataPath = new PSumSPadDataIO
-  val ctrlPath = new PSumSPadCtrlIO
-}
-
-class PSumSPadDataIO extends Bundle with PESizeConfig {
-  val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
-  val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
-}
-
-class PSumSPadCtrlIO extends Bundle with SPadSizeConfig {
-  val readIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
-  val writeIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
-}
-
 class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with SPadSizeConfig with PESizeConfig {
   val io: ProcessingElementPadIO = IO(new ProcessingElementPadIO)
   private def nextSPadInActAdr(): Unit = {

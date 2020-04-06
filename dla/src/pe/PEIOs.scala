@@ -117,3 +117,19 @@ class PETopToHigherIO extends Bundle {
   val writeFinish: Bool = Output(Bool()) // true then write data into the Scratch Pad finished
   val calFinish: Bool = Output(Bool()) // true then MAC computations finished
 }
+
+/** PSumSPad IOs*/
+class PSumSPadIO extends Bundle {
+  val dataPath = new PSumSPadDataIO
+  val ctrlPath = new PSumSPadCtrlIO
+}
+
+class PSumSPadDataIO extends Bundle with PESizeConfig {
+  val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
+  val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
+}
+
+class PSumSPadCtrlIO extends Bundle with SPadSizeConfig {
+  val readIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
+  val writeIdx: UInt = Input(UInt(log2Ceil(pSumDataSPadSize).W))
+}

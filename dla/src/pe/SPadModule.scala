@@ -86,3 +86,17 @@ class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
     }
   }
 }
+
+class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeConfig {
+  val io: PSumSPadIO = IO(new PSumSPadIO)
+  private val pSumDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
+  pSumDataSPadReg.suggestName("pSumDataSPadReg")
+  private val readOutDataWire = Wire(UInt(psDataWidth.W))
+  readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
+  io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read
+  io.dataPath.opsIO.valid := !io.dataPath.ipsIO.valid // when not write
+  io.dataPath.opsIO.bits := readOutDataWire
+  when (io.dataPath.ipsIO.fire()) {
+    pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits
+  }
+}
