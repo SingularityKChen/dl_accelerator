@@ -229,10 +229,10 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   pSumWriteAdrL4Reg := Mux(io.glbPSumCtrlIOs.head.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg)
   io.glbPSumCtrlIOs.zipWithIndex.foreach({case (x,idx) =>
     x.writeIO.adr := pSumAdrL2 + pSumWriteAdrL4Reg
-    x.writeIO.enable := cgReadWire && glbPSumWriteFinReg(idx) // TODO:use cgLoadGLBWire to load PSum at the beginning
+    x.writeIO.enable := cgReadWire && !glbPSumWriteFinReg(idx) // TODO:use cgLoadGLBWire to load PSum at the beginning
     x.readIO.adr := pSumAdrL2 + pSumReadAdrL4Reg
     /** PSum will be read out from GLB to PE for accumulation or from GLB to outside as a result*/
-    x.readIO.enable := (cgReadWire && glbPSumWriteFinReg(idx)) || io.topIO.readOutPSum
+    x.readIO.enable := (cgReadWire && !glbPSumWriteFinReg(idx)) || io.topIO.readOutPSum
   })
   io.glbInActCtrlIOs.zipWithIndex.foreach({case (x, idx) =>
     x.writeIO.enable := cgLoadGLBWire

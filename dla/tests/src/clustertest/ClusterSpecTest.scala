@@ -3,13 +3,11 @@ package dla.tests.clustertest
 import Chisel.DecoupledIO
 import chisel3._
 import chisel3.experimental.{DataMirror, Direction}
-import chisel3.stage._
 import chisel3.tester._
 import dla.cluster._
 import dla.eyerissTop.EyerissTopConfig
 import dla.pe.{CSCStreamIO, MCRENFConfig, SPadSizeConfig, StreamBitsIO}
 import dla.tests.GenOneStreamData
-import firrtl.options.TargetDirAnnotation
 import org.scalatest._
 
 import scala.util.Random
@@ -599,74 +597,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       val theCtrlIO = theTopIO.inActCtrlSel
       val theDoneIO = theTopIO.inActWriteFinVec // (peRow, peCol)
       val theDebugIO = theTopIO.debugIO
-      def inActIOPokeHelper(idx: Int): Unit = {
-        fork {
-          var pokeIdx: Int = 0
-          while (theInActAdrStreams(idx)(pokeIdx) != 0) {
-            val prefix: String = s"inActIO$idx@Adr@$pokeIdx"
-            println(s"[$prefix] poke ${theInActAdrStreams(idx)(pokeIdx)} now")
-            theTopToCtrlDataIO(idx).adrIOs.data.bits.poke(theInActAdrStreams(idx)(pokeIdx).U)
-            theTopToCtrlDataIO(idx).adrIOs.data.valid.poke(true.B)
-            theClock.step()
-            //theTopToCtrlDataIO(idx).adrIOs.data.ready.expect(true.B)
-            println(s"[$prefix] t + 1, ready = ${theTopToCtrlDataIO(idx).adrIOs.data.ready.peek()}")
-            pokeIdx = pokeIdx + 1
-          }
-          theTopToCtrlDataIO(idx).adrIOs.data.valid.poke(false.B)
-          theClock.step()
-        } .fork {
-          var pokeIdx: Int = 0
-          while (theInActDataStreams(idx)(pokeIdx) != 0) {
-            val prefix: String = s"inActIO$idx@Data@$pokeIdx"
-            println(s"[$prefix] poke ${theInActDataStreams(idx)(pokeIdx)} now")
-            theTopToCtrlDataIO(idx).dataIOs.data.bits.poke(theInActDataStreams(idx)(pokeIdx).U)
-            theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(true.B)
-            theClock.step()
-            //theTopToCtrlDataIO(idx).dataIOs.data.ready.expect(true.B)
-            println(s"[$prefix] t + 1, ready = ${theTopToCtrlDataIO(idx).dataIOs.data.ready.peek()}")
-            pokeIdx = pokeIdx + 1
-          }
-          theTopToCtrlDataIO(idx).dataIOs.data.valid.poke(false.B)
-          theClock.step()
-        } .join()
-      }
-      def muxInActPeekHelper(row: Int, col: Int): Unit = {
-        val inActIdx: Int = (row + col) % inActRouterNum
-        fork {
-          var formerOrLater: Boolean = (row + col) < inActRouterNum
-          var peekIdx: Int = 0
-          var prefix: String = s"muxInActIO@$row@$col@Adr@$peekIdx"
-          // while (formerOrLater) {} TODO: when finish, then later ones should begin to peek
-          while (theInActAdrStreams(inActIdx)(peekIdx) != 0 && formerOrLater) {
-            println(s"[$prefix] now valid = ${theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek()}")
-            while (theCtrlToPEDataIO(row)(col).adrIOs.data.valid.peek().litToBoolean) {
-              prefix = s"muxInActIO@$row@$col@Adr@$peekIdx"
-              println(s"[$prefix] peek ${theInActAdrStreams(inActIdx)(peekIdx)} now")
-              theCtrlToPEDataIO(row)(col).adrIOs.data.ready.poke(true.B)
-              theCtrlToPEDataIO(row)(col).adrIOs.data.bits.expect(theInActAdrStreams(inActIdx)(peekIdx).U)
-              theClock.step()
-              peekIdx = peekIdx + 1
-            }
-          }
-          theClock.step()
-        } .fork {
-          var formerOrLater: Boolean = (row + col) < inActRouterNum
-          var peekIdx: Int = 0
-          var prefix: String = s"muxInActIO@$row@$col@Data@$peekIdx"
-          while (theInActDataStreams(inActIdx)(peekIdx) != 0 && formerOrLater) {
-            println(s"[$prefix] now valid = ${theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek()}")
-            while (theCtrlToPEDataIO(row)(col).dataIOs.data.valid.peek().litToBoolean) {
-              prefix = s"muxInActIO@$row@$col@Adr@$peekIdx"
-              println(s"[$prefix] peek ${theInActDataStreams(inActIdx)(peekIdx)} now")
-              theCtrlToPEDataIO(row)(col).dataIOs.data.ready.poke(true.B)
-              theCtrlToPEDataIO(row)(col).dataIOs.data.bits.expect(theInActDataStreams(inActIdx)(peekIdx).U)
-              theClock.step()
-              peekIdx = peekIdx + 1
-            }
-            theClock.step()
-          }
-        } .join()
-      }
       def singleThreadPokePeek(adrOrData: Int, peekCon: (Int, Int) => Boolean): Unit = {
         val prefix: Seq[String] = Seq("adr", "data")
         for (i <- 0 until inActRouterNum) {
@@ -738,19 +668,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
           }
         }
       }
-      /*fork { // poke via inActIO
-        (1 until inActRouterNum).foldLeft(fork(inActIOPokeHelper(0))) {
-          case (left, right) => left.fork(inActIOPokeHelper(idx = right))
-        } .join()
-      } .fork.withRegion(Monitor) { // peek via muxInActData, so we need to use region to peek from another thread
-        (1 until peRowNum).foldLeft((1 until peColNum).foldLeft(fork(muxInActPeekHelper(0, 0))){
-          case (left, right) => left.fork(muxInActPeekHelper(0, col = right))
-        }) {
-          case (left, right) => (1 until peColNum).foldLeft(fork(muxInActPeekHelper(row = right, col = 0))) {
-            case (leftt, rightt) => leftt.fork(muxInActPeekHelper(row = right, col = rightt))
-          }
-        } .join()
-      } .joinAndStep(theClock)*/
     }
   }
 
@@ -804,18 +721,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         }
         println(s"pSum$idx = $pSumList")
         println(s"-------- $idx-th Column PEs receive all inPSum")
-      }
-      def forkWriteCSCHelper(index: Int, theCSCIO: CSCStreamIO, theAdrStream: List[Int],
-                             theDataStream: List[Int]): Unit = {
-        fork {
-          println(s"------------- write adr $index begin --------------")
-          writeCSCPECluster(theCSCIO.adrIOs, theAdrStream)
-          println(s"------------ write adr $index finish --------------")
-        } .fork {
-          println(s"------------ write data $index begin --------------")
-          writeCSCPECluster(theCSCIO.dataIOs, theDataStream)
-          println(s"------------ write data $index finish -------------")
-        } .joinAndStep(theClock)
       }
       def singleThreadWriteOneSCS(thePokeIO: IndexedSeq[DecoupledIO[UInt]], theLookup: Seq[List[Int]],
                                   theStreamReadIdx: Array[Int], thePokeStream: Seq[List[Int]],
@@ -974,23 +879,6 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       theCtrlIO.inActCtrlSel.inDataSel.poke(false.B) // not broad-cast
       theCtrlIO.doEn.poke(true.B) // begin to load inAct and weight, then cal
       theClock.step()
-      /*
-      val inActRegion = Monitor
-      val weightRegion = Monitor
-      fork {
-        (1 until inActSRAMNum).foldLeft( fork.withRegion(inActRegion){forkWriteCSCHelper(index = 0, theCSCIO = inActDataIO(0),
-          theAdrStream = theInActAdrStreams.head, theDataStream = theInActDataStreams.head)}) {
-          case (left, right) => left.fork{forkWriteCSCHelper(index = right, theCSCIO = inActDataIO(right),
-            theAdrStream = theInActAdrStreams(right), theDataStream = theInActDataStreams(right))}
-        } .joinAndStep(theClock)
-      } .fork {
-        (1 until weightRouterNum).foldLeft( fork.withRegion(weightRegion){forkWriteCSCHelper(index = 0, theCSCIO = weightDataIO(0),
-          theAdrStream = theWeightAdrStreams.head, theDataStream = theWeightDataStreams.head)}) {
-          case (left, right) => left.fork{forkWriteCSCHelper(index = right, theCSCIO = weightDataIO(right),
-            theAdrStream = theWeightAdrStreams(right), theDataStream = theWeightDataStreams(right))}
-        } .joinAndStep(theClock)
-      } .join()
-      */
       fork.withName("inActLoadThread") { // inActLoad
         val prefixNeedContainsInAct = new Regex("(I|i)nAct") // used for require statements
         fork.withName("inActAdrLoadThread") { // address
@@ -1252,17 +1140,29 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       var inActReadAdr: List[Int] = Nil
       var pSumWriteAdr: List[Int] = Nil
       var pSumReadAdr: List[Int] = Nil
+      def printCGState(stateInt: Int): Unit = {
+        var state: String = "idle"
+        if (stateInt == 0) state = "cgIdle"
+        if (stateInt == 1) state = "cgLoadGLB"
+        if (stateInt == 2) state = "cgLoadPE"
+        if (stateInt == 3) state = "cgCal"
+        if (stateInt == 4) state = "cgRead"
+        println(s"CG State   =  $state")
+      }
       def randomGiveFin(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
         theClock.step((new Random).nextInt(15))
         pokeIO(idx).poke(true.B)
-        println(s"[$prefix$idx] poke true now")
+        //println(s"[$prefix$idx] poke true now")
         theClock.step()
         pokeIO(idx).poke(false.B)
         expectIO(idx).expect(true.B, s"[$prefix$idx] one cycle later, the reg should be true")
-        if (printLogDetails) println(s"[$prefix$idx] cgState = ${theDebugIO.cgState.peek().litValue()}")
+        if (printLogDetails) {
+          print(s"[$prefix$idx]")
+          printCGState(theDebugIO.cgState.peek().litValue().toInt)
+        }
       }
       def inActReadHelper(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
-        println(s"[$prefix] inActReadAdr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
+        //println(s"[$prefix] inActReadAdr = ${theTop.glbInActCtrlIOs(idx).readIO.adr.peek()}")
         val currentAdr: Int = theTop.glbInActCtrlIOs(idx).readIO.adr.peek().litValue().toInt
         if (!inActReadAdr.contains(currentAdr)) {
           inActReadAdr = inActReadAdr:::List(currentAdr)
@@ -1272,8 +1172,8 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
         theTop.glbInActCtrlIOs(idx).readIO.enable.expect(false.B, s"as inAct $idx has been read from GLB")
       }
       def pSumRWHelper(pokeIO: Vec[SRAMCommonCtrlIO], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
-        println(s"[$prefix] pSumReadAdr = ${theTop.glbPSumCtrlIOs(idx).readIO.adr.peek()}")
-        println(s"[$prefix] pSumWriteAdr = ${theTop.glbPSumCtrlIOs(idx).writeIO.adr.peek()}")
+        //println(s"[$prefix] pSumReadAdr = ${theTop.glbPSumCtrlIOs(idx).readIO.adr.peek()}")
+        //println(s"[$prefix] pSumWriteAdr = ${theTop.glbPSumCtrlIOs(idx).writeIO.adr.peek()}")
         val readAdr: Int = theTop.glbPSumCtrlIOs(idx).readIO.adr.peek().litValue().toInt
         val writeAdr: Int = theTop.glbPSumCtrlIOs(idx).writeIO.adr.peek().litValue().toInt
         if (!pSumReadAdr.contains(readAdr)) {
@@ -1303,71 +1203,82 @@ class ClusterSpecTest extends FlatSpec with ChiselScalatestTester with Matchers
       println("----------------- test begin -----------------")
       println("-------- ClusterGroup Controller Spec --------")
       println("----------- test basic functions -------------")
-      theTop.allPSumAddFin.poke(false.B)
-      theTop.allCalFin.poke(false.B)
-      theTop.topIO.cgEnable.poke(true.B)
-      theClock.step()
-      theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
-      (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(
-        pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
-        expectIO = theDebugIO.inActWriteFinVecIO, idx = 0, prefix =  s"inActWrite")
-      }) {
-        case (left, right) =>
-          left.fork {randomGiveFin(
-            pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
-            expectIO = theDebugIO.inActWriteFinVecIO, idx = right , prefix = s"inActWrite")
-          }
-      }.joinAndStep(theClock) // wait for state machine
-      for (n2 <-0 until N2) {
-        for (m2 <- 0 until M2) {
-          for (f2 <- 0 until F2) {
-            for (c2 <- 0 until C2) {
-              for (s2 <- 0 until S2) {
-                if (printLogDetails) println(s"[$c2,$s2] cgState = ${theDebugIO.cgState.peek().litValue()}")
-                theDebugIO.cgState.expect(2.U, s"[$c2,$s2] cgState should be 2 to load PE")
-                theTop.peCtrlIO.peLoadEn.expect(true.B, s"[$c2,$s2] should load data into PE")
-                theTop.glbInActCtrlIOs.foreach({x =>
-                  x.writeIO.enable.expect(false.B, s"[$c2,$s2] should not write data into GLB")
-                  x.readIO.enable.expect(true.B, s"[$c2,$s2] should read data from GLB")
-                })
-                (1 until inActSRAMNum).foldLeft( fork {
-                  inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
-                    expectIO = theDebugIO.inActReadFinVecIO, idx = 0, prefix = s"($c2,$s2)@inActRead")
-                }) {
-                  case (left, right) =>
-                    left.fork {
-                      inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
-                        expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"$c2$s2@inActRead")
-                    }
-                }.joinAndStep(theClock)
-                theDebugIO.cgState.expect(3.U, s"[$c2,$s2] after read inAct from GLB, it should do computation")
-                theClock.step((new Random).nextInt(15))
-                theTop.allCalFin.poke(true.B)
-                theClock.step()
-                theTop.allCalFin.poke(false.B)
-              } // end of S2 loop
-            } // end of C2 loop
-            println(s"state = ${theDebugIO.cgState.peek()}")
-            theDebugIO.cgState.expect(4.U, s"after S2 = $S2 computations, it should read PSum Now")
-            theTop.glbPSumCtrlIOs.foreach(_.readIO.enable.expect(true.B, s"[] Should read PSum out from GLB now"))
-            (1 until pSumSRAMNum).foldLeft( fork {
-              pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
-                expectIO = theDebugIO.pSumWriteFinVecIO, idx = 0, prefix = s"@pSumWrite")
-            }) {
-              case (left, right) =>
-                left.fork {
-                  pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
-                    expectIO = theDebugIO.pSumWriteFinVecIO, idx = right, prefix = s"@pSumWrite")
-                  theDebugIO.cgState.expect(4.U, "it should be cgRead")
-                }
-            }.join()
-            theTop.allPSumAddFin.poke(true.B)
-            theClock.step() // wait for state machine
-            theTop.allPSumAddFin.poke(false.B)
-            theDebugIO.cgState.expect(2.U, "it should be PELoad again")
-          } // end of F2 loop
-        } // end of M2 loop
-      } // end of N2 loop
+      for (g2 <- 0 until G2) {
+        theTop.allPSumAddFin.poke(false.B)
+        theTop.allCalFin.poke(false.B)
+        theTop.topIO.cgEnable.poke(true.B)
+        theClock.step()
+        /** cgState = 1, load inAct into GLB from outside*/
+        theDebugIO.cgState.expect(1.U, s"[$g2] cgState should be 1 to load data from outside into GLB")
+        theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
+        (1 until inActSRAMNum).foldLeft( fork {randomGiveFin(
+          pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
+          expectIO = theDebugIO.inActWriteFinVecIO, idx = 0, prefix =  s"inActWrite")
+        }) {
+          case (left, right) =>
+            left.fork {randomGiveFin(
+              pokeIO = theTop.glbInActCtrlIOs.map(x => x.writeIO.done),
+              expectIO = theDebugIO.inActWriteFinVecIO, idx = right , prefix = s"inActWrite")
+            }
+        }.joinAndStep(theClock) // wait for state machine
+        for (n2 <- 0 until N2) {
+          for (m2 <- 0 until M2) {
+            for (f2 <- 0 until F2) {
+              for (c2 <- 0 until C2) {
+                for (s2 <- 0 until S2) {
+                  /** cgState = 2, load inAct and weight into PE*/
+                  if (printLogDetails) {
+                    print(s"[$g2, $n2, $m2, $f2, $c2, $s2]")
+                    printCGState(theDebugIO.cgState.peek().litValue().toInt)
+                  }
+                  theDebugIO.cgState.expect(2.U, s"[$c2,$s2] cgState should be 2 to load PE")
+                  theTop.peCtrlIO.peLoadEn.expect(true.B, s"[$c2,$s2] should load data into PE")
+                  theTop.glbInActCtrlIOs.foreach({x =>
+                    x.writeIO.enable.expect(false.B, s"[$c2,$s2] should not write data into GLB")
+                    x.readIO.enable.expect(true.B, s"[$c2,$s2] should read data from GLB")
+                  })
+                  (1 until inActSRAMNum).foldLeft( fork {
+                    inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                      expectIO = theDebugIO.inActReadFinVecIO, idx = 0, prefix = s"($c2,$s2)@inActRead")
+                  }) {
+                    case (left, right) =>
+                      left.fork {
+                        inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                          expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"$c2$s2@inActRead")
+                      }
+                  }.joinAndStep(theClock)
+                  /** cgState = 3, do computations inside PE*/
+                  theDebugIO.cgState.expect(3.U, s"[$c2,$s2] after read inAct from GLB, it should do computation")
+                  theClock.step((new Random).nextInt(15))
+                  theTop.allCalFin.poke(true.B)
+                  theClock.step()
+                  theTop.allCalFin.poke(false.B)
+                } // end of S2 loop
+              } // end of C2 loop
+              /** cgState = 4, read PSum from PE to GLB PSumSRAM */
+              printCGState(theDebugIO.cgState.peek().litValue().toInt)
+              theDebugIO.cgState.expect(4.U, s"after S2 = $S2 computations, it should read PSum Now")
+              theTop.glbPSumCtrlIOs.foreach(_.readIO.enable.expect(true.B,
+                s"[$g2, $n2, $m2, $f2] Should read PSum out from GLB now"))
+              (1 until pSumSRAMNum).foldLeft( fork {
+                pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
+                  expectIO = theDebugIO.pSumWriteFinVecIO, idx = 0, prefix = s"@pSumWrite")
+              }) {
+                case (left, right) =>
+                  left.fork {
+                    pSumRWHelper( pokeIO = theTop.glbPSumCtrlIOs,
+                      expectIO = theDebugIO.pSumWriteFinVecIO, idx = right, prefix = s"@pSumWrite")
+                    theDebugIO.cgState.expect(4.U, s"[$g2, $n2, $m2, $f2] it should be cgRead")
+                  }
+              }.join()
+              theTop.allPSumAddFin.poke(true.B)
+              theClock.step() // wait for state machine
+              theTop.allPSumAddFin.poke(false.B)
+            } // end of F2 loop
+          } // end of M2 loop
+        } // end of N2 loop
+        theDebugIO.cgState.expect(0.U, s" g2 = $g2, it should be cgIdle again")
+      } // end of G2 loop
       println(s"inActReadAdr = \n $inActReadAdr")
       println(s"pSumWriteAdr = \n $pSumWriteAdr")
       println(s"pSumReadAdr = \n $pSumReadAdr")
