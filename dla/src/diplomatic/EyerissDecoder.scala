@@ -3,24 +3,32 @@ package dla.diplomatic
 import chisel3._
 import chisel3.util._
 
+class AdrAndSizeIO extends Bundle {
+  val starAdr: UInt = Output(UInt(5.W))
+  val reqSize: UInt = Output(UInt(10.W))
+}
+
+trait HasPSumLoadEn extends Bundle {
+  val pSumLoadEn: Bool = Output(Bool())
+}
+
 class DecoderIO extends Bundle {
   val instruction: UInt = Input(UInt(32.W))
   val calFin: Bool = Input(Bool()) // when pSum load finish, then this will be input a true
-  val pSumLoadEn: Bool = Output(Bool())
-  val inActAddress: UInt = Output(UInt(5.W))
-  val weightAddress: UInt = Output(UInt(5.W))
   val valid: Bool = Output(Bool())
+  val doMacEn: Bool = Output(Bool())
+  val inActIO = new AdrAndSizeIO
+  val weightIO = new AdrAndSizeIO
+  val pSumIO = new AdrAndSizeIO with HasPSumLoadEn
 }
 
-class Decoder extends Module {
+/** the decoder is used to decode instructions from CPU,
+  * and when PSum computation finishes, io.valid is true, then it will be translated to interrupt.
+  * Via this decoder, the dla can get three addresses, PSum load enable signals
+  * and the size of inAct, weight and PSum
+  * */
+class EyerissDecoder extends Module {
   val io: DecoderIO = IO(new DecoderIO)
-  /** if `compReg = false`, that's idle, then CPU sends one instruction, then compReg becomes true,
-    * one means busy, and the dla will process this instruction.
-    * After this instruction is done, then it becomes false again.
-    * In this case, after configuration and get inAct and weight address, this reg will be assigned
-    * to true, to show it is computing, and when it finishes, it will be false, and wait for read PSum.
-    * When reading PSum, compReg will be assigned to true until it finishes write back.
-    * */
   private val func3 = Wire(UInt(3.W))
   private val rs1 = Wire(UInt(5.W))
   private val rd = Wire(UInt(5.W))
@@ -85,7 +93,9 @@ class Decoder extends Module {
     }
   }
   // TODO: use the configurations via instructions rather than those configs
-  io.inActAddress := inActStrAdr
-  io.weightAddress := weightStrAdr
-  io.pSumLoadEn := func3 === 4.U // 100
+  io.inActIO.starAdr := inActStrAdr
+  io.weightIO.starAdr := weightStrAdr
+  io.pSumIO.starAdr := pSumStrAdr
+  io.pSumIO.pSumLoadEn := func3 === 4.U // 100 TODO: maybe need one register
+  io.doMacEn := func3 === 3.U
 }
