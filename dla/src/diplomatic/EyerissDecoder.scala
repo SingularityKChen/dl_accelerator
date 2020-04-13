@@ -5,7 +5,7 @@ import chisel3.util._
 
 class AdrAndSizeIO extends Bundle {
   val starAdr: UInt = Output(UInt(5.W))
-  val reqSize: UInt = Output(UInt(10.W))
+  val reqSize: UInt = Output(UInt(12.W))
 }
 
 trait HasPSumLoadEn extends Bundle {
@@ -80,22 +80,32 @@ class EyerissDecoder extends Module {
       gnmfcsRegVec(10) := imm(5, 3)
       gnmfcsRegVec(11) := imm(2, 0)
     }
-    is(3.U) { // F0, N0, C0, M0
+    is(3.U) { // F0, N0, E, R, C0, M0
       fnercmRegVec.head := imm(11, 9)
       fnercmRegVec(1) := imm(8, 6)
       fnercmRegVec(4) := imm(5, 3)
       fnercmRegVec(5) := imm(2, 0)
-      fnercmRegVec(2) := rs1
-      fnercmRegVec(3) := rd
+      fnercmRegVec(2) := rs1(2, 0) // E
+      fnercmRegVec(3) := rd(2, 0) // R
     }
     is(4.U) { //LoadPSum
       pSumStrAdr := rd
     }
   }
   // TODO: use the configurations via instructions rather than those configs
+  private val rc0 = fnercmRegVec(3)*fnercmRegVec(4)
+  private val f0n0e = fnercmRegVec.take(3).reduce(_ * _)
   io.inActIO.starAdr := inActStrAdr
+  // io.inActIO.reqSize: G2*N2*C2*(F2 + S2) * R*C0 * F0*N0*E
+  io.inActIO.reqSize := gnmfcsRegVec.head*gnmfcsRegVec(1)*gnmfcsRegVec(4)*(gnmfcsRegVec(3) + gnmfcsRegVec(5)) *
+    rc0*f0n0e
   io.weightIO.starAdr := weightStrAdr
+  // reqSize: G2*M2*C2*S2 * M0 * R*C0
+  io.weightIO.reqSize := gnmfcsRegVec.head*gnmfcsRegVec(2)*gnmfcsRegVec(4)*gnmfcsRegVec(5) * rc0*fnercmRegVec(5)
   io.pSumIO.starAdr := pSumStrAdr
-  io.pSumIO.pSumLoadEn := func3 === 4.U // 100 TODO: maybe need one register
-  io.doMacEn := func3 === 3.U
+  // reqSize: G2*N2*M2*F2 * M0*E*N0*F0
+  io.pSumIO.reqSize := gnmfcsRegVec.take(4).reduce(_ * _) * f0n0e*fnercmRegVec(5)
+  io.pSumIO.pSumLoadEn := RegNext(func3 === 4.U) // 100 one delay for address
+  /** when loadPart3, then can doMac*/
+  io.doMacEn := RegNext(func3 === 3.U) // one delay for reqSize //TODO: use reg to record 000-011, and reduce them
 }

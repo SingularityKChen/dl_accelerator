@@ -89,8 +89,8 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val decoderIO = decoder.io
     private val memCtrl = Module(new EyerissMemCtrlModule()(EyerissMemCtrlParameters(
       addressBits = memInActNode.out.head._2.manager.maxAddress.toInt, // TODO: check
-      inActSizeBits = 10, // TODO: check
-      weightSizeBits = 10,
+      inActSizeBits = 12, // TODO: check
+      weightSizeBits = 12,
       pSumSizeBits = log2Ceil(pSumSRAMSize),
       inActIds = inActRouterNum,
       weightIds = weightRouterNum,
