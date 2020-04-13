@@ -6,7 +6,9 @@ And it will extend some custom RISC-V instructions in the near future.
 
 ## Run
 
-Thanks to [Sequencer](https://github.com/sequencer), this project is integrated in [`rocket-playground` environment](https://github.com/sequencer/rocket-playground), you can clone the whole environment and run inside, or you can only test the module under `ClusterGroup`.
+Thanks to [Sequencer](https://github.com/sequencer), 
+this project is integrated in [`rocket-playground` environment](https://github.com/sequencer/rocket-playground), 
+you can clone the whole environment and run inside, or you can only test the module under `ClusterGroup`.
 
 ### Clone Rocket-Playground With This Project
 
@@ -259,6 +261,54 @@ This class is the generator of one partial sum router. `inIOs(0)` connects direc
 
 This file contains some basic static parameters needed in the Cluster Group.
 
+### [Diplomatic](./dla/src/diplomatic) and [EyerissTop](./dla/src/eyerissTop)
+
+#### [CSCSwitcher](./dla/src/eyerissTop/CSCSwitcher.scala)
+
+This module is used to compress matrix into [optimised CSC data format](#Compressed-Sparse-Column-Data-Format).
+
++ inData: flipped decoupled IO, this is the uncompressed orgional data.
++ outData:
+  + adrIO: decoupled IO, this is the compressed address vector.
+  + dataIO: decoupled IO. this is the compressed data vector and count vector.
++ ctrlPath: input only
+  + matrixHeight: the height of one matrix.
+  + matrixWidth: the width of one matrix.
+  + vectorNum: the number of matrix, as we need `0` to be the ending flag.
+
+#### [EyerissDecoder](./dla/src/diplomatic/EyerissDecoder.scala)
+
+This module is used to decode the instructions from CPU and outputs some config data and control signals.
+
++ instruction: input, the instructions from CPU
++ calFin: input, true when pSum load finish
++ valid: output, true at one cycle later after pSum load finish
++ doMacEn: output, true when all config instructions have received, then can begin computing.
++ inActIO: input only
+  + starAdr: the start address of input activations
+  + reqSize: the number of elements that receive from memory at one time.
++ weightIO: input only
+  + starAdr: the start address of weight
+  + reqSize: the number of elements that receive from memory at one time.
++ pSumIO:
+  + starAdr: input, the start address of partial sum
+  + reqSize: input, the number of elements that receive from memory at one time.
+  + pSumLoadEn: output, true to load PSum from GLB to memory.
+
+#### [MemCtrl](./dla/src/diplomatic/MemCtrl.scala)
+
+This module is used to control the process of read and write from memory. 
+This module can generate the address, sourceId, which are used in TileLink get/put. 
+Also, it's able to manage all the source id.
+
++ inActIO, weightIO, pSumIO:
+  + address: output, address of the first element of the current matrix
+  + sourceAlloc: decoupled IO, output the source id of current requirement.
+  + sourceFree: flipped decoupled IO, input the source id that have received the response.
+  + startAdr: input, the start address
+  + reqSize: input, the number of elements that receive from memory at one time.
+    It should less than the size of the GLB SRAM.
+
 ## [Tests](./dla/tests/src)
 
 This directory contains all the test files.
@@ -293,7 +343,8 @@ This behavior contains several tests related to the GLB cluster's spec, i.e., th
 
 ### OpCode
 
-As the opcode map of [RISC-V user 2.2](https://github.com/riscv/riscv-isa-manual/blob/riscv-user-2.2/src/opcode-map.tex) shows, I choose the custom space of `custom-1`, so the opcode is `01_010_11`.
+As the opcode map of [RISC-V user 2.2](https://github.com/riscv/riscv-isa-manual/blob/riscv-user-2.2/src/opcode-map.tex) shows, 
+I choose the custom space of `custom-1`, so the opcode is `01_010_11`.
 If I use `RoCC` interface, I have to use the following instructions: 
 
   | `INSTRUCTIONS` | `funct7` | `rs2` | `rs1` | `xd` \& `xs1` \& `xs2` | `rd`  | `opcode` |
@@ -306,7 +357,8 @@ If I use `RoCC` interface, I have to use the following instructions:
   | `F0N0C0M0` | 0000101  | ????? | ????? | 110                    | ????? | 0101011  |
   | `E&R` | 0000110  | ????? | ????? | 110                    | ????? | 0101011  |
 
-However, if I decide to get the configurations and instructions via mapped register, then the instruction set can be more flexible. I try to design the instruction set based on **I-type**.
+However, if I decide to get the configurations and instructions via mapped register, then the instruction set can be more flexible. 
+I try to design the instruction set based on **I-type**.
 
 | `INSTRUCTIONS` | `imm[11:0]` | `rs1` | `func3` | `rd` | `opcode`|
 | --- | --- | --- | --- | --- | --- |
@@ -328,7 +380,9 @@ And the figure bellow is the data flow of Row Stationary, you will find more inf
 
 ![](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200311220756.png)
 
-However, when I tried to map the Row Stationary Plus data flow into a graph like Row Stationary's, I found that we are supposed to accumulate each partial sum columns rather than rows, because in RS+, we have done each row in SPad Level, i.e., the for loop of `E` and `R`.
+However, when I tried to map the Row Stationary Plus data flow into a graph like Row Stationary's, 
+I found that we are supposed to accumulate each partial sum columns rather than rows, because in RS+, 
+we have done each row in SPad Level, i.e., the for loop of `E` and `R`.
 
 So we can get the graphs bellow.
 
@@ -336,7 +390,8 @@ At SPad level, we will calculate all rows of weights and partial sums, so we don
 
 ![EyerissV2 SPad Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232716EyerissV2SPadLevel.png)
 
-At Noc level, all kinds of data will be mapped in to PE array at same time, and regard the PEs which will produce the same column of partial sums as one group.
+At Noc level, all kinds of data will be mapped in to PE array at same time, 
+and regard the PEs which will produce the same column of partial sums as one group.
 
 ![EyerissV2 NoC Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232830EyerissV2NoCLevel.png)
 
@@ -361,30 +416,40 @@ Although it will decrease the size of matrix column with a pseudo-count vector, 
 
 ### The Length of Address Vectors and Data Vectors
 
-When we use CSC format data, the length of both address vectors and data vectors are variable. So we can not use the common way to stop reading or writing.
+When we use CSC format data, the length of both address vectors and data vectors are variable. 
+So we cannot use the common way to stop reading or writing.
 
-I use one zero `0` to show the end of one vector (one address vector or one data vector with count vector) at Scratch Pad level; I use two continuous zero `00` to show the end of one stream of vectors at SRAM bank level.
+I use one zero `0` to show the end of one vector (one address vector or one data vector with count vector) 
+at Scratch Pad level; I use two continuous zero `00` to show the end of one stream of vectors at SRAM bank level.
 
 ## Reference
 
-\[1\]V. Sze, Y.-H. Chen, T.-J. Yang, and J. S. Emer, “Efficient Processing of Deep Neural Networks: A Tutorial and Survey,” Proc. IEEE, vol. 105, no. 12, pp. 2295–2329, Dec. 2017, doi: 10.1109/JPROC.2017.2761740.
+\[1\]V. Sze, Y.-H. Chen, T.-J. Yang, and J. S. Emer, “Efficient Processing of Deep Neural Networks: A Tutorial and Survey,” 
+Proc. IEEE, vol. 105, no. 12, pp. 2295–2329, Dec. 2017, doi: 10.1109/JPROC.2017.2761740.
 
-\[2\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible Accelerator for Emerging Deep Neural Networks on Mobile Devices,” arXiv:1807.07928 \[cs\], May 2019.
+\[2\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible Accelerator for Emerging Deep Neural Networks 
+on Mobile Devices,” arXiv:1807.07928 \[cs\], May 2019.
 
-\[3\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible and High-Performance Accelerator for Emerging Deep Neural Networks,” arXiv:1807.07928 \[cs\], May 2019.
+\[3\]Y.-H. Chen, T.-J. Yang, J. Emer, and V. Sze, “Eyeriss v2: A Flexible and High-Performance Accelerator for 
+Emerging Deep Neural Networks,” arXiv:1807.07928 \[cs\], May 2019.
 
-\[4\]Y.-H. Chen, J. Emer, V. Sze, Y.-H. Chen, J. Emer, and V. Sze, “Eyeriss: a spatial architecture for energy-efficient dataflow for convolutional neural networks,” ACM SIGARCH Computer Architecture News, vol. 44, no. 3, pp. 367–379, Jun. 2016, doi: 10.1109/ISCA.2016.40.
+\[4\]Y.-H. Chen, J. Emer, V. Sze, Y.-H. Chen, J. Emer, and V. Sze, “Eyeriss: a spatial architecture for energy-efficient 
+dataflow for convolutional neural networks,” ACM SIGARCH Computer Architecture News, vol. 44, no. 3, pp. 367–379, Jun. 2016, doi: 10.1109/ISCA.2016.40.
 
-\[5\]Y.-H. Chen, T. Krishna, J. S. Emer, and V. Sze, “Eyeriss: An Energy-Efficient Reconfigurable Accelerator for Deep Convolutional Neural Networks,” IEEE J. Solid-State Circuits, vol. 52, no. 1, pp. 127–138, Jan. 2017, doi: 10.1109/JSSC.2016.2616357.
+\[5\]Y.-H. Chen, T. Krishna, J. S. Emer, and V. Sze, “Eyeriss: An Energy-Efficient Reconfigurable Accelerator for 
+Deep Convolutional Neural Networks,” IEEE J. Solid-State Circuits, vol. 52, no. 1, pp. 127–138, Jan. 2017, doi: 10.1109/JSSC.2016.2616357.
 
-\[6\] A. Waterman and H. Cook, “Chisel/FIRRTL: Home,” Chisel/FIRRTL, 2019. \[Online\]. Available: https://www.chisel-lang.org/. \[Accessed: 30-Nov-2019\].
+\[6\] A. Waterman and H. Cook, “Chisel/FIRRTL: Home,” Chisel/FIRRTL, 2019. \[Online\]. 
+Available: https://www.chisel-lang.org/. \[Accessed: 30-Nov-2019\].
 
 \[7\] D. Pala, “Design and programming of a coprocessor for a RISC-V architecture,” laurea, Politecnico di Torino, 2017.
 
 \[8\] A. Waterman, “Design of the RISC-V Instruction Set Architecture,” PhD Thesis, EECS Department, University of California, Berkeley, 2016.
 
-\[9\] K. Asanović and D. A. Patterson, “Instruction Sets Should Be Free: The Case For RISC-V,” EECS Department, University of California, Berkeley, UCB/EECS-2014-146, Aug. 2014.
+\[9\] K. Asanović and D. A. Patterson, “Instruction Sets Should Be Free: The Case For RISC-V,” EECS Department, University of California, 
+Berkeley, UCB/EECS-2014-146, Aug. 2014.
 
-\[10\] A. Izraelevitz et al., “Reusability is FIRRTL ground: Hardware construction languages, compiler frameworks, and transformations,” in 2017 IEEE/ACM International Conference on Computer-Aided Design (ICCAD), 2017, pp. 209–216, doi: 10.1109/ICCAD.2017.8203780.
+\[10\] A. Izraelevitz et al., “Reusability is FIRRTL ground: Hardware construction languages, compiler frameworks, 
+and transformations,” in 2017 IEEE/ACM International Conference on Computer-Aided Design (ICCAD), 2017, pp. 209–216, doi: 10.1109/ICCAD.2017.8203780.
 
 \[11\] K. Asanović et al., “The Rocket Chip Generator,” EECS Department, University of California, Berkeley, UCB/EECS-2016-17,
