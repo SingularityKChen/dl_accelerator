@@ -139,12 +139,12 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
     Seq(adrList, countList, dataList)
   }
   protected def toBinary(i: Int, digits: Int = 8): String =
-    String.format("%" + digits + "s", i.toBinaryString).replace(' ', '0')
+    s"%${digits}s".format(i.toBinaryString).replaceAllLiterally(" ", "0")
   def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = {
     // input data and count, and combine them together
     val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
     val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
-    val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => Integer.parseInt(x, 2))
+    val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => BigInt(x, 2).toInt)
     theDataCountDec
   }
 }
