@@ -150,22 +150,28 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val inActLegal = inActLegalDest && getInActLegal
     private val (inActReqFirst, inActReqLast, inActReqDone) = memInActEdge.firstlast(memInActBundle.a)
     private val (inActRespFirst, inActRespLast, inActRespDone) = memInActEdge.firstlast(memInActBundle.d)
-    memCtrlIO.inActIO.sourceAlloc.ready := inActLegal && inActReqFirst && memInActBundle.a.ready && cgCtrlPath.glbLoadEn
+    /** only glbLoadEn, then generate source id*/
+    memCtrlIO.inActIO.sourceAlloc.ready := inActLegal && inActReqFirst &&
+      memInActBundle.a.ready && cgCtrlPath.glbLoadEn
     memCtrlIO.inActIO.sourceFree.valid := inActRespFirst && memInActBundle.d.fire()
     memCtrlIO.inActIO.sourceFree.bits := memInActBundle.d.bits.source
     memInActBundle.a.bits := getInActBits // TODO: check
-    memInActBundle.a.valid := inActLegal && (!inActReqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbLoadEn)
+    /** only glbLoadEn then a.valid is true then can Get data */
+    memInActBundle.a.valid := inActLegal &&
+      (!inActReqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbLoadEn)
     memInActBundle.d.ready := true.B
     /** the logic of weight */
     private val weightLegalDest = memWeightEdge.manager.containsSafe(getWeightAddress)
     private val weightLegal = weightLegalDest && getWeightLegal
     private val (weightReqFirst, weightReqLast, weightReqDone) = memWeightEdge.firstlast(memWeightBundle.a)
     private val (weightRespFirst, weightRespLast, weightRespDone) = memWeightEdge.firstlast(memWeightBundle.d)
+    /** only peLoadEn, then generate source id*/
     memCtrlIO.weightIO.sourceAlloc.ready := weightLegal && weightReqFirst &&
       memWeightBundle.a.ready && cgCtrlPath.peLoadEn
     memCtrlIO.weightIO.sourceFree.valid := weightRespFirst && memWeightBundle.d.fire()
     memCtrlIO.weightIO.sourceFree.bits := memWeightBundle.d.bits.source
     memWeightBundle.a.bits := getWeightBits // TODO: check
+    /** only peLoadEn then a.valid is true then can Get data */
     memWeightBundle.a.valid := weightLegal &&
       (!weightReqFirst || memCtrlIO.weightIO.sourceAlloc.valid && cgCtrlPath.peLoadEn)
     memWeightBundle.d.ready := true.B
@@ -175,11 +181,15 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val (pSumReqFirst, pSumReqLast, pSumReqDone) = memPSumEdge.firstlast(memPSumBundle.a)
     private val (pSumRespFirst, pSumRespLast, pSumRespDone) = memPSumEdge.firstlast(memPSumBundle.d)
     private val pSumCGPutDataValid = Wire(Bool())
-    memCtrlIO.pSumIO.sourceAlloc.ready := pSumLegal && pSumReqFirst && memPSumBundle.a.ready
+    /** only pSumLoadEn, then generate source id*/
+    memCtrlIO.pSumIO.sourceAlloc.ready := pSumLegal && pSumReqFirst &&
+      memPSumBundle.a.ready && decoderIO.pSumIO.pSumLoadEn
     memCtrlIO.pSumIO.sourceFree.valid := pSumRespFirst && memPSumBundle.d.fire()
     memCtrlIO.pSumIO.sourceFree.bits := memPSumBundle.d.bits.source
     memPSumBundle.a.bits := getWeightBits // TODO: check
-    memPSumBundle.a.valid := pSumLegal && ((!pSumReqFirst && pSumCGPutDataValid) || memCtrlIO.pSumIO.sourceAlloc.valid)
+    /** only pSumLoadEn then a.valid is true then can Put*/
+    memPSumBundle.a.valid := pSumLegal &&
+      ((!pSumReqFirst && pSumCGPutDataValid) || memCtrlIO.pSumIO.sourceAlloc.valid && decoderIO.pSumIO.pSumLoadEn)
     memPSumBundle.d.ready := true.B
     /** tie off unused channels */
     memInActBundle.b.ready := false.B
