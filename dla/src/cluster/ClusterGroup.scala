@@ -219,6 +219,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val pSumAdrL2 = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
   private val inActReadAdrL2 = configG2Val*(N2*C2*(F2+S2)).U + configN2Val*(C2*(F2+S2)).U +
     configC2Val*(F2+S2).U + configF2Val + configS2Val
+  private val weightReadAdrL2 = configG2Val*(M2*C2*S2).U + configM2Val*(C2*S2).U + configC2Val*S2.U + configS2Val
   private val pSumWriteAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val pSumReadAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val cgLoadGLBWire = cgStateReg === cgLoadGLB
@@ -241,6 +242,9 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     /** each GLB inAct's read enable will be true until the corresponding PEs finish reading */
     x.readIO.enable := cgLoadPEWire && !glbInActReadFinReg(idx)
   })
+  // weight's address TODO
+  //io.glbWeightCtrlIO.head.adr := weightReadAdrL2
+  //io.glbWeightCtrlIO.head.enable := cgLoadPEWire && !glbWeightReadFinReg(idx)
   io.peCtrlIO.pSumLoadEn := configIncWireSeq(3)
   io.peCtrlIO.peLoadEn := cgLoadPEWire
   io.pSumAdd := cgReadWire
