@@ -49,13 +49,13 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     sourceId = IdRange(0, sourceNum),
     // @todo
     // supportsGet = TransferSizes(1, 4),
-    supportsPutFull = TransferSizes(1, 4) // avoid using partial to avoid mask
+    //supportsPutFull = TransferSizes(1, 4) // avoid using partial to avoid mask
   ))
   private def eyerissGetNodeParameters(sramName: String, sourceNum: Int) = Seq(TLMasterParameters.v1(
     /** read only, for inAct and weight */
     name = s"Eyeriss$sramName",
     sourceId = IdRange(0, sourceNum),
-    supportsGet = TransferSizes(1, 4)
+    //supportsGet = TransferSizes(1, 4)
   ))
   /** memory access node. */
   val memInActNode: TLClientNode = TLClientNode(
