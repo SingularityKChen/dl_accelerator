@@ -157,6 +157,7 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
         /** inActAdr, writeFinRegVec's idx = 0, inActData, idx = 1, weightAdr, idx = 2, weightData, idx = 3*/
         val writeFinRegIdx: Int = (if (itIsInAct) 0 else 1)*2 + (if (itIsData) 1 else 0)
         val formerOrLater: Boolean = conFunc(0, 0) // if 0 + 0 ? InActRouter == true, then it's former
+        /** use x(1).max to make sure it can poke all the data */
         for (_ <- 0 until theLookup.map(x => x(1)).max) {
           /** expect the inActIO state*/
           if (itIsInAct) {
@@ -203,8 +204,10 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
                 whetherInActDone(if (!itIsData) routerIdx+inActRouterNum*2 else routerIdx+inActRouterNum*3) = true
               }
             }
-            if (theStreamReadIdx(routerIdx) < theLookup(routerIdx)(1)) { // until the end of first stream
-              if (true)
+            /**  theLookup(routerIdx)(1) means the start idx of second stream,
+              * then it can poke data until the end of first stream*/
+            if (theStreamReadIdx(routerIdx) < theLookup(routerIdx)(1)) {
+              if (printLogDetails)
                 println(s"[$prefix] poke bits = ${thePokeStream(routerIdx)(theStreamReadIdx(routerIdx))}")
               thePokeIO(routerIdx).bits.poke(thePokeStream(routerIdx)(theStreamReadIdx(routerIdx)).U)
               thePokeIO(routerIdx).valid.poke(true.B)

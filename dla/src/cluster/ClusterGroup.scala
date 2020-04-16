@@ -163,6 +163,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     * */
   private val cgIdle :: cgLoadGLB :: cgLoadPE :: cgCal :: cgRead :: Nil = Enum(5)
   private val cgStateReg = RegInit(cgIdle)
+  cgStateReg.suggestName("cgStateReg")
   switch (cgStateReg) {
     is (cgIdle) {
       when (io.topIO.cgEnable) {  // when doEn ClusterGroup
@@ -221,7 +222,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val pSumAdrL2 = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
   private val inActReadAdrL2 = configG2Val*(N2*C2*(F2+S2)).U + configN2Val*(C2*(F2+S2)).U +
     configC2Val*(F2+S2).U + configF2Val + configS2Val
-  private val weightReadAdrL2 = configG2Val*(M2*C2*S2).U + configM2Val*(C2*S2).U + configC2Val*S2.U + configS2Val
+  //private val weightReadAdrL2 = configG2Val*(M2*C2*S2).U + configM2Val*(C2*S2).U + configC2Val*S2.U + configS2Val
   private val pSumWriteAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val pSumReadAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val cgLoadGLBWire = cgStateReg === cgLoadGLB
