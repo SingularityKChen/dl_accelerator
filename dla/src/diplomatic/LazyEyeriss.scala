@@ -1,8 +1,7 @@
 package dla.diplomatic
 
-import Chisel.DecoupledIO
 import chisel3._
-import chisel3.util.{MuxLookup, log2Ceil}
+import chisel3.util.{DecoupledIO, MuxLookup, log2Ceil}
 import dla.ClusterGroupWrapper
 import dla.cluster.{ClusterConfig, ClusterSRAMConfig}
 import dla.pe.PESizeConfig
@@ -151,22 +150,24 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val inActLegal = inActLegalDest && getInActLegal
     private val (inActReqFirst, inActReqLast, inActReqDone) = memInActEdge.firstlast(memInActBundle.a)
     private val (inActRespFirst, inActRespLast, inActRespDone) = memInActEdge.firstlast(memInActBundle.d)
-    memCtrlIO.inActIO.sourceAlloc.ready := inActLegal && inActReqFirst && memInActBundle.a.ready
+    memCtrlIO.inActIO.sourceAlloc.ready := inActLegal && inActReqFirst && memInActBundle.a.ready && cgCtrlPath.glbLoadEn
     memCtrlIO.inActIO.sourceFree.valid := inActRespFirst && memInActBundle.d.fire()
     memCtrlIO.inActIO.sourceFree.bits := memInActBundle.d.bits.source
     memInActBundle.a.bits := getInActBits // TODO: check
-    memInActBundle.a.valid := inActLegal && (!inActReqFirst || memCtrlIO.inActIO.sourceAlloc.valid)
+    memInActBundle.a.valid := inActLegal && (!inActReqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbLoadEn)
     memInActBundle.d.ready := true.B
     /** the logic of weight */
     private val weightLegalDest = memWeightEdge.manager.containsSafe(getWeightAddress)
     private val weightLegal = weightLegalDest && getWeightLegal
     private val (weightReqFirst, weightReqLast, weightReqDone) = memWeightEdge.firstlast(memWeightBundle.a)
     private val (weightRespFirst, weightRespLast, weightRespDone) = memWeightEdge.firstlast(memWeightBundle.d)
-    memCtrlIO.weightIO.sourceAlloc.ready := weightLegal && weightReqFirst && memWeightBundle.a.ready
+    memCtrlIO.weightIO.sourceAlloc.ready := weightLegal && weightReqFirst &&
+      memWeightBundle.a.ready && cgCtrlPath.peLoadEn
     memCtrlIO.weightIO.sourceFree.valid := weightRespFirst && memWeightBundle.d.fire()
     memCtrlIO.weightIO.sourceFree.bits := memWeightBundle.d.bits.source
     memWeightBundle.a.bits := getWeightBits // TODO: check
-    memWeightBundle.a.valid := weightLegal && (!weightReqFirst || memCtrlIO.weightIO.sourceAlloc.valid)
+    memWeightBundle.a.valid := weightLegal &&
+      (!weightReqFirst || memCtrlIO.weightIO.sourceAlloc.valid && cgCtrlPath.peLoadEn)
     memWeightBundle.d.ready := true.B
     /** the logic of partial sum */
     private val pSumLegalDest = memPSumEdge.manager.containsSafe(pSumAddress)

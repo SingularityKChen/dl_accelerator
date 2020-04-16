@@ -29,6 +29,8 @@ class ClusterGroupCtrlIO extends Bundle {
   val readOutPSum: Bool = Input(Bool()) // true then to read out partial sums from GLB
   val calFin: Bool = Output(Bool())
   val doMacEn: Bool = Input(Bool())
+  val peLoadEn: Bool = Output(Bool())
+  val glbLoadEn: Bool = Output(Bool())
 }
 
 class RouterClusterIO extends Bundle {
