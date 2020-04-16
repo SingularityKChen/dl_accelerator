@@ -11,6 +11,15 @@ import scala.util.Random
 
 class ClusterGroupSpecTest extends ClusterSpecTestBasic {
   override val printLogDetails = false
+  val theWeightAdrLookup: Seq[List[Int]] = theWeightAdrStreams.map(x => getStreamLookUp(x))
+  val theWeightDataLookup: Seq[List[Int]] = theWeightDataStreams.map(x => getStreamLookUp(x))
+  private def getSPadData(fullData: List[Int], theLookup: List[Int], idx: Int): List[Int] = {
+    var currentSPad: List[Int] = Nil
+    for (i <- theLookup(idx) until theLookup(idx + 1)) {
+      currentSPad = currentSPad:::List(fullData(i))
+    }
+    currentSPad
+  }
   behavior of "test the spec of Cluster Group"
   it should "work well on Cluster Group Controller" in {
     test (new ClusterGroupController(debug = true)).withAnnotations(Seq(WriteVcdAnnotation)) { theCGCtrl =>
@@ -27,7 +36,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
         if (stateInt == 2) state = "cgLoadPE"
         if (stateInt == 3) state = "cgCal"
         if (stateInt == 4) state = "cgRead"
-        println(s"CG State   =  $state")
+        if(printLogDetails) println(s"CG State   =  $state")
       }
       def randomGiveFin(pokeIO: Seq[Bool], expectIO: Seq[Bool], idx: Int, prefix: String): Unit = {
         theClock.step((new Random).nextInt(15))
@@ -70,7 +79,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
         readDoneIO(idx).poke(false.B)
         theClock.step((new Random).nextInt(5))
         writeDoneIO(idx).poke(true.B)
-        println(s"[${prefix}Write$idx] poke true now")
+        if(printLogDetails) println(s"[${prefix}Write$idx] poke true now")
         theClock.step()
         writeDoneIO(idx).poke(false.B)
         expectIO(idx).expect(true.B, s"[${prefix}Write$idx] one cycle later, the reg should be true")
@@ -176,10 +185,11 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
           pokeIO.bits.poke(pokeData(pokeIdx).U)
           pokeIO.valid.poke(true.B)
           if (pokeIO.ready.peek().litToBoolean) {
+            if (printLogDetails) println(s"[$prefix@$pokeIdx] poked ${pokeData(pokeIdx)}")
             println(s"[$prefix@$pokeIdx] poked ${pokeData(pokeIdx)}")
             pokeIdx += 1
           } else {
-            println(s"[$prefix@$pokeIdx] not ready now")
+            println(Console.RED + s"[WARING] [$prefix@$pokeIdx] not ready now" + Console.RESET)
           }
           theClock.step()
         }
@@ -203,18 +213,25 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
       theClock.step()
       theTop.ctrlPath.doMacEn.poke(true.B)
       theClock.step(2)
+      /** it should poke with signal thread as it read data via memory bus */
+      /** each inAct SRAM needs store two streams of data
+        * TODO: remove the 00 at the end of first stream so that it can poke later stream */
       fork.withName("pokeInActAdr") {
         (1 until inActSRAMNum).foldLeft(
           fork {
             val prefix: String = s"inActAdr0"
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.adrIOs.data
             pokeData(pokeIO, theInActAdrStreams.head, prefix)
+            println("now poke later")
+            //pokeData(pokeIO, theInActAdrStreams(inActRouterNum), s"${prefix}Later")
           }) {
           case (left, right) =>
             left.fork {
               val prefix: String = s"inActAdr$right"
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.adrIOs.data
               pokeData(pokeIO, theInActAdrStreams(right), prefix)
+              println("now poke later")
+              //pokeData(pokeIO, theInActAdrStreams(right+inActRouterNum), s"${prefix}Later")
             }
         }.join()
       } .fork.withName("pokeInActData") {
@@ -223,76 +240,64 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
             val prefix: String = s"inActData0"
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.dataIOs.data
             pokeData(pokeIO, theInActDataStreams.head, prefix)
+            println("now poke later")
+            //pokeData(pokeIO, theInActDataStreams(inActRouterNum), prefix)
           }) {
           case (left, right) =>
             left.fork {
               val prefix: String = s"inActData$right"
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.dataIOs.data
               pokeData(pokeIO, theInActDataStreams(right), prefix)
-            }
-        }.join()
-      } .joinAndStep(theClock)
-      println("poke later data now")
-      fork.withName("pokeInActAdrLater") {
-        (1 until inActSRAMNum).foldLeft(
-          fork {
-            val prefix: String = s"inActAdr$inActRouterNum"
-            val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.adrIOs.data
-            pokeData(pokeIO, theInActAdrStreams(0+inActRouterNum), prefix)
-          }) {
-          case (left, right) =>
-            left.fork {
-              val prefix: String = s"inActAdr${right+inActRouterNum}"
-              val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.adrIOs.data
-              pokeData(pokeIO, theInActAdrStreams(right+inActRouterNum), prefix)
-            }
-        }.join()
-      } .fork.withName("pokeInActDataLater") {
-        (1 until inActSRAMNum).foldLeft(
-          fork {
-            val prefix: String = s"inActData$inActRouterNum"
-            val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.dataIOs.data
-            pokeData(pokeIO, theInActDataStreams(0+inActRouterNum), prefix)
-          }) {
-          case (left, right) =>
-            left.fork {
-              val prefix: String = s"inActData${right+inActRouterNum}"
-              val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.dataIOs.data
-              pokeData(pokeIO, theInActDataStreams(right+inActRouterNum), prefix)
+              println("now poke later")
+              //pokeData(pokeIO, theInActDataStreams(right+inActRouterNum), prefix)
             }
         }.join()
       } .joinAndStep(theClock)
       println("when it begins to cal, when it will need weight")
       theClock.step()
-      fork.withName("pokeWeightAdr") {
-        (1 until weightRouterNum).foldLeft(
-          fork {
-            val prefix: String = s"weightAdr0"
-            val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.adrIOs.data
-            pokeData(pokeIO, theWeightAdrStreams.head, prefix)
-          }) {
-          case (left, right) =>
-            left.fork {
-              val prefix: String = s"weightAdr$right"
-              val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.adrIOs.data
-              pokeData(pokeIO, theWeightAdrStreams(right), prefix)
-            }
-        }.join()
-      } .fork.withName("pokeWeightData") {
-        (1 until weightRouterNum).foldLeft(
-          fork {
-            val prefix: String = s"weightData0"
-            val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.dataIOs.data
-            pokeData(pokeIO, theWeightDataStreams.head, prefix)
-          }) {
-          case (left, right) =>
-            left.fork {
-              val prefix: String = s"weightData$right"
-              val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.dataIOs.data
-              pokeData(pokeIO, theWeightDataStreams(right), prefix)
-            }
-        }.join()
-      } .join()
+      theTop.ctrlPath.peLoadEn.expect(true.B, "peLoadEn should be true to load weight")
+      var weightReadTimes = 0
+      while (weightReadTimes < G2*M2*C2*S2) {
+        while (!theTop.ctrlPath.peLoadEn.peek().litToBoolean) {
+          theClock.step()
+        }
+        val weightAdrOneSPad = theWeightAdrStreams.zip(theWeightAdrLookup).map({ case (ints, ints1) =>
+          getSPadData(ints, ints1, idx = weightReadTimes)
+        })
+        val weightDataOneSPad = theWeightDataStreams.zip(theWeightDataLookup).map({ case (ints, ints1) =>
+          getSPadData(ints, ints1, idx = weightReadTimes)
+        })
+        fork.withName("pokeWeightAdr") {
+          (1 until weightRouterNum).foldLeft(
+            fork {
+              val prefix: String = s"${weightReadTimes}weightAdr0"
+              val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.adrIOs.data
+              pokeData(pokeIO, weightAdrOneSPad.head, prefix)
+            }) {
+            case (left, right) =>
+              left.fork {
+                val prefix: String = s"${weightReadTimes}weightAdr$right"
+                val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.adrIOs.data
+                pokeData(pokeIO, weightAdrOneSPad(right), prefix)
+              }
+          }.join()
+        } .fork.withName("pokeWeightData") {
+          (1 until weightRouterNum).foldLeft(
+            fork {
+              val prefix: String = s"${weightReadTimes}weightData0"
+              val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.dataIOs.data
+              pokeData(pokeIO, weightDataOneSPad.head, prefix)
+            }) {
+            case (left, right) =>
+              left.fork {
+                val prefix: String = s"${weightReadTimes}weightData$right"
+                val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.dataIOs.data
+                pokeData(pokeIO, weightDataOneSPad(right), prefix)
+              }
+          }.join()
+        } .join()
+        weightReadTimes += 1
+      }
       theClock.step()
     }
   }
