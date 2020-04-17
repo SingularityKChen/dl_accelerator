@@ -63,7 +63,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
   stateMac.suggestName("PEStateReg")
-  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish && stateMac === psCal // TODO
+  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish && stateMac === psCal
   io.ctrlPad.fromTopIO.pSumEnqEn := io.ctrlTop.pSumEnqEn
   io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
   io.ctrlPad.doMACEn := stateMac === psCal

@@ -205,7 +205,6 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
           pokeIO.valid.poke(true.B)
           if (pokeIO.ready.peek().litToBoolean) {
             if (printLogDetails) println(s"[$prefix@$pokeIdx] poked ${pokeData(pokeIdx)}")
-            println(s"[$prefix@$pokeIdx] poked ${pokeData(pokeIdx)}")
             pokeIdx += 1
           } else {
             println(Console.RED + s"[WARING] [$prefix@$pokeIdx] not ready now" + Console.RESET)
@@ -231,7 +230,9 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
       theTop.ctrlPath.peClusterCtrl.pSumInSel.poke(true.B) // load PSum from Router
       theClock.step()
       theTop.ctrlPath.doMacEn.poke(true.B)
-      theClock.step(2)
+      theClock.step()
+      theTop.ctrlPath.doMacEn.poke(false.B)
+      theClock.step()
       /** it should poke with signal thread as it read data via memory bus */
       /** each inAct SRAM needs store two streams of data
         * TODO: remove the 00 at the end of first stream so that it can poke later stream */
@@ -241,7 +242,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
             val prefix: String = s"inActAdr0"
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.adrIOs.data
             pokeData(pokeIO, theInActAdrStreams.head, prefix)
-            println("now poke later")
+            println(s"[$prefix] poke later")
             //pokeData(pokeIO, theInActAdrStreams(inActRouterNum), s"${prefix}Later")
           }) {
           case (left, right) =>
@@ -249,7 +250,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
               val prefix: String = s"inActAdr$right"
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.adrIOs.data
               pokeData(pokeIO, theInActAdrStreams(right), prefix)
-              println("now poke later")
+              println(s"[$prefix] poke later")
               //pokeData(pokeIO, theInActAdrStreams(right+inActRouterNum), s"${prefix}Later")
             }
         }.join()
@@ -259,7 +260,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
             val prefix: String = s"inActData0"
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.dataIOs.data
             pokeData(pokeIO, theInActDataStreams.head, prefix)
-            println("now poke later")
+            println(s"[$prefix] poke later")
             //pokeData(pokeIO, theInActDataStreams(inActRouterNum), prefix)
           }) {
           case (left, right) =>
@@ -267,7 +268,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
               val prefix: String = s"inActData$right"
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.dataIOs.data
               pokeData(pokeIO, theInActDataStreams(right), prefix)
-              println("now poke later")
+              println(s"[$prefix] poke later")
               //pokeData(pokeIO, theInActDataStreams(right+inActRouterNum), prefix)
             }
         }.join()
@@ -275,10 +276,12 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
       println("when it begins to cal, when it will need weight")
       theClock.step()
       theTop.ctrlPath.peLoadEn.expect(true.B, "peLoadEn should be true to load weight")
-      var weightReadTimes = 0
-      while (weightReadTimes < G2*M2*C2*S2) {
-        while (!theTop.ctrlPath.peLoadEn.peek().litToBoolean) {
+      var weightReadFin = false
+      for (weightReadTimes <- 0 until G2*M2*C2*S2) {
+        while (!theTop.ctrlPath.peLoadEn.peek().litToBoolean || weightReadFin) {
+          /** while not enable or has read current weight */
           theClock.step()
+          if (!theTop.ctrlPath.peLoadEn.peek().litToBoolean) weightReadFin = false
         }
         val weightAdrOneSPad = theWeightAdrStreams.zip(theWeightAdrLookup).map({ case (ints, ints1) =>
           getSPadData(ints, ints1, idx = weightReadTimes)
@@ -315,7 +318,8 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
               }
           }.join()
         } .join()
-        weightReadTimes += 1
+        println(s"[$weightReadTimes] now finish one pe load")
+        weightReadFin = true
       }
       theClock.step()
     }
