@@ -6,12 +6,14 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMFCS2Config {
   val io: GLBClusterIO = IO(new GLBClusterIO)
-  private val iSRAMs = Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug)).io}
+  private val iSRAMs = Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug))}
   iSRAMs.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"inActSRAM$i")})
-  private val pSRAMs = Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug)).io}
+  private val iSRAMsIO = iSRAMs.map(x => x.io)
+  private val pSRAMs = Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug))}
   pSRAMs.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"pSumSRAM$i")})
+  private val pSRAMsIO = pSRAMs.map(x => x.io)
   private val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
-  private val theSRAMsCtrl = Seq(iSRAMs.map(x => x.ctrlPath), pSRAMs.map(x => x.ctrlPath))
+  private val theSRAMsCtrl = Seq(iSRAMsIO.map(x => x.ctrlPath), pSRAMsIO.map(x => x.ctrlPath))
   private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
   private val theSRAMsEnWire = Wire(Vec(2, Vec(2, Bool())))
   theSRAMsEnWire.suggestName("theSRAMsEnWire")
@@ -40,17 +42,17 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   }
   // connections of data path
   io.dataPath.weightIO.foreach(x => x.inIOs <> x.outIOs)
-  io.dataPath.inActIO.zip(iSRAMs).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
-  io.dataPath.pSumIO.zip(pSRAMs).foreach({ case (dataIO, sramIO) =>
+  io.dataPath.inActIO.zip(iSRAMsIO).foreach({ case (dataIO, sramIO) => dataIO <> sramIO.dataPath})
+  io.dataPath.pSumIO.zip(pSRAMsIO).foreach({ case (dataIO, sramIO) =>
     dataIO <> sramIO.dataPath
   })
-  pSRAMs.zipWithIndex.foreach({ case (pSumIO, idx) =>
+  pSRAMsIO.zipWithIndex.foreach({ case (pSumIO, idx) =>
     pSumIO.dataPath <> io.dataPath.pSumIO(idx)
   })
   // connections of debugIO
   if (debug) {
-    io.debugIO.inActDebugIO.zip(iSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
-    io.debugIO.pSumDebugIO.zip(pSRAMs).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
+    io.debugIO.inActDebugIO.zip(iSRAMsIO).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
+    io.debugIO.pSumDebugIO.zip(pSRAMsIO).foreach({ case (topDebug, sram) => topDebug <> sram.debugIO})
     io.debugIO.oneInActSRAMDone <> theSRAMsCtrl.head.map(x => x.readIO.done)
     io.debugIO.onePSumSRAMDone <> theSRAMsCtrl(1).map(x => Mux(x.readIO.enable, x.readIO.done, x.writeIO.done)) // so that's the wire not reg done
   } else {

@@ -12,19 +12,21 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
   // io.ctrlPath.inActCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
-  private val peArray = Seq.fill(peRowNum, peColNum){Module(new ProcessingElement(debug = debug)).io}
-  peArray.zipWithIndex.foreach({case (pe, idx) =>
-    pe.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"pe($idx)($i)")
+  private val peArray = Seq.fill(peRowNum, peColNum){Module(new ProcessingElement(debug = debug))}
+  peArray.zipWithIndex.foreach({case (pe, row) =>
+    pe.zipWithIndex.foreach({ case (o, col) => o.suggestName(s"pe($row)($col)")
     })})
-  private val peClusterInAct = Module(new PEClusterInAct(debug = debug)).io
+  private val peArrayIO = peArray.map(x => x.map(y => y.io))
+  private val peClusterInAct = Module(new PEClusterInAct(debug = debug))
   peClusterInAct.suggestName("peClusterInAct")
+  private val peClusterInActIO = peClusterInAct.io
   // connections of peClusterInAct
-  peClusterInAct.inActCtrlSel <> io.ctrlPath.inActCtrlSel
-  peClusterInAct.inActWriteFinVec.zip(peArray).foreach({ case (os, peCol) =>
+  peClusterInActIO.inActCtrlSel <> io.ctrlPath.inActCtrlSel
+  peClusterInActIO.inActWriteFinVec.zip(peArrayIO).foreach({ case (os, peCol) =>
     os.zip(peCol).foreach({ case (o, onePE) =>
       o := onePE.padWF.inActWriteFin
     })})
-  peClusterInAct.inActToArrayData.inActIO <> io.dataPath.inActIO
+  peClusterInActIO.inActToArrayData.inActIO <> io.dataPath.inActIO
   private val oneColumnPSumAddFinRegVec = Seq.fill(peColNum){RegInit(false.B)}
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"col${i}PSumAddFinReg")})
   private val allColPSumAddFin = Wire(Bool())
@@ -37,12 +39,12 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
   for (j <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
-    io.dataPath.pSumIO.outIOs(j) <> peArray.head(j).dataStream.opsIO
+    io.dataPath.pSumIO.outIOs(j) <> peArrayIO.head(j).dataStream.opsIO
     for (row <- 1 until peRowNum) {
-      peArray(row - 1)(j).dataStream.ipsIO <> peArray(row)(j).dataStream.opsIO
+      peArrayIO(row - 1)(j).dataStream.ipsIO <> peArrayIO(row)(j).dataStream.opsIO
     }
     // connect input partial sum from top IO to the PE at the tail of each column with the signal after Mux
-    peArray.last(j).dataStream.ipsIO <> muxInPSumDataWire(j)
+    peArrayIO.last(j).dataStream.ipsIO <> muxInPSumDataWire(j)
     // select ips of the tail of each column, true from router, false from southern PEArray
     when (io.ctrlPath.pSumCtrlSel.inDataSel) {
       muxInPSumDataWire(j) <> io.dataPath.pSumIO.inIOs(j) // from router
@@ -51,23 +53,23 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       muxInPSumDataWire(j) <> io.dataPath.pSumDataFromSouthernIO(j) // from southern PEArray
       io.dataPath.pSumIO.inIOs(j).ready := false.B
     }
-    when (peArray.head(j).padWF.pSumAddFin) { // only need to record each head of column as we begin add from the tail
+    when (peArrayIO.head(j).padWF.pSumAddFin) { // only need to record each head of column as we begin add from the tail
       oneColumnPSumAddFinRegVec(j) := true.B
     }
     when (allColPSumAddFin) {
       oneColumnPSumAddFinRegVec(j) := false.B
     }
     for (i <- 0 until peRowNum) {
-      connectAllExceptReady(peArray(i)(j).dataStream.weightIOs, io.dataPath.weightIO(i))
-      io.dataPath.weightIO(i).adrIOs.data.ready := peArray(i).map(x =>
+      connectAllExceptReady(peArrayIO(i)(j).dataStream.weightIOs, io.dataPath.weightIO(i))
+      io.dataPath.weightIO(i).adrIOs.data.ready := peArrayIO(i).map(x =>
         x.dataStream.weightIOs.adrIOs.data.ready).reduce(_ && _)
-      io.dataPath.weightIO(i).dataIOs.data.ready := peArray(i).map(x =>
+      io.dataPath.weightIO(i).dataIOs.data.ready := peArrayIO(i).map(x =>
         x.dataStream.weightIOs.dataIOs.data.ready).reduce(_ && _)
-      peArray(i)(j).dataStream.inActIOs <> peClusterInAct.inActToArrayData.muxInActData(i)(j)
-      peArray(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
+      peArrayIO(i)(j).dataStream.inActIOs <> peClusterInActIO.inActToArrayData.muxInActData(i)(j)
+      peArrayIO(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
       // pSumControl
-      peArray(i)(j).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
-      when (peArray(i)(j).topCtrl.calFinish) {
+      peArrayIO(i)(j).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
+      when (peArrayIO(i)(j).topCtrl.calFinish) {
         onePECalFinReg(i)(j) := true.B
       }
       when (allCalFinWire) {
@@ -81,14 +83,14 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
     for (row <- 0 until peRowNum) {
       for (col <- 0 until peColNum) {
         io.debugIO.eachPEInActValid.head(row)(col) :=
-          peClusterInAct.inActToArrayData.muxInActData(row)(col).adrIOs.data.valid
+          peClusterInActIO.inActToArrayData.muxInActData(row)(col).adrIOs.data.valid
         io.debugIO.eachPEInActValid.last(row)(col) :=
-          peClusterInAct.inActToArrayData.muxInActData(row)(col).dataIOs.data.valid
-        io.debugIO.inActWriteFinVec(row)(col) <> peArray(row)(col).padWF.inActWriteFin
-        io.debugIO.eachPETopDebug(row)(col) <> peArray(row)(col).debugIO
+          peClusterInActIO.inActToArrayData.muxInActData(row)(col).dataIOs.data.valid
+        io.debugIO.inActWriteFinVec(row)(col) <> peArrayIO(row)(col).padWF.inActWriteFin
+        io.debugIO.eachPETopDebug(row)(col) <> peArrayIO(row)(col).debugIO
       }
     }
-    io.debugIO.inActDataIOState <> peClusterInAct.debugIO.inActDataIOState
+    io.debugIO.inActDataIOState <> peClusterInActIO.debugIO.inActDataIOState
   } else {
     io.debugIO <> DontCare
   }

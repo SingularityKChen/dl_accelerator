@@ -5,27 +5,29 @@ import chisel3.util._
 
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io: ProcessingElementIO = IO(new ProcessingElementIO)
-  private val peCtrl = Module(new ProcessingElementControl(debug = debug)).io
-  peCtrl.suggestName("peCtrl")
-  private val pePad = Module(new ProcessingElementPad(debug = debug)).io
-  pePad.suggestName("pePad")
+  private val peCtrl = Module(new ProcessingElementControl(debug = debug))
+  peCtrl.suggestName("peCtrlModule")
+  private val peCtrlIO = peCtrl.io
+  private val pePad = Module(new ProcessingElementPad(debug = debug))
+  pePad.suggestName("pePadModule")
+  private val pePadIO = pePad.io
   if (fifoEn) {
-    pePad.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
-    pePad.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
-    pePad.dataStream.weightIOs.adrIOs.data <> Queue(io.dataStream.weightIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
-    pePad.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
+    pePadIO.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
+    pePadIO.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
+    pePadIO.dataStream.weightIOs.adrIOs.data <> Queue(io.dataStream.weightIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
+    pePadIO.dataStream.weightIOs.dataIOs.data <> Queue(io.dataStream.weightIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
   } else {
-    pePad.dataStream.inActIOs <> io.dataStream.inActIOs
-    pePad.dataStream.weightIOs <> io.dataStream.weightIOs
+    pePadIO.dataStream.inActIOs <> io.dataStream.inActIOs
+    pePadIO.dataStream.weightIOs <> io.dataStream.weightIOs
  }
-  private val inActAndWeightWFIOs = Seq(pePad.padWF.inActWriteFin, pePad.padWF.weightWriteFin)
+  private val inActAndWeightWFIOs = Seq(pePadIO.padWF.inActWriteFin, pePadIO.padWF.weightWriteFin)
   private val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
   inActAndWeightWFIOs.zip(inActAndWeightTopWFIOs).foreach{case (x, y) => y <> x}
-  io.padWF.pSumAddFin := pePad.padWF.pSumAddFin
-  peCtrl.ctrlPad <> pePad.padCtrl
-  io.topCtrl.pSumEnqEn <> peCtrl.ctrlTop.pSumEnqEn
-  io.topCtrl.calFinish := peCtrl.ctrlTop.calFinish
-  peCtrl.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
+  io.padWF.pSumAddFin := pePadIO.padWF.pSumAddFin
+  peCtrlIO.ctrlPad <> pePadIO.padCtrl
+  io.topCtrl.pSumEnqEn <> peCtrlIO.ctrlTop.pSumEnqEn
+  io.topCtrl.calFinish := peCtrlIO.ctrlTop.calFinish
+  peCtrlIO.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
   private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
     inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin)
   private val writeFinishWire: Bool = Wire(Bool())
@@ -45,12 +47,12 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   }
   writeFinishWire := writeFinishRegVec.reduce(_ && _) // when inAct and Weight Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
-  peCtrl.ctrlTop.writeFinish := writeFinishWire
-  pePad.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true, pipe = true)
-  io.dataStream.opsIO <> Queue(pePad.dataStream.opsIO, fifoSize, flow = true, pipe = true)
+  peCtrlIO.ctrlTop.writeFinish := writeFinishWire
+  pePadIO.dataStream.ipsIO <> Queue(io.dataStream.ipsIO, fifoSize, flow = true, pipe = true)
+  io.dataStream.opsIO <> Queue(pePadIO.dataStream.opsIO, fifoSize, flow = true, pipe = true)
   if (debug) {
-    io.debugIO.peControlDebugIO <> peCtrl.debugIO
-    io.debugIO.peSPadDebugIO <> pePad.debugIO
+    io.debugIO.peControlDebugIO <> peCtrlIO.debugIO
+    io.debugIO.peSPadDebugIO <> pePadIO.debugIO
     io.debugIO.writeFinishRegVec <> writeFinishRegVec
   } else {
     io.debugIO <> DontCare
