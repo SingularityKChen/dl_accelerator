@@ -38,12 +38,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   writeFinishRegVec(2).suggestName("weightAdrWFReg")
   writeFinishRegVec.last.suggestName("weightDataWFReg")
   for (i <- SPadWFSeq.indices) {
-    when (SPadWFSeq(i)) {
-      writeFinishRegVec(i) := true.B
-    }
-    when (io.topCtrl.calFinish) {
-      writeFinishRegVec(i) := false.B
-    }
+    writeFinishRegVec(i) := Mux(io.topCtrl.calFinish, false.B, Mux(SPadWFSeq(i), true.B, writeFinishRegVec(i)))
   }
   writeFinishWire := writeFinishRegVec.reduce(_ && _) // when inAct and Weight Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
@@ -68,7 +63,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
   private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
   stateMac.suggestName("PEStateReg")
-  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish
+  io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish && stateMac === psCal // TODO
   io.ctrlPad.fromTopIO.pSumEnqEn := io.ctrlTop.pSumEnqEn
   io.ctrlPad.fromTopIO.doLoadEn := io.ctrlTop.doLoadEn
   io.ctrlPad.doMACEn := stateMac === psCal

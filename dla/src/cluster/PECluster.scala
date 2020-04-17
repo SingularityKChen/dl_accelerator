@@ -37,44 +37,41 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   // connections of peClusterPSum
   private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
-  for (j <- 0 until peColNum) {
+  for (col <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
-    io.dataPath.pSumIO.outIOs(j) <> peArrayIO.head(j).dataStream.opsIO
+    io.dataPath.pSumIO.outIOs(col) <> peArrayIO.head(col).dataStream.opsIO
     for (row <- 1 until peRowNum) {
-      peArrayIO(row - 1)(j).dataStream.ipsIO <> peArrayIO(row)(j).dataStream.opsIO
+      peArrayIO(row - 1)(col).dataStream.ipsIO <> peArrayIO(row)(col).dataStream.opsIO
     }
     // connect input partial sum from top IO to the PE at the tail of each column with the signal after Mux
-    peArrayIO.last(j).dataStream.ipsIO <> muxInPSumDataWire(j)
+    peArrayIO.last(col).dataStream.ipsIO <> muxInPSumDataWire(col)
     // select ips of the tail of each column, true from router, false from southern PEArray
     when (io.ctrlPath.pSumCtrlSel.inDataSel) {
-      muxInPSumDataWire(j) <> io.dataPath.pSumIO.inIOs(j) // from router
-      io.dataPath.pSumDataFromSouthernIO(j).ready := false.B
+      muxInPSumDataWire(col) <> io.dataPath.pSumIO.inIOs(col) // from router
+      io.dataPath.pSumDataFromSouthernIO(col).ready := false.B
     } .otherwise {
-      muxInPSumDataWire(j) <> io.dataPath.pSumDataFromSouthernIO(j) // from southern PEArray
-      io.dataPath.pSumIO.inIOs(j).ready := false.B
+      muxInPSumDataWire(col) <> io.dataPath.pSumDataFromSouthernIO(col) // from southern PEArray
+      io.dataPath.pSumIO.inIOs(col).ready := false.B
     }
-    when (peArrayIO.head(j).padWF.pSumAddFin) { // only need to record each head of column as we begin add from the tail
-      oneColumnPSumAddFinRegVec(j) := true.B
+    when (peArrayIO.head(col).padWF.pSumAddFin) { // only need to record each head of column as we begin add from the tail
+      oneColumnPSumAddFinRegVec(col) := true.B
     }
     when (allColPSumAddFin) {
-      oneColumnPSumAddFinRegVec(j) := false.B
+      oneColumnPSumAddFinRegVec(col) := false.B
     }
-    for (i <- 0 until peRowNum) {
-      connectAllExceptReady(peArrayIO(i)(j).dataStream.weightIOs, io.dataPath.weightIO(i))
-      io.dataPath.weightIO(i).adrIOs.data.ready := peArrayIO(i).map(x =>
+    for (row <- 0 until peRowNum) {
+      connectAllExceptReady(peArrayIO(row)(col).dataStream.weightIOs, io.dataPath.weightIO(row))
+      io.dataPath.weightIO(row).adrIOs.data.ready := peArrayIO(row).map(x =>
         x.dataStream.weightIOs.adrIOs.data.ready).reduce(_ && _)
-      io.dataPath.weightIO(i).dataIOs.data.ready := peArrayIO(i).map(x =>
+      io.dataPath.weightIO(row).dataIOs.data.ready := peArrayIO(row).map(x =>
         x.dataStream.weightIOs.dataIOs.data.ready).reduce(_ && _)
-      peArrayIO(i)(j).dataStream.inActIOs <> peClusterInActIO.inActToArrayData.muxInActData(i)(j)
-      peArrayIO(i)(j).topCtrl.doLoadEn := io.ctrlPath.doEn
+      peArrayIO(row)(col).dataStream.inActIOs <> peClusterInActIO.inActToArrayData.muxInActData(row)(col)
+      peArrayIO(row)(col).topCtrl.doLoadEn := io.ctrlPath.doEn
       // pSumControl
-      peArrayIO(i)(j).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
-      when (peArrayIO(i)(j).topCtrl.calFinish) {
-        onePECalFinReg(i)(j) := true.B
-      }
-      when (allCalFinWire) {
-        onePECalFinReg(i)(j) := false.B
-      }
+      peArrayIO(row)(col).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
+      onePECalFinReg(row)(col) := Mux(allCalFinWire, false.B,
+        Mux(peArrayIO(row)(col).topCtrl.calFinish, true.B, onePECalFinReg(row)(col))
+      )
     }
   }
   io.ctrlPath.allPSumAddFin := allColPSumAddFin
