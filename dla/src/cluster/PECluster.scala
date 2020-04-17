@@ -29,8 +29,7 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   peClusterInActIO.inActToArrayData.inActIO <> io.dataPath.inActIO
   private val oneColumnPSumAddFinRegVec = Seq.fill(peColNum){RegInit(false.B)}
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"col${i}PSumAddFinReg")})
-  private val allColPSumAddFin = Wire(Bool())
-  allColPSumAddFin := oneColumnPSumAddFinRegVec.reduce(_ && _)
+  private val allColPSumAddFin = oneColumnPSumAddFinRegVec.reduce(_ && _)
   private val onePECalFinReg = Seq.fill(peRowNum, peColNum){RegInit(false.B)}
   private val allCalFinWire = Wire(Bool())
   allCalFinWire := onePECalFinReg.map(_.reduce(_ && _)).reduce(_ && _)
@@ -53,12 +52,10 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       muxInPSumDataWire(col) <> io.dataPath.pSumDataFromSouthernIO(col) // from southern PEArray
       io.dataPath.pSumIO.inIOs(col).ready := false.B
     }
-    when (peArrayIO.head(col).padWF.pSumAddFin) { // only need to record each head of column as we begin add from the tail
-      oneColumnPSumAddFinRegVec(col) := true.B
-    }
-    when (allColPSumAddFin) {
-      oneColumnPSumAddFinRegVec(col) := false.B
-    }
+    oneColumnPSumAddFinRegVec(col) := Mux(allColPSumAddFin, false.B,
+      // only need to record each head of column as we begin add from the tail
+      Mux(peArrayIO.head(col).padWF.pSumAddFin, true.B, oneColumnPSumAddFinRegVec(col))
+    )
     for (row <- 0 until peRowNum) {
       connectAllExceptReady(peArrayIO(row)(col).dataStream.weightIOs, io.dataPath.weightIO(row))
       io.dataPath.weightIO(row).adrIOs.data.ready := peArrayIO(row).map(x =>

@@ -219,6 +219,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   padEqID := sPad === padInActData
   weightMatrixReadFirstColumn := inActMatrixRowWire === 0.U
   private val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
+  weightMatrixRowReg.suggestName("weightMatrixRowReg")
   private val SPadSeq = Seq(inActAdrSPadIO, inActDataSPadIO, weightAdrSPadIO, weightDataSPadIO)
   // Connections
   SPadSeq.map(_.ctrlPath.writeEn := io.padCtrl.fromTopIO.doLoadEn)
@@ -272,6 +273,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val pSumPadReadIdxIncWire = Wire(Bool())
   pSumPadReadIdxIncWire.suggestName("pSumPadReadIdxIncWire")
   private val pSumPadReadWrap = Wire(Bool())
+  pSumPadReadWrap.suggestName("pSumPadReadWrap")
   private val pSumReadOutValid = io.dataStream.ipsIO.valid && io.padCtrl.fromTopIO.pSumEnqEn
   // top connections
   io.padWF.pSumAddFin := pSumPadReadWrap && io.padCtrl.fromTopIO.pSumEnqEn // when need read and wrap

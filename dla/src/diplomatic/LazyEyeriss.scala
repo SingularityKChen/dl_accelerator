@@ -165,7 +165,7 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     private val weightLegal = weightLegalDest && getWeightLegal
     private val (weightReqFirst, weightReqLast, weightReqDone) = memWeightEdge.firstlast(memWeightBundle.a)
     private val (weightRespFirst, weightRespLast, weightRespDone) = memWeightEdge.firstlast(memWeightBundle.d)
-    /** only peLoadEn, then generate source id*/
+    /** only peLoadEn and haven't finish read (sourceAlloc.valid), then generate source id*/
     memCtrlIO.weightIO.sourceAlloc.ready := weightLegal && weightReqFirst &&
       memWeightBundle.a.ready && cgCtrlPath.peLoadEn
     memCtrlIO.weightIO.sourceFree.valid := weightRespFirst && memWeightBundle.d.fire()
