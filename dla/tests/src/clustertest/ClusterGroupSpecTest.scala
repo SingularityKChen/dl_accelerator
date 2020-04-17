@@ -136,6 +136,25 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
                           expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"$c2$s2@inActRead")
                       }
                   }.joinAndStep(theClock)
+                  theDebugIO.inActReadFinVecIO.foreach(x => x.expect(false.B,
+                    "need reset FinReg every time read finish"))
+                  theTop.glbInActCtrlIOs.foreach(x => x.readIO.enable.expect(true.B,
+                    "as inAct has only been read once, need read again"))
+                  /** then read inAct again*/
+                  (1 until inActSRAMNum).foldLeft( fork {
+                    inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                      expectIO = theDebugIO.inActReadFinVecIO, idx = 0, prefix = s"($c2,$s2)@inActRead")
+                  }) {
+                    case (left, right) =>
+                      left.fork {
+                        inActReadHelper( pokeIO = theTop.glbInActCtrlIOs.map(x =>x.readIO.done),
+                          expectIO = theDebugIO.inActReadFinVecIO, idx = right, prefix = s"$c2$s2@inActRead")
+                      }
+                  }.joinAndStep(theClock)
+                  theDebugIO.inActReadFinVecIO.foreach(x => x.expect(false.B,
+                    "needs reset FinReg every time read finish"))
+                  theTop.glbInActCtrlIOs.foreach(x => x.readIO.enable.expect(false.B,
+                    "as inAct has been read twice"))
                   /** cgState = 3, do computations inside PE*/
                   theDebugIO.cgState.expect(3.U, s"[$c2,$s2] after read inAct from GLB, it should do computation")
                   theClock.step((new Random).nextInt(15))

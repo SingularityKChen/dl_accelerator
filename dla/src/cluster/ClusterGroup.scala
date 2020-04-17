@@ -133,6 +133,8 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val configWrapWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
   //private val configValWireVec = Seq(configG2Val, configN2Val, configM2Val, configF2Val, configC2Val, configS2Val)
   // 0g, 1n, 2m, 3f, 4c, 5s
+  private val inActReadTwoReg = RegInit(false.B) // for inAct, which needs former and later data read
+  inActReadTwoReg.suggestName("inActReadTwoReg")
   private val glbInActWriteFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
   glbInActWriteFinReg.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"glbInActWriteFin$i")})
   private val glbInActReadFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
@@ -140,15 +142,17 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val glbPSumWriteFinReg = Seq.fill(pSumSRAMNum){RegInit(false.B)}
   // true when inAct data have loaded into GLB from off chip
   private val glbInActWriteFinWire = glbInActWriteFinReg.reduce(_ && _)
-  private val glbInActReadFinWire = glbInActReadFinReg.reduce(_ && _)
+  private val glbInActReadFinOnceWire = glbInActReadFinReg.reduce(_ && _)
+  private val glbInActReadFinWire = glbInActReadFinOnceWire && inActReadTwoReg
   // true when pSum data have loaded into GLB from PECluster
   private val glbPSumLoadFinWire = glbPSumWriteFinReg.reduce(_ && _)
   glbInActWriteFinReg.zip(io.glbInActCtrlIOs.map(x => x.writeIO.done)).foreach({ case (reg, doneIO) =>
     reg := Mux(glbInActWriteFinWire, false.B, Mux(doneIO, true.B, reg))
   })
   glbInActReadFinReg.zip(io.glbInActCtrlIOs.map(x => x.readIO.done)).foreach({ case (reg, doneIO) =>
-    reg := Mux(glbInActReadFinWire, false.B, Mux(doneIO, true.B, reg))
+    reg := Mux(glbInActReadFinOnceWire, false.B, Mux(doneIO, true.B, reg))
   })
+  inActReadTwoReg := Mux(glbInActReadFinOnceWire, !inActReadTwoReg, inActReadTwoReg)
   glbPSumWriteFinReg.zip(io.glbPSumCtrlIOs.map(x => x.writeIO.done)).foreach({case (reg, doneIO) =>
     reg := Mux(glbPSumLoadFinWire, false.B, Mux(doneIO, true.B, reg))
     // FIXME: writeIO.done is always DontCare
@@ -222,7 +226,6 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   private val pSumAdrL2 = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
   private val inActReadAdrL2 = configG2Val*(N2*C2*(F2+S2)).U + configN2Val*(C2*(F2+S2)).U +
     configC2Val*(F2+S2).U + configF2Val + configS2Val
-  //private val weightReadAdrL2 = configG2Val*(M2*C2*S2).U + configM2Val*(C2*S2).U + configC2Val*S2.U + configS2Val
   private val pSumWriteAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val pSumReadAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   private val cgLoadGLBWire = cgStateReg === cgLoadGLB
@@ -241,17 +244,13 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   io.glbInActCtrlIOs.zipWithIndex.foreach({case (x, idx) =>
     x.writeIO.enable := cgLoadGLBWire
     x.writeIO.adr := DontCare
-    x.readIO.adr := inActReadAdrL2
+    x.readIO.adr := inActReadAdrL2 // FIXME: change the address while reading later
     /** each GLB inAct's read enable will be true until the corresponding PEs finish reading */
     x.readIO.enable := cgLoadPEWire && !glbInActReadFinReg(idx)
   })
-  // weight's address TODO
-  //io.glbWeightCtrlIO.head.adr := weightReadAdrL2
-  //io.glbWeightCtrlIO.head.enable := cgLoadPEWire && !glbWeightReadFinReg(idx)
   io.peCtrlIO.pSumLoadEn := configIncWireSeq(3)
   io.peCtrlIO.peLoadEn := cgLoadPEWire
   io.pSumAdd := cgReadWire
-  //io.peCal := cgStateReg === cgCal
   io.glbLoadEn := cgLoadGLBWire
   io.topIO.calFin := cgReadWire && configG2Wrap
   if (debug) {
@@ -274,7 +273,6 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
   val allPSumAddFin: Bool = Input(Bool()) // all columns of PE have finished accumulated PSum
   val allCalFin: Bool = Input(Bool()) // all PEs have finished the MAC computation
   val pSumAdd: Bool = Output(Bool())
-  //val peCal: Bool = Output(Bool())
   val topIO = new Bundle {
     val readOutPSum: Bool = Input(Bool())
     val cgEnable: Bool = Input(Bool())
