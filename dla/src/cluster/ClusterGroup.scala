@@ -155,9 +155,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   inActReadTwoReg := Mux(glbInActReadFinOnceWire, !inActReadTwoReg, inActReadTwoReg)
   glbPSumWriteFinReg.zip(io.glbPSumCtrlIOs.map(x => x.writeIO.done)).foreach({case (reg, doneIO) =>
     reg := Mux(glbPSumLoadFinWire, false.B, Mux(doneIO, true.B, reg))
-    // FIXME: writeIO.done is always DontCare
   })
-  //glbWriteFinWire := glbPSumWriteFinReg.reduce(_ && _) && glbInActWriteFinReg.reduce(_ && _)
   /** cluster group state machine
     * cgLoadGLB: load inAct and PSum from outside CG into GLBCluster
     * cgLoadPE: load inAct, weight from outside PECluster (from GLB and outside CG)
@@ -248,7 +246,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     /** each GLB inAct's read enable will be true until the corresponding PEs finish reading */
     x.readIO.enable := cgLoadPEWire && !glbInActReadFinReg(idx)
   })
-  io.peCtrlIO.pSumLoadEn := configIncWireSeq(3)
+  io.peCtrlIO.pSumLoadEn := cgReadWire
   io.peCtrlIO.peLoadEn := cgLoadPEWire
   io.pSumAdd := cgReadWire
   io.glbLoadEn := cgLoadGLBWire

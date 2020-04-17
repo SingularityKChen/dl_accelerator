@@ -32,7 +32,7 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
         } else {
           sramCtrlSeq(k).adr := topCtrlSeq(k).adr
         }
-        if (i == 1) { // pSum done wires, can be seen from the GLB controller
+        if (i == 1 && k == 0) { // pSum.read.done wires, can be seen from the GLB controller
           topCtrlSeq(k).done := DontCare
         } else {
           topCtrlSeq(k).done := sramCtrlSeq(k).done
@@ -61,15 +61,20 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
 }
 
 class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, debug: Boolean)
-  extends SRAMCommon(theSRAMSize, theDataWidth) {
+  extends SRAMCommon(theSRAMSize, theDataWidth) with MCRENFConfig {
   theSRAM.suggestName("onePSumSRAMBank")
   val io: PSumSRAMBankIO = IO(new PSumSRAMBankIO)
   // write logic
   writeLogic(io.dataPath.inIOs, io.ctrlPath.writeIO.enable, io.ctrlPath.writeIO.adr)
+  private val writeCounter = RegInit(0.U(log2Ceil(pSumOneSPadNum).W))
+  writeCounter.suggestName("writeCounter")
+  private val writeDone = writeCounter === (pSumOneSPadNum - 1).U
+  writeDone.suggestName("writeDone")
+  writeCounter := Mux(writeDone, 0.U, Mux(io.dataPath.inIOs.fire(), writeCounter + 1.U, writeCounter))
   // read logic
   // only use ready to control the read progress, so ready signal need to keep at least two cycles
   readLogic(io.dataPath.outIOs, io.ctrlPath.readIO.enable, io.ctrlPath.readIO.adr, false.B)
-  io.ctrlPath.writeIO.done := DontCare
+  io.ctrlPath.writeIO.done := writeDone
   io.ctrlPath.readIO.done := DontCare
   // debug io
   if (debug) {
@@ -101,10 +106,10 @@ abstract class SRAMCommon(private val theSRAMSize: Int, private val theDataWidth
     readOutDataIO.bits := readOutData
   }
   def writeLogic(writeInDataIO: DecoupledIO[UInt], enable: Bool, idx: UInt): Any = {
-    doWriteWire := enable && writeInDataIO.valid
+    doWriteWire := enable
     writeInData := writeInDataIO.bits
     writeInDataIO.ready := doWriteWire
-    when(doWriteWire) {
+    when(writeInDataIO.fire()) {
       theSRAM.write(idx, writeInData)
     }
   }
