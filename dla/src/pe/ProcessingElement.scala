@@ -306,7 +306,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   when (pSumPadReadIdxIncWire) {
     pSumPadReadIdxReg := pSumPadReadIdxReg + 1.U
   }
-
+  /** the first half of pSumPadReadWrap is needed when doing mac for getting pSum
+    * another half is needed when reading all pSum out*/
   pSumPadReadWrap := (padEqID && mightInActReadFinish) || (padEqWB && mightInActReadFinish) ||
     (pSumPadReadIdxIncWire && pSumPadReadIdxReg === (M0*E*N0*F0 -1 ).U) // no need to use mux
   // SPadToCtrl

@@ -15,7 +15,9 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
   val theWeightDataLookup: Seq[List[Int]] = theWeightDataStreams.map(x => getStreamLookUp(x))
   private def getSPadData(fullData: List[Int], theLookup: List[Int], idx: Int): List[Int] = {
     var currentSPad: List[Int] = Nil
-    for (i <- theLookup(idx) until theLookup(idx + 1)) {
+    var endIdx = fullData.length
+    if (idx < theLookup.length - 1) endIdx = theLookup(idx + 1)
+    for (i <- theLookup(idx) until endIdx) {
       currentSPad = currentSPad:::List(fullData(i))
     }
     currentSPad
@@ -321,7 +323,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
         println(s"[$weightReadTimes] now finish one pe load")
         weightReadFin = true
       }
-      theClock.step()
+      theClock.step(100)
     }
   }
 }
