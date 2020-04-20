@@ -169,10 +169,11 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // do finish?
   meetZeroWire.head := readOutData === 0.U
   meetZeroWire.last := writeInData === 0.U
+  private val canJump = Seq(io.dataPath.outIOs.data.fire(), io.dataPath.inIOs.data.fire())
   for (i <- 0 until 2) {
     switch(zeroState(i)) {
       is (noZero) {
-        when (meetZeroWire(i) && (io.dataPath.inIOs.data.fire() || io.dataPath.outIOs.data.fire())) {
+        when (meetZeroWire(i) && canJump(i) ) {
           zeroState(i) := oneZero
         }
       }
