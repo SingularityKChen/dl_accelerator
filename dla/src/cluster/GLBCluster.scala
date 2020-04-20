@@ -169,7 +169,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   for (i <- 0 until 2) {
     switch(zeroState(i)) {
       is (noZero) {
-        when (meetZeroWire(i)) {
+        when (meetZeroWire(i) && (io.dataPath.inIOs.data.fire() || io.dataPath.outIOs.data.fire())) {
           zeroState(i) := oneZero
         }
       }
