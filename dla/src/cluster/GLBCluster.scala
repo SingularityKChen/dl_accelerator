@@ -127,7 +127,10 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   private val adrLookUpTable = Mem(2*inActStreamNum, UInt(log2Ceil(theSRAMSize).W))
   private val noZero :: oneZero :: twoZeros :: Nil = Enum(3)
   private val zeroState = Seq.fill(2){RegInit(noZero)} // 0 for read, 1 for write
+  zeroState.head.suggestName("readZeroStateReg")
+  zeroState.last.suggestName("writeZeroStateReg")
   private val meetZeroWire = Wire(Vec(2, Bool())) // 0 for read, 1 for write
+  meetZeroWire.suggestName("meetZeroWire")
   private val writeDoneWire = Wire(Bool())
   private val readDoneWire = Wire(Bool())
   private val writeIdxReg = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
@@ -197,8 +200,8 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
       }
     }
   }
-  readDoneWire := meetZeroWire.head && waitForRead// or meet one zero
-  writeDoneWire := meetTwoZerosWire
+  readDoneWire := meetZeroWire.head && waitForRead && io.ctrlPath.readIO.enable// or meet one zero
+  writeDoneWire := meetTwoZerosWire && io.ctrlPath.writeIO.enable
   meetTwoZerosWire := zeroState.last === twoZeros // that's two zeros, only write need
   // debug io
   if (debug) {
@@ -217,10 +220,12 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
 
 class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io: InActSRAMBankIO = IO(new InActSRAMBankIO)
-  private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug)).io
+  private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug))
   adrSRAM.suggestName("adrSRAM")
-  private val dataSRAM = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug)).io
+  private val dataSRAM = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug))
   dataSRAM.suggestName("dataSRAM")
+  private val adrSRAMIO = adrSRAM.io
+  private val dataSRAMIO = dataSRAM.io
   private val bothDoneWire = Wire(Vec(2,Bool()))
   private val doneAtSameTimeWire = Wire(Vec(2,Bool()))
   private val inActIdle :: inActDoing :: inActWaitAdr :: inActWaitData :: Nil = Enum(4)
@@ -228,14 +233,14 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   private val currentDoingWire = Wire(Vec(2, Bool()))
   private val adrDoneWire = Wire(Vec(2, Bool()))
   private val dataDoneWire = Wire(Vec(2, Bool()))
-  adrDoneWire.head := adrSRAM.ctrlPath.readIO.done
-  dataDoneWire.head := dataSRAM.ctrlPath.readIO.done
-  adrDoneWire.last := adrSRAM.ctrlPath.writeIO.done
-  dataDoneWire.last := dataSRAM.ctrlPath.writeIO.done
-  adrSRAM.ctrlPath.readIO.enable := currentDoingWire.head || (inActState.head === inActWaitAdr)
-  dataSRAM.ctrlPath.readIO.enable := currentDoingWire.head || (inActState.head === inActWaitData)
-  adrSRAM.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitAdr)
-  dataSRAM.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitData)
+  adrDoneWire.head := adrSRAMIO.ctrlPath.readIO.done
+  dataDoneWire.head := dataSRAMIO.ctrlPath.readIO.done
+  adrDoneWire.last := adrSRAMIO.ctrlPath.writeIO.done
+  dataDoneWire.last := dataSRAMIO.ctrlPath.writeIO.done
+  adrSRAMIO.ctrlPath.readIO.enable := currentDoingWire.head || (inActState.head === inActWaitAdr)
+  dataSRAMIO.ctrlPath.readIO.enable := currentDoingWire.head || (inActState.head === inActWaitData)
+  adrSRAMIO.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitAdr)
+  dataSRAMIO.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitData)
   private val topCtrlSeq = Seq(io.ctrlPath.readIO, io.ctrlPath.writeIO)
   for (i <- 0 until 2) {
     currentDoingWire(i) := inActState(i) === inActDoing
@@ -273,12 +278,12 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
     }
   }
   // SRAM connections
-  adrSRAM.dataPath.inIOs <> io.dataPath.inIOs.adrIOs
-  adrSRAM.dataPath.outIOs <> io.dataPath.outIOs.adrIOs
-  dataSRAM.dataPath.inIOs <> io.dataPath.inIOs.dataIOs
-  dataSRAM.dataPath.outIOs <> io.dataPath.outIOs.dataIOs
+  adrSRAMIO.dataPath.inIOs <> io.dataPath.inIOs.adrIOs
+  adrSRAMIO.dataPath.outIOs <> io.dataPath.outIOs.adrIOs
+  dataSRAMIO.dataPath.inIOs <> io.dataPath.inIOs.dataIOs
+  dataSRAMIO.dataPath.outIOs <> io.dataPath.outIOs.dataIOs
   // control path
-  Seq(adrSRAM.ctrlPath, dataSRAM.ctrlPath).foreach({ x =>
+  Seq(adrSRAMIO.ctrlPath, dataSRAMIO.ctrlPath).foreach({ x =>
     x.readIO.adr := io.ctrlPath.readIO.adr // address for lookup table
     x.writeIO.adr := DontCare
   })
@@ -286,7 +291,7 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   io.ctrlPath.writeIO.done := bothDoneWire.last
   if (debug) {
     io.debugIO.theState := Mux(!io.ctrlPath.writeIO.enable, inActState.head, inActState.last)
-    Seq(io.debugIO.adrDebug, io.debugIO.dataDebug).zip(Seq(adrSRAM, dataSRAM)).foreach({case (topIO, sram) =>
+    Seq(io.debugIO.adrDebug, io.debugIO.dataDebug).zip(Seq(adrSRAMIO, dataSRAMIO)).foreach({case (topIO, sram) =>
       topIO.subDone := Mux(!io.ctrlPath.writeIO.enable, sram.ctrlPath.readIO.done, sram.ctrlPath.writeIO.done)
       topIO.commonDebug <> sram.debugIO
     })
