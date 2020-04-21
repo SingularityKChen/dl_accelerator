@@ -38,7 +38,7 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   writeFinishRegVec(2).suggestName("weightAdrWFReg")
   writeFinishRegVec.last.suggestName("weightDataWFReg")
   for (i <- SPadWFSeq.indices) {
-    writeFinishRegVec(i) := Mux(io.topCtrl.calFinish, false.B, Mux(SPadWFSeq(i), true.B, writeFinishRegVec(i)))
+    writeFinishRegVec(i) := Mux(writeFinishWire, false.B, Mux(SPadWFSeq(i), true.B, writeFinishRegVec(i)))
   }
   writeFinishWire := writeFinishRegVec.reduce(_ && _) // when inAct and Weight Scratch Pads write finished
   io.topCtrl.writeFinish := writeFinishWire
@@ -132,6 +132,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   }
   private def readFinish(): Unit = {
     sPad := padIdle
+    inActDataSPadFirstReadReg := true.B
     inActMatrixColumnReg := 0.U
   }
   // reg, partial sum scratch pad
@@ -164,6 +165,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // InActSPad
   private val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
   private val inActAdrDataWire: UInt = Wire(UInt(inActAdrWidth.W))
+  inActAdrDataWire.suggestName("inActAdrData")
   private val inActDataIndexWire: UInt = Wire(UInt(inActDataIdxWidth.W)) // use for address vector readEn
   private val inActAdrSPadReadEnReg: Bool = RegInit(false.B)
   private val inActDataSPadReadEnReg: Bool = RegInit(false.B)
@@ -172,6 +174,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val inActMatrixColumnReg: UInt = RegInit(0.U(inActAdrIdxWidth.W))
   private val inActZeroColumnNumber: UInt = RegInit(0.U(inActAdrIdxWidth.W)) // use for get the right column number
   private val inActDataSPadFirstReadReg: Bool = RegInit(true.B)
+  inActDataSPadFirstReadReg.suggestName("inActFirstRead")
   private val inActMatrixRowWire: UInt = Wire(UInt(cscCountWidth.W))
   inActMatrixRowWire.suggestName("inActMatrixRowWire")
   private val inActMatrixDataWire: UInt = Wire(UInt(cscDataWidth.W))
@@ -318,11 +321,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   mightInActReadFinish := inActMatrixDataWire === 0.U && !inActDataSPadFirstReadReg
   mightWeightReadFinish := weightMatrixDataReg === 0.U && !weightDataSPadFirstRead
   inActAdrSPadIdxIncWire := (padEqIA && mightInActZeroColumnWire) || (((padEqWA && mightWeightZeroColumnWire) ||
-    (padEqWB && mightWeightIdxIncWire)) && mightInActIdxIncWire)
+    (padEqWB && mightWeightIdxIncWire)) && mightInActIdxIncWire) || (mightInActReadFinish && sPad =/= 0.U)
   weightAdrSPadIdxIncWire := (padEqMpy || sPad === padWeightData1) && mightWeightZeroColumnWire // FIXME: should add a state
   // if first read, then keep the read index of zero
   inActDataSPadIdxIncWire := (padEqIA && !mightInActZeroColumnWire && !inActDataSPadFirstReadReg) ||
-    (((padEqWA && mightWeightZeroColumnWire) || (padEqWB && mightWeightIdxIncWire)) && !mightInActIdxIncWire)
+    (((padEqWA && mightWeightZeroColumnWire) ||
+      (padEqWB && mightWeightIdxIncWire)) && !mightInActIdxIncWire) || (mightInActReadFinish && sPad =/= 0.U)
   weightDataSPadIdxIncWire := (padEqWA && !mightWeightZeroColumnWire && !weightDataSPadFirstRead) ||
     (padEqWB && !mightWeightIdxIncWire) // when first read, ask Weight Address Scratch Pad for data index
   weightAdrIdxEnWire := (padEqID || padEqWA) && weightDataSPadFirstRead // read the start and end index from address SPad
@@ -330,13 +334,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataIdxMuxWire := padEqID && weightDataSPadFirstRead && !weightMatrixReadFirstColumn
   weightAdrSPadReadIdxWire := Mux(weightDataIdxMuxWire, inActMatrixRowWire - 1.U, inActMatrixRowWire)
   weightDataIdxEnWire := padEqWA && weightDataSPadFirstRead && !mightWeightZeroColumnWire
-  io.padCtrl.fromTopIO.calFinish := mightInActReadFinish
+  io.padCtrl.fromTopIO.calFinish := mightInActReadFinish && sPad =/= 0.U
   psDataSPadIdxWire := weightMatrixRowReg + inActMatrixColumnReg * M0.U
   switch (sPad) {
     is (padIdle) {
       when(io.padCtrl.doMACEn) {
         nextSPadInActAdr()
-        inActDataSPadFirstReadReg := true.B
       }
     }
     is (padInActAdr) {

@@ -28,9 +28,13 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
     })})
   peClusterInActIO.inActToArrayData.inActIO <> io.dataPath.inActIO
   private val oneColumnPSumAddFinRegVec = Seq.fill(peColNum){RegInit(false.B)}
+  oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, col) => bool.suggestName(s"pePSumAddFin$col")})
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"col${i}PSumAddFinReg")})
   private val allColPSumAddFin = oneColumnPSumAddFinRegVec.reduce(_ && _)
   private val onePECalFinReg = Seq.fill(peRowNum, peColNum){RegInit(false.B)}
+  onePECalFinReg.zipWithIndex.foreach({ case (bools, row) => bools.zipWithIndex.foreach({ case (bool, col) =>
+    bool.suggestName(s"peCalFin$row$col")
+  })})
   private val allCalFinWire = Wire(Bool())
   allCalFinWire := onePECalFinReg.map(_.reduce(_ && _)).reduce(_ && _)
   // connections of peClusterPSum
@@ -63,7 +67,7 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       io.dataPath.weightIO(row).dataIOs.data.ready := peArrayIO(row).map(x =>
         x.dataStream.weightIOs.dataIOs.data.ready).reduce(_ && _)
       peArrayIO(row)(col).dataStream.inActIOs <> peClusterInActIO.inActToArrayData.muxInActData(row)(col)
-      peArrayIO(row)(col).topCtrl.doLoadEn := io.ctrlPath.doEn
+      peArrayIO(row)(col).topCtrl.doLoadEn := io.ctrlPath.doEn && !onePECalFinReg(row)(col)
       // pSumControl
       peArrayIO(row)(col).topCtrl.pSumEnqEn := io.ctrlPath.pSumLoadEn
       onePECalFinReg(row)(col) := Mux(allCalFinWire, false.B,
