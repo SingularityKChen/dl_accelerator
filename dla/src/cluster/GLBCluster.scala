@@ -65,7 +65,7 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   writeLogic(io.dataPath.inIOs, io.ctrlPath.writeIO.enable, io.ctrlPath.writeIO.adr)
   private val writeCounter = RegInit(0.U(log2Ceil(pSumOneSPadNum).W))
   writeCounter.suggestName("writeCounter")
-  private val writeDone = writeCounter === (pSumOneSPadNum - 1).U
+  private val writeDone = writeCounter === (pSumOneSPadNum - 1).U && io.dataPath.inIOs.fire()
   writeDone.suggestName("writeDone")
   writeCounter := Mux(writeDone, 0.U, Mux(io.dataPath.inIOs.fire(), writeCounter + 1.U, writeCounter))
   // read logic
@@ -146,7 +146,6 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // SRAM read write logic
   // if meet two continuous zeros, then the group of data finishes, also write finish
   private val meetTwoZerosWire = Wire(Bool())
-  // TODO: add some logic to check whether one SPad of data is a zero matrix, true then jump
   io.ctrlPath.readIO.done := readDoneWire && zeroState.head =/= oneZero
   io.ctrlPath.writeIO.done := writeDoneWire && writeIdxReg =/= 0.U
   // write logic

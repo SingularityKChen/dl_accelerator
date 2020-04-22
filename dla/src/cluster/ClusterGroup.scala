@@ -196,7 +196,8 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
       }
     }
     is (cgRead) {
-      when (glbPSumLoadFinWire) { // after read out all PSum from the head of each column
+      when (glbPSumLoadFinWire) {
+        /** after GLB, read out all PSum from the head of each column*/
         when (configG2Wrap) { // when g2 wrap, then finish current takes
           cgStateReg := cgIdle
         } .otherwise { // or , load next c2*s2
@@ -246,7 +247,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     /** each GLB inAct's read enable will be true until the corresponding PEs finish reading */
     x.readIO.enable := cgLoadPEWire && !glbInActReadFinReg(idx)
   })
-  io.peCtrlIO.pSumLoadEn := cgReadWire
+  io.peCtrlIO.pSumLoadEn := RegNext(configIncWireSeq(5) && configWrapWireSeq(4) && cgStateReg === cgCal)
   io.peCtrlIO.peLoadEn := cgLoadPEWire
   io.pSumAdd := cgReadWire
   io.glbLoadEn := cgLoadGLBWire
