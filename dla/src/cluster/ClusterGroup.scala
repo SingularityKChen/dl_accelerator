@@ -37,7 +37,7 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   clusterCtrl.allPSumAddFin := peCluster.ctrlPath.allPSumAddFin
   clusterCtrl.allCalFin := peCluster.ctrlPath.allCalFin
   io.ctrlPath.calFin := clusterCtrl.topIO.calFin
-  io.ctrlPath.peLoadEn := clusterCtrl.peCtrlIO.peLoadEn
+  io.ctrlPath.peWeightLoadEn := clusterCtrl.peCtrlIO.peLoadEn
   io.ctrlPath.glbLoadEn := clusterCtrl.glbLoadEn
   // connections of data path
   // input activations

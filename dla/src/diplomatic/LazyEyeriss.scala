@@ -273,7 +273,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   /** only peLoadEn and haven't finish read (sourceAlloc.valid), then generate source id*/
   memCtrlIO.weightIO.sourceAlloc.ready := io.ctrlPath.bundles.memWeightBundles.legal &&
     io.ctrlPath.bundles.memWeightBundles.reqFirst &&
-    io.ctrlPath.bundles.memWeightBundles.a.ready && cgCtrlPath.peLoadEn
+    io.ctrlPath.bundles.memWeightBundles.a.ready && cgCtrlPath.peWeightLoadEn
   memCtrlIO.weightIO.sourceFree.valid := io.ctrlPath.bundles.memWeightBundles.respFirst &&
     io.ctrlPath.bundles.memWeightBundles.d.fire()
   memCtrlIO.weightIO.sourceFree.bits := io.ctrlPath.bundles.memWeightBundles.d.bits.source
@@ -297,7 +297,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.bundles.memInActBundles.reqSize := decoderIO.inActIO.reqSize
   /** weight */
   io.ctrlPath.bundles.memWeightBundles.a.valid := io.ctrlPath.bundles.memWeightBundles.legal &&
-    (!io.ctrlPath.bundles.memWeightBundles.reqFirst || (memCtrlIO.weightIO.sourceAlloc.valid && cgCtrlPath.peLoadEn))
+    (!io.ctrlPath.bundles.memWeightBundles.reqFirst || (memCtrlIO.weightIO.sourceAlloc.valid && cgCtrlPath.peWeightLoadEn))
   io.ctrlPath.bundles.memWeightBundles.a.bits.source := memCtrlIO.weightIO.sourceAlloc.bits
   io.ctrlPath.bundles.memWeightBundles.address := memCtrlIO.weightIO.address
   io.ctrlPath.bundles.memWeightBundles.reqSize := decoderIO.weightIO.reqSize

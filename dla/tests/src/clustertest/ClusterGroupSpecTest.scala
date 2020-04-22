@@ -278,56 +278,72 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
       } .joinAndStep(theClock)
       println("when it begins to cal, when it will need weight")
       theClock.step()
-      theTop.ctrlPath.peLoadEn.expect(true.B, "peLoadEn should be true to load weight")
+      theTop.ctrlPath.peWeightLoadEn.expect(true.B, "peLoadEn should be true to load weight")
       var weightReadFin = false
-      for (weightReadTimes <- 0 until G2*M2*C2*S2) {
-        while (!theTop.ctrlPath.peLoadEn.peek().litToBoolean || weightReadFin) {
-          /** while not enable or has read current weight */
-          theClock.step()
-          if (!theTop.ctrlPath.peLoadEn.peek().litToBoolean) weightReadFin = false
+      var weightReadAdr = 0
+      var weightReadTimes = 0
+      for (g2 <- 0 until G2) {
+        for (n2 <- 0 until N2) {
+          for (m2 <- 0 until M2) {
+            for (f2 <- 0 until F2) {
+              for (c2 <- 0 until C2) {
+                for (s2 <- 0 until S2) {
+                  weightReadAdr = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
+                  while (!theTop.ctrlPath.peWeightLoadEn.peek().litToBoolean || weightReadFin) {
+                    /** while not enable or has read current weight */
+                    theClock.step()
+                    if (!theTop.ctrlPath.peWeightLoadEn.peek().litToBoolean) weightReadFin = false
+                  }
+                  val weightAdrOneSPad = theWeightAdrStreams.zip(theWeightAdrLookup).map({ case (ints, ints1) =>
+                    getSPadData(ints, ints1, idx = weightReadAdr)
+                  })
+                  val weightDataOneSPad = theWeightDataStreams.zip(theWeightDataLookup).map({ case (ints, ints1) =>
+                    getSPadData(ints, ints1, idx = weightReadAdr)
+                  })
+                  fork.withName("pokeWeightAdr") {
+                    (1 until weightRouterNum).foldLeft(
+                      fork {
+                        val prefix: String = s"${weightReadTimes}weightAdr0@$weightReadAdr"
+                        val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.adrIOs.data
+                        pokeData(pokeIO, weightAdrOneSPad.head, prefix)
+                      }) {
+                      case (left, right) =>
+                        left.fork {
+                          val prefix: String = s"${weightReadTimes}weightAdr$right@$weightReadAdr"
+                          val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.adrIOs.data
+                          pokeData(pokeIO, weightAdrOneSPad(right), prefix)
+                        }
+                    }.join()
+                  } .fork.withName("pokeWeightData") {
+                    (1 until weightRouterNum).foldLeft(
+                      fork {
+                        val prefix: String = s"${weightReadTimes}weightData0@$weightReadAdr"
+                        val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.dataIOs.data
+                        pokeData(pokeIO, weightDataOneSPad.head, prefix)
+                      }) {
+                      case (left, right) =>
+                        left.fork {
+                          val prefix: String = s"${weightReadTimes}weightData$right@$weightReadAdr"
+                          val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.dataIOs.data
+                          pokeData(pokeIO, weightDataOneSPad(right), prefix)
+                        }
+                    }.join()
+                  } .join()
+                  println(s"[$weightReadTimes@$weightReadAdr] now finish one pe load. " +
+                    s"($g2/$G2, $n2/$N2, $m2/$M2, $f2/$F2, $c2/$C2, $s2/$S2)")
+                  weightReadFin = true
+                  weightReadTimes += 1
+                }
+              }
+            }
+          }
         }
-        val weightAdrOneSPad = theWeightAdrStreams.zip(theWeightAdrLookup).map({ case (ints, ints1) =>
-          getSPadData(ints, ints1, idx = weightReadTimes)
-        })
-        val weightDataOneSPad = theWeightDataStreams.zip(theWeightDataLookup).map({ case (ints, ints1) =>
-          getSPadData(ints, ints1, idx = weightReadTimes)
-        })
-        fork.withName("pokeWeightAdr") {
-          (1 until weightRouterNum).foldLeft(
-            fork {
-              val prefix: String = s"${weightReadTimes}weightAdr0"
-              val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.adrIOs.data
-              pokeData(pokeIO, weightAdrOneSPad.head, prefix)
-            }) {
-            case (left, right) =>
-              left.fork {
-                val prefix: String = s"${weightReadTimes}weightAdr$right"
-                val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.adrIOs.data
-                pokeData(pokeIO, weightAdrOneSPad(right), prefix)
-              }
-          }.join()
-        } .fork.withName("pokeWeightData") {
-          (1 until weightRouterNum).foldLeft(
-            fork {
-              val prefix: String = s"${weightReadTimes}weightData0"
-              val pokeIO = theTop.dataPath.glbDataPath.weightIO.head.inIOs.dataIOs.data
-              pokeData(pokeIO, weightDataOneSPad.head, prefix)
-            }) {
-            case (left, right) =>
-              left.fork {
-                val prefix: String = s"${weightReadTimes}weightData$right"
-                val pokeIO = theTop.dataPath.glbDataPath.weightIO(right).inIOs.dataIOs.data
-                pokeData(pokeIO, weightDataOneSPad(right), prefix)
-              }
-          }.join()
-        } .join()
-        println(s"[$weightReadTimes] now finish one pe load")
-        weightReadFin = true
       }
+      println("now wait for calFin")
       while (!theTop.ctrlPath.calFin.peek().litToBoolean) {
         theClock.step()
       }
-      println("All cal finish again")
+      println("All cal finish now")
       theClock.step(100)
     }
   }
