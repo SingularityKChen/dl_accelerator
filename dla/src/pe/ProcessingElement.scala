@@ -160,6 +160,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   private val mightWeightZeroColumnWire: Bool = Wire(Bool())
   private val mightWeightIdxIncWire: Bool = Wire(Bool())
   private val mightInActReadFinish: Bool = Wire(Bool())
+  mightInActReadFinish.suggestName("mightInActReadFinish")
   private val mightWeightReadFinish: Bool = Wire(Bool())
   private val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
   // InActSPad
@@ -356,10 +357,10 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
         readFinish()
       } .otherwise {
         nextSPadWeightAdr()
-        inActDataSPadFirstReadReg := false.B
       }
     }
     is (padWeightAdr) {
+      inActDataSPadFirstReadReg := false.B
       when (mightWeightZeroColumnWire) { // need to get next inAct
         when (mightInActIdxIncWire) { // if have read all elements in current inAct Matrix column
           nextSPadInActAdr()

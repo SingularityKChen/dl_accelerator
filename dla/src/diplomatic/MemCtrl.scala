@@ -36,9 +36,15 @@ class EyerissMemCtrlIO()(implicit val p: EyerissMemCtrlParameters) extends Bundl
 class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends Module
   with PESizeConfig {
   val io: EyerissMemCtrlIO = IO(new EyerissMemCtrlIO()(p))
-  private val inActIdMap = Module(new EyerissIDMapGenerator(p.inActIds)).io
-  private val weightIdMap = Module(new EyerissIDMapGenerator(p.weightIds)).io
-  private val pSumIdMap = Module(new EyerissIDMapGenerator(p.pSumIds)).io
+  private val inActIdMap = Module(new EyerissIDMapGenerator(p.inActIds))
+  inActIdMap.suggestName("inActIdMap")
+  private val weightIdMap = Module(new EyerissIDMapGenerator(p.weightIds))
+  weightIdMap.suggestName("weightIdMap")
+  private val pSumIdMap = Module(new EyerissIDMapGenerator(p.pSumIds))
+  pSumIdMap.suggestName("pSumIdMap")
+  private val inActIdMapIO = inActIdMap.io
+  private val weightIdMapIO = weightIdMap.io
+  private val pSumIdMapIO = pSumIdMap.io
   private val inActStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val weightStarAdrReg = RegInit(0.U(p.addressBits.W))
   private val pSumStarAdrReg = RegInit(0.U(p.addressBits.W))
@@ -49,12 +55,12 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   private val weightReqSizeReg = RegInit(0.U(p.weightSizeBits.W))
   private val pSumReqSizeReg = RegInit(0.U(p.pSumSizeBits.W))
   /** connections of input and source generate module */
-  io.inActIO.sourceAlloc <> inActIdMap.alloc
-  io.inActIO.sourceFree <> inActIdMap.free
-  io.weightIO.sourceAlloc <> weightIdMap.alloc
-  io.weightIO.sourceFree <> weightIdMap.free
-  io.pSumIO.sourceAlloc <> pSumIdMap.alloc
-  io.pSumIO.sourceFree <> pSumIdMap.free
+  io.inActIO.sourceAlloc <> inActIdMapIO.alloc
+  io.inActIO.sourceFree <> inActIdMapIO.free
+  io.weightIO.sourceAlloc <> weightIdMapIO.alloc
+  io.weightIO.sourceFree <> weightIdMapIO.free
+  io.pSumIO.sourceAlloc <> pSumIdMapIO.alloc
+  io.pSumIO.sourceFree <> pSumIdMapIO.free
   /** the start address */
   inActStarAdrReg := io.inActIO.startAdr
   weightStarAdrReg := io.weightIO.startAdr
@@ -67,12 +73,12 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   private val inActReqAdrAcc = RegInit(0.U(p.addressBits.W))
   private val weightReqAdrAcc = RegInit(0.U(p.addressBits.W))
   private val pSumReqAdrAcc = RegInit(0.U(p.addressBits.W))
-  inActReqAdrAcc := (inActReqAdrAcc + (inActReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(inActIdMap.finish)
+  inActReqAdrAcc := (inActReqAdrAcc + (inActReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(inActIdMapIO.finish)
   // TODO: different source id should own different address accumulator regs.
   inActReqAdrReg := inActStarAdrReg + inActReqAdrAcc
-  weightReqAdrAcc := (weightReqAdrAcc + (weightReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(weightIdMap.finish)
+  weightReqAdrAcc := (weightReqAdrAcc + (weightReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(weightIdMapIO.finish)
   weightReqAdrReg := weightStarAdrReg + weightReqAdrAcc
-  pSumReqAdrAcc := (pSumReqAdrAcc + pSumReqSizeReg * psDataWidth.U).holdUnless(pSumIdMap.finish)
+  pSumReqAdrAcc := (pSumReqAdrAcc + pSumReqSizeReg * psDataWidth.U).holdUnless(pSumIdMapIO.finish)
   pSumReqAdrReg := pSumStarAdrReg + pSumReqAdrAcc
   /** connections of require address */
   io.inActIO.address := inActReqAdrReg

@@ -15,8 +15,6 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
   private val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
   private val theSRAMsCtrl = Seq(iSRAMsIO.map(x => x.ctrlPath), pSRAMsIO.map(x => x.ctrlPath))
   private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
-  private val theSRAMsEnWire = Wire(Vec(2, Vec(2, Bool())))
-  theSRAMsEnWire.suggestName("theSRAMsEnWire")
   // connections of inAct and PSum
   for (i <- 0 until 2) { // inAct and PSum
     // connections of control path
@@ -24,7 +22,6 @@ class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMF
       // inner connections
       for (j <- 0 until theSRAMsNum(i)) {
         val topCtrlSeq = Seq(theTopCtrls(i)(j).readIO, theTopCtrls(i)(j).writeIO)
-        theSRAMsEnWire(i)(k) := topCtrlSeq(k).enable
         val sramCtrlSeq = Seq(theSRAMsCtrl(i)(j).readIO, theSRAMsCtrl(i)(j).writeIO)
         sramCtrlSeq(k).enable := topCtrlSeq(k).enable
         if (i == 0 && k == 1) { // inActWrite.adr don't need
@@ -231,6 +228,8 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   private val doneAtSameTimeWire = Wire(Vec(2,Bool()))
   private val inActIdle :: inActDoing :: inActWaitAdr :: inActWaitData :: Nil = Enum(4)
   private val inActState = Seq.fill(2){RegInit(inActIdle)}
+  inActState.head.suggestName("inActReadState")
+  inActState.last.suggestName("inActWriteState")
   private val currentDoingWire = Wire(Vec(2, Bool()))
   private val adrDoneWire = Wire(Vec(2, Bool()))
   private val dataDoneWire = Wire(Vec(2, Bool()))

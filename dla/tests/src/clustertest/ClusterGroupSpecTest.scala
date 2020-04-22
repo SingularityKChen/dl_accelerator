@@ -99,6 +99,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
         theTop.allCalFin.poke(false.B)
         theTop.topIO.cgEnable.poke(true.B)
         theClock.step()
+        theTop.topIO.cgEnable.poke(false.B)
         /** cgState = 1, load inAct into GLB from outside*/
         theDebugIO.cgState.expect(1.U, s"[$g2] cgState should be 1 to load data from outside into GLB")
         theTop.glbInActCtrlIOs.foreach(_.writeIO.enable.expect(true.B, "the GLB inAct write should enable now"))
@@ -323,6 +324,10 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
         println(s"[$weightReadTimes] now finish one pe load")
         weightReadFin = true
       }
+      while (!theTop.ctrlPath.calFin.peek().litToBoolean) {
+        theClock.step()
+      }
+      println("All cal finish again")
       theClock.step(100)
     }
   }
