@@ -329,7 +329,9 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
                         }
                     }.join()
                   } .join()
-                  println(s"[$weightReadTimes@$weightReadAdr] now finish one pe load. " +
+                  println(s"[$weightReadTimes@$weightReadAdr] " +
+                    f"${(weightReadTimes.toFloat/(G2*N2*M2*F2*C2*S2).toFloat)*100}%.2f%% " +
+                    "now finish one pe load. " +
                     s"($g2/$G2, $n2/$N2, $m2/$M2, $f2/$F2, $c2/$C2, $s2/$S2)")
                   weightReadFin = true
                   weightReadTimes += 1
@@ -345,6 +347,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
       }
       println("All cal finish now")
       theClock.step(100)
+      println("-------------- Success ---------------")
     }
   }
 }
