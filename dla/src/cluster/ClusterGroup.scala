@@ -240,7 +240,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     x.readIO.enable := (cgReadWire && !glbPSumWriteFinReg(idx)) || io.topIO.readOutPSum
   })
   io.glbInActCtrlIOs.zipWithIndex.foreach({case (x, idx) =>
-    x.writeIO.enable := cgLoadGLBWire
+    x.writeIO.enable := RegNext(io.topIO.cgEnable && cgStateReg === cgIdle, false.B)
     x.writeIO.adr := DontCare
     x.readIO.adr := inActReadAdrL2 // FIXME: change the address while reading later
     /** each GLB inAct's read enable will be true until the corresponding PEs finish reading */
