@@ -9,6 +9,7 @@ import diplomatictester._
 import diplomatictester.TLEdgeLit._
 import dla.diplomatic.{EyerissParams, LazyEyeriss}
 import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.interrupts.{IntSinkNode, IntSinkPortSimple, IntXbar}
 import freechips.rocketchip.tilelink._
 
 abstract class TLEyerissWrapperBasic(implicit p: Parameters) extends LazyModule {
@@ -19,8 +20,10 @@ abstract class TLEyerissWrapperBasic(implicit p: Parameters) extends LazyModule 
     address = 0x10013000, // TODO: change
     beatBytes = 10
   ))(p))
-
+  eyeriss.controlXing(NoCrossing) := TLFragmenter(4, 256) := TLWidthWidget(16) := xbar.node
+  IntSinkNode(IntSinkPortSimple()) := eyeriss.intXing(NoCrossing)
   xbar.node := eyeriss.memInActNode
+  xbar.node := eyeriss.memWeightNode
   xbar.node := eyeriss.memPSumNode
   ram2.node := TLFragmenter(16, 256) := xbar.node
   ram.node := TLFragmenter(4, 256) := TLWidthWidget(16) := xbar.node
@@ -58,7 +61,8 @@ object LazyEyerissTLTest extends App {
       val data = 0xff
       dut.clock.setTimeout(0)
       dut.clock.step()
-      /** write 0xff into RAM via PSum edge*/
+
+      /** write 0xff into RAM via PSum edge */
       // FIXME: correct the monitor's bundle (such as memInActBundle, memPSumBundle)
       dut.monitor.pokePartial(chiselTypeOf(dut.monitor).Lit(
         _.elements("out").asInstanceOf[TLBundle].a.bits -> pSumOutEdge.PutFullData(size, source, address, mask, corrupt = false, data),
@@ -70,7 +74,8 @@ object LazyEyerissTLTest extends App {
         _.elements("out").asInstanceOf[TLBundle].a.valid -> false.B
       ))
       dut.clock.step(5)
-      /** read 0xff from RAM via inAct edge*/
+
+      /** read 0xff from RAM via inAct edge */
       dut.monitor.pokePartial(chiselTypeOf(dut.monitor).Lit(
         _.elements("out").asInstanceOf[TLBundle].a.bits -> inActOutEdge.Get(size, source, address, mask),
         _.elements("out").asInstanceOf[TLBundle].a.valid -> true.B
@@ -80,7 +85,7 @@ object LazyEyerissTLTest extends App {
         _.elements("out").asInstanceOf[TLBundle].a.valid -> false.B
       ))
       dut.clock.step(5)
-      // TODO: add interrupt output
+    // TODO: add interrupt output
   }
 }
 
@@ -104,4 +109,14 @@ object LazyEyerissSpecTest extends App {
     //dut.eyerissIO
     // TODO: add instruction input
   }
+}
+
+object GenEyeriss extends App {
+  implicit val p: Parameters = Parameters((site, here, up) => {
+    case MonitorsEnabled => false
+  })
+  val lm = LazyModule(new TLEyerissWrapperBasic() {
+    override def module: LazyModuleImpLike = new LazyModuleImp(this)
+  })
+  (new chisel3.stage.ChiselStage).emitChirrtl(lm.module)
 }

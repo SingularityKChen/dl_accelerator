@@ -17,14 +17,18 @@ trait HasEyeriss { this: BaseSubsystem =>
   private val portName = "Eyeriss"
   val eyeriss: LazyEyeriss = LazyModule(new LazyEyeriss(EyerissParams(address, pbus.beatBytes))(p))
   /** attach control reg at periphery bus */
-  pbus.coupleTo(name = portName) { eyeriss.controlXing(NoCrossing) := TLFragmenter(pbus) := _ }
+  val xbar = LazyModule(new TLXbar()(p)).node
+  cbus.coupleTo(name = portName) { eyeriss.controlXing(NoCrossing) := TLFragmenter(cbus) := _ }
   /** attach interrupt signal */
   ibus.fromSync := eyeriss.intXing(NoCrossing) // or use fromAsync
-  /** attach EyerissSRAMNodes at memory bus*/
-  mbus.coupleTo(name = "EyerissSRAMs") { bus =>
-    eyeriss.memInActNode := TLFragmenter(mbus) := bus
-    eyeriss.memWeightNode := TLFragmenter(mbus) := bus
-    eyeriss.memPSumNode :=* TLFragmenter(mbus) :=* bus // TODO: check
+  /** rocket<->InclusiveCache */
+  /** rocket->xbar->
+    * eyeriss */
+  sbus.coupleTo(name = "EyerissSRAMs") { bus =>
+    eyeriss.memInActNode := xbar
+    eyeriss.memWeightNode := xbar
+    eyeriss.memPSumNode := xbar
+    xbar := bus
   }
 }
 
