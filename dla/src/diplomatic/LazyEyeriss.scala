@@ -3,7 +3,6 @@ package dla.diplomatic
 import chisel3._
 import chisel3.util._
 import dla.cluster.{ClusterConfig, ClusterSRAMConfig}
-import dla.eyerissTop.EyerissTop
 import dla.pe.PESizeConfig
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._

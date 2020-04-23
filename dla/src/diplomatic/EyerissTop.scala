@@ -1,10 +1,10 @@
-package dla.eyerissTop
+package dla.diplomatic
 
 import chisel3._
-import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import chisel3.util._
+import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import dla.cluster.{ClusterConfig, ClusterSRAMConfig}
-import dla.diplomatic.{EyerissDecoder, EyerissMemCtrlBundle, EyerissMemCtrlModule, EyerissMemCtrlParameters, EyerissTopParam, SimpleTLDIO}
+import dla.eyerissTop.ClusterGroupWrapper
 import firrtl.options.TargetDirAnnotation
 
 class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig with ClusterSRAMConfig {
@@ -140,7 +140,6 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.bundles.memPSumBundles.reqSize := decoderIO.pSumIO.reqSize
   io.ctrlPath.bundles.memPSumBundles.d.ready := true.B // always ready to receive Put response
 }
-
 object GenEyerissTop extends App {
   (new ChiselStage).run(Seq(
     ChiselGeneratorAnnotation(() => new EyerissTop(EyerissTopParam(
@@ -155,4 +154,3 @@ object GenEyerissTop extends App {
     TargetDirAnnotation(directory = "test_run_dir/EyerissTop")
   ))
 }
-
