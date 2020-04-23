@@ -1,19 +1,11 @@
-package dla
+package dla.eyerissTop
 
 import chisel3._
+import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import chisel3.util._
-import firrtl.options.TargetDirAnnotation
-import chisel3.stage._
-import dla.cluster._
-import dla.eyerissTop.{CSCSwitcher, CSCSwitcherCtrlIO}
+import dla.cluster.{ClusterGroup, ClusterGroupCtrlIO, ClusterSRAMConfig, GNMFCS2Config, PSumSRAMDataIO}
 import dla.pe.StreamBitsIO
-
-object GenClusterGroupWithWrapper extends App {
-  (new ChiselStage).run(Seq(
-    ChiselGeneratorAnnotation(() => new ClusterGroupWrapper),
-    TargetDirAnnotation(directory = "test_run_dir")
-  ))
-}
+import firrtl.options.TargetDirAnnotation
 
 class ClusterGroupWrapper extends Module with ClusterSRAMConfig {
   /** This is a wrapper for Cluster Group.
@@ -28,10 +20,7 @@ class ClusterGroupWrapper extends Module with ClusterSRAMConfig {
     }
     val ctrlPath = new Bundle {
       val cgCtrlPath: ClusterGroupCtrlIO = new ClusterGroupCtrlIO // now, input them
-      val cscSwitcherCtrlPath = new Bundle with GNMFCS2Config {
-        val inActCSCSwitcher = new CSCSwitcherCtrlIO(lgVectorNum = log2Ceil(inActStreamNum))
-        val weightCSCSwitcher = new CSCSwitcherCtrlIO(lgVectorNum = log2Ceil(weightStreamNum))
-      }
+      val cscSwitcherCtrlPath = new CSCSwitcherCtrlPath
     }
   })
   private val cgModule = Module(new ClusterGroup(debug = false)).io
@@ -64,4 +53,16 @@ class ClusterGroupWrapper extends Module with ClusterSRAMConfig {
   /** add some suggest name*/
   inActCSCSwitchersModule.zipWithIndex.foreach({ case (switcher, i) => switcher.suggestName(s"inActSwitcher$i")})
   weightCSCSwitchersModule.zipWithIndex.foreach({ case (switcher, i) => switcher.suggestName(s"weightSwitcher$i")})
+}
+
+class CSCSwitcherCtrlPath extends Bundle with GNMFCS2Config {
+  val inActCSCSwitcher = new CSCSwitcherCtrlIO(lgVectorNum = log2Ceil(inActStreamNum))
+  val weightCSCSwitcher = new CSCSwitcherCtrlIO(lgVectorNum = log2Ceil(weightStreamNum))
+}
+
+object GenClusterGroupWithWrapper extends App {
+  (new ChiselStage).run(Seq(
+    ChiselGeneratorAnnotation(() => new ClusterGroupWrapper),
+    TargetDirAnnotation(directory = "test_run_dir/ClusterGroupWrapper")
+  ))
 }
