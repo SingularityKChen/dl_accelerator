@@ -2,6 +2,7 @@ package dla.diplomatic
 
 import chisel3._
 import chisel3.util._
+import dla.eyerissTop.CSCSwitcherCtrlPath
 
 class AdrAndSizeIO extends Bundle {
   val starAdr: UInt = Output(UInt(5.W))
@@ -20,6 +21,7 @@ class DecoderIO extends Bundle {
   val inActIO = new AdrAndSizeIO
   val weightIO = new AdrAndSizeIO
   val pSumIO = new AdrAndSizeIO with HasPSumLoadEn
+  val cscSwitcherCtrlIO: CSCSwitcherCtrlPath = Flipped(new CSCSwitcherCtrlPath)
 }
 
 /** the decoder is used to decode instructions from CPU,
@@ -95,17 +97,25 @@ class EyerissDecoder extends Module {
   // TODO: use the configurations via instructions rather than those configs
   private val rc0 = fnercmRegVec(3)*fnercmRegVec(4)
   private val f0n0e = fnercmRegVec.take(3).reduce(_ * _)
+  private val g2n2c2f2Pluss2 = gnmfcsRegVec.head*gnmfcsRegVec(1)*gnmfcsRegVec(4)*(gnmfcsRegVec(3) + gnmfcsRegVec(5))
+  private val g2m2c2s2 = gnmfcsRegVec.head*gnmfcsRegVec(2)*gnmfcsRegVec(4)*gnmfcsRegVec(5)
   io.inActIO.starAdr := inActStrAdr
   // io.inActIO.reqSize: G2*N2*C2*(F2 + S2) * R*C0 * F0*N0*E
-  io.inActIO.reqSize := gnmfcsRegVec.head*gnmfcsRegVec(1)*gnmfcsRegVec(4)*(gnmfcsRegVec(3) + gnmfcsRegVec(5)) *
-    rc0*f0n0e
+  io.inActIO.reqSize :=  g2n2c2f2Pluss2 * rc0 * f0n0e
   io.weightIO.starAdr := weightStrAdr
   // reqSize: G2*M2*C2*S2 * M0 * R*C0
-  io.weightIO.reqSize := gnmfcsRegVec.head*gnmfcsRegVec(2)*gnmfcsRegVec(4)*gnmfcsRegVec(5) * rc0*fnercmRegVec(5)
+  io.weightIO.reqSize := g2m2c2s2 * rc0*fnercmRegVec(5)
   io.pSumIO.starAdr := pSumStrAdr
   // reqSize: G2*N2*M2*F2 * M0*E*N0*F0
   io.pSumIO.reqSize := gnmfcsRegVec.take(4).reduce(_ * _) * f0n0e*fnercmRegVec(5)
   io.pSumIO.pSumLoadEn := RegNext(func3 === 4.U) // 100 one delay for address
   /** when loadPart3, then can doMac*/
   io.doMacEn := RegNext(func3 === 3.U) // one delay for reqSize //TODO: use reg to record 000-011, and reduce them
+  /** csc switchers control signal */
+  io.cscSwitcherCtrlIO.inActCSCSwitcher.matrixHeight := rc0
+  io.cscSwitcherCtrlIO.inActCSCSwitcher.matrixWidth := f0n0e
+  io.cscSwitcherCtrlIO.inActCSCSwitcher.vectorNum := g2n2c2f2Pluss2
+  io.cscSwitcherCtrlIO.weightCSCSwitcher.matrixHeight := fnercmRegVec(5)
+  io.cscSwitcherCtrlIO.weightCSCSwitcher.matrixWidth := rc0
+  io.cscSwitcherCtrlIO.weightCSCSwitcher.vectorNum := g2m2c2s2
 }
