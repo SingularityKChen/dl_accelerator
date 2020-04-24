@@ -1,4 +1,4 @@
-package dla.eyerissTop
+package dla.eyerissWrapper
 
 import chisel3._
 import chisel3.util._

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.stage.ChiselGeneratorAnnotation
 import chisel3.tester._
 import dla.cluster.GNMFCS2Config
-import dla.eyerissTop.CSCSwitcher
+import dla.eyerissWrapper.CSCSwitcher
 import dla.pe.{MCRENFConfig, PESizeConfig}
 import dla.tests.GenOneStreamData
 import firrtl.options.TargetDirAnnotation

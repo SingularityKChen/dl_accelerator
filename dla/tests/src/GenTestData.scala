@@ -1,7 +1,7 @@
 package dla.tests
 
 import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
-import dla.eyerissTop.EyerissTopConfig
+import dla.eyerissWrapper.EyerissTopConfig
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 

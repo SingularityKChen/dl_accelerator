@@ -2,7 +2,7 @@ package dla.diplomatic
 
 import chisel3._
 import chisel3.util._
-import dla.eyerissTop.CSCSwitcherCtrlPath
+import dla.eyerissWrapper.CSCSwitcherCtrlPath
 
 class AdrAndSizeIO extends Bundle {
   val starAdr: UInt = Output(UInt(5.W))

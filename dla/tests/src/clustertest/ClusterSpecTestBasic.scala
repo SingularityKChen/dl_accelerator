@@ -2,7 +2,7 @@ package dla.tests.clustertest
 
 import chisel3.tester._
 import dla.cluster._
-import dla.eyerissTop.EyerissTopConfig
+import dla.eyerissWrapper.EyerissTopConfig
 import dla.pe.{MCRENFConfig, SPadSizeConfig}
 import dla.tests.GenOneStreamData
 import org.scalatest._

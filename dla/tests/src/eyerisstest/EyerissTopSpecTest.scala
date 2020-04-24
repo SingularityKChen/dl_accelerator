@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.tester._
 import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
 import org.scalatest._
-import dla.eyerissTop.{Eyeriss, EyerissTopConfig}
+import dla.eyerissWrapper.{Eyeriss, EyerissTopConfig}
 import dla.pe.{MCRENFConfig, SPadSizeConfig}
 
 import scala.util.Random

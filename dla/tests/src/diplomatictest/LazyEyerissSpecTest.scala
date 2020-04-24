@@ -3,8 +3,10 @@ package dla.tests.diplomatictest
 import chipsalliance.rocketchip.config._
 import chisel3._
 import chisel3.experimental.BundleLiterals._
+import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import chiseltest._
 import chiseltest.internal.WriteVcdAnnotation
+import firrtl.options.TargetDirAnnotation
 import diplomatictester._
 import diplomatictester.TLEdgeLit._
 import dla.diplomatic.{EyerissParams, LazyEyeriss}
@@ -17,7 +19,7 @@ abstract class TLEyerissWrapperBasic(implicit p: Parameters) extends LazyModule 
   val ram2: TLRAM = LazyModule(new TLRAM(AddressSet(0, 0xff), beatBytes = 16))
   val xbar: TLXbar = LazyModule(new TLXbar)
   val eyeriss: LazyEyeriss = LazyModule(new LazyEyeriss(params = EyerissParams(
-    address = 0x10013000, // TODO: change
+    address = 0x10000, // TODO: change
     beatBytes = 10
   ))(p))
   eyeriss.controlXing(NoCrossing) := TLFragmenter(4, 256) := TLWidthWidget(16) := xbar.node
@@ -111,12 +113,15 @@ object LazyEyerissSpecTest extends App {
   }
 }
 
-object GenEyeriss extends App {
+object GenLazyEyeriss extends App {
   implicit val p: Parameters = Parameters((site, here, up) => {
     case MonitorsEnabled => false
   })
   val lm = LazyModule(new TLEyerissWrapperBasic() {
     override def module: LazyModuleImpLike = new LazyModuleImp(this)
   })
-  (new chisel3.stage.ChiselStage).emitChirrtl(lm.module)
+  (new ChiselStage).run(Seq(
+    ChiselGeneratorAnnotation(() => lm.module),
+    TargetDirAnnotation(directory = "test_run_dir/TLEyerissWrapper")
+  ))
 }
