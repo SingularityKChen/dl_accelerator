@@ -28,7 +28,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   decoder.suggestName("decoderModule")
   private val decoderIO = decoder.io
   private val memCtrl = Module(new EyerissMemCtrlModule()(EyerissMemCtrlParameters(
-    addressBits = param.addressBits, // TODO: check
+    addressBits = param.addressBits,
     inActSizeBits = 12, // TODO: check
     weightSizeBits = 12,
     pSumSizeBits = log2Ceil(pSumSRAMSize),
@@ -140,6 +140,17 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.bundles.memPSumBundles.reqSize := decoderIO.pSumIO.reqSize
   io.ctrlPath.bundles.memPSumBundles.d.ready := true.B // always ready to receive Put response
 }
+
+class EyerissMemCtrlBundle(val dataBits: Int, val sourceBits: Int)(implicit val addressBits: Int) extends Bundle {
+  val reqSize: UInt = Output(UInt(12.W))
+  val address: UInt = Output(UInt(addressBits.W))
+  val reqFirst: Bool = Input(Bool())
+  val respFirst: Bool = Input(Bool())
+  val legal: Bool = Input(Bool())
+  val a: DecoupledIO[SimpleTLDIO] = Decoupled(new SimpleTLDIO(dataBits, sourceBits))
+  val d: DecoupledIO[SimpleTLDIO] = Flipped(Decoupled(new SimpleTLDIO(dataBits, sourceBits)))
+}
+
 object GenEyerissTop extends App {
   (new ChiselStage).run(Seq(
     ChiselGeneratorAnnotation(() => new EyerissTop(EyerissTopParam(

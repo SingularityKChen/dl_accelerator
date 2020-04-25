@@ -188,13 +188,3 @@ class SimpleTLDIO(val dataBits: Int, val sourceBits: Int) extends Bundle {
   val data: UInt = UInt(dataBits.W)
   val source: UInt = UInt(sourceBits.W)
 }
-
-class EyerissMemCtrlBundle(val dataBits: Int, val sourceBits: Int)(implicit val addressBits: Int) extends Bundle {
-  val reqSize: UInt = Output(UInt(12.W))
-  val address: UInt = Output(UInt(addressBits.W))
-  val reqFirst: Bool = Input(Bool())
-  val respFirst: Bool = Input(Bool())
-  val legal: Bool = Input(Bool())
-  val a: DecoupledIO[SimpleTLDIO] = Decoupled(new SimpleTLDIO(dataBits, sourceBits))
-  val d: DecoupledIO[SimpleTLDIO] = Flipped(Decoupled(new SimpleTLDIO(dataBits, sourceBits)))
-}

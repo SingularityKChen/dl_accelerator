@@ -40,7 +40,7 @@ object DecoderSequencer extends MCRENFConfig with GNMFCS2Config with GNMFCS1Conf
   val loadPSum: Int = BigInt(s"${toBinary(0, 12)}${zeroAddress}100${pSumAdr.b}$opcode", 2).toInt
   object reqSize {
     val inAct: Int = G2*N2*C2*(F2 + S2) * R*C0 * F0*N0*E
-    val weight: Int = G2*M2*C2*S2 * M0 * R*C0
+    val weight: Int = M0 * R*C0
     val pSum: Int = G2*N2*M2*F2 * M0*E*N0*F0
   }
 }

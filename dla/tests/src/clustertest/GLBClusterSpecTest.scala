@@ -420,6 +420,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
                       InActAdrStream.flatten.toList, theRdIdx, theClock, prefix = "inActCommonSRAMAdr")
                     theRdIdx = theRdIdx + 1
                   }
+                  theClock.step()
                   theTopIO.ctrlPath.readIO.enable.poke(false.B)
                   theTopIO.dataPath.outIOs.data.ready.poke(false.B)
                   println("------------ read out one stream -------------")

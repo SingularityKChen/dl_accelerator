@@ -52,6 +52,7 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   private val weightReqAdrReg = RegInit(0.U(p.addressBits.W))
   private val pSumReqAdrReg = RegInit(0.U(p.addressBits.W))
   private val inActReqSizeReg = RegInit(0.U(p.inActSizeBits.W))
+  inActReqSizeReg.suggestName("inActReqSizeReg")
   private val weightReqSizeReg = RegInit(0.U(p.weightSizeBits.W))
   private val pSumReqSizeReg = RegInit(0.U(p.pSumSizeBits.W))
   /** connections of input and source generate module */
@@ -71,14 +72,27 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   pSumReqSizeReg := io.pSumIO.reqSize
   /** each require address */
   private val inActReqAdrAcc = RegInit(0.U(p.addressBits.W))
+  inActReqAdrAcc.suggestName("inActReqAdrAcc")
   private val weightReqAdrAcc = RegInit(0.U(p.addressBits.W))
+  weightReqAdrAcc.suggestName("weightReqAdrAcc")
   private val pSumReqAdrAcc = RegInit(0.U(p.addressBits.W))
-  inActReqAdrAcc := (inActReqAdrAcc + (inActReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(inActIdMapIO.finish)
-  // TODO: different source id should own different address accumulator regs.
+  private val inActReqFinOnce = RegInit(false.B) // true when have finished once
+  inActReqFinOnce.suggestName("inActReqFinOnce")
+  /** as inAct needs require 2 times of SRAM number
+    * while `inActReqFinOnce && inActIdMapIO.finish` then that's the second time
+    * and it's real finish */
+  inActReqFinOnce := Mux(inActIdMapIO.finish, !inActReqFinOnce, inActReqFinOnce)
+  inActReqAdrAcc := Mux(inActReqFinOnce && inActIdMapIO.finish, 0.U,
+    Mux(inActIdMapIO.alloc.fire(), inActReqAdrAcc + inActReqSizeReg, inActReqAdrAcc)
+  )
   inActReqAdrReg := inActStarAdrReg + inActReqAdrAcc
-  weightReqAdrAcc := (weightReqAdrAcc + (weightReqSizeReg << log2Ceil(cscDataWidth)).asUInt()).holdUnless(weightIdMapIO.finish)
+  weightReqAdrAcc := Mux(weightIdMapIO.finish, 0.U,
+    Mux(weightIdMapIO.alloc.fire(), weightReqAdrAcc + weightReqSizeReg, weightReqAdrAcc)
+  )
   weightReqAdrReg := weightStarAdrReg + weightReqAdrAcc
-  pSumReqAdrAcc := (pSumReqAdrAcc + pSumReqSizeReg * psDataWidth.U).holdUnless(pSumIdMapIO.finish)
+  pSumReqAdrAcc := Mux(pSumIdMapIO.finish, 0.U,
+    Mux(pSumIdMapIO.alloc.fire(), pSumReqAdrAcc + pSumReqSizeReg, pSumReqAdrAcc)
+  )
   pSumReqAdrReg := pSumStarAdrReg + pSumReqAdrAcc
   /** connections of require address */
   io.inActIO.address := inActReqAdrReg

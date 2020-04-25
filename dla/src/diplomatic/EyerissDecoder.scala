@@ -103,8 +103,8 @@ class EyerissDecoder extends Module {
   // io.inActIO.reqSize: G2*N2*C2*(F2 + S2) * R*C0 * F0*N0*E
   io.inActIO.reqSize :=  g2n2c2f2Pluss2 * rc0 * f0n0e
   io.weightIO.starAdr := weightStrAdr
-  // reqSize: G2*M2*C2*S2 * M0 * R*C0
-  io.weightIO.reqSize := g2m2c2s2 * rc0*fnercmRegVec(5)
+  /** weight require for data every time peLoad, so the reqSize: M0 * R*C0*/
+  io.weightIO.reqSize := rc0*fnercmRegVec(5)
   io.pSumIO.starAdr := pSumStrAdr
   // reqSize: G2*N2*M2*F2 * M0*E*N0*F0
   io.pSumIO.reqSize := gnmfcsRegVec.take(4).reduce(_ * _) * f0n0e*fnercmRegVec(5)
