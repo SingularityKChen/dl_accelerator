@@ -96,7 +96,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   /** only glbLoadEn, then generate source id*/
   memCtrlIO.inActIO.sourceAlloc.ready := io.ctrlPath.bundles.memInActBundles.legal &&
     io.ctrlPath.bundles.memInActBundles.reqFirst &&
-    io.ctrlPath.bundles.memInActBundles.a.ready && cgCtrlPath.glbLoadEn
+    io.ctrlPath.bundles.memInActBundles.a.ready && cgCtrlPath.glbInActLoadEn
   memCtrlIO.inActIO.sourceFree.valid := io.ctrlPath.bundles.memInActBundles.respFirst &&
     io.ctrlPath.bundles.memInActBundles.d.fire()
   memCtrlIO.inActIO.sourceFree.bits := io.ctrlPath.bundles.memInActBundles.d.bits.source
@@ -121,7 +121,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.interrupts := decoderIO.valid
   /** only glbLoadEn then a.valid is true then can Get data */
   io.ctrlPath.bundles.memInActBundles.a.valid := io.ctrlPath.bundles.memInActBundles.legal &&
-    (!io.ctrlPath.bundles.memInActBundles.reqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbLoadEn)
+    (!io.ctrlPath.bundles.memInActBundles.reqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbInActLoadEn)
   io.ctrlPath.bundles.memInActBundles.a.bits.source := memCtrlIO.inActIO.sourceAlloc.bits
   /** Don't care memInActBundles.a.bits.data as memInActBundle.a.bits.data will be assigned in LazyImp*/
   io.ctrlPath.bundles.memInActBundles.a.bits.data := DontCare

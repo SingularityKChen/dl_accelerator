@@ -38,7 +38,7 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
   clusterCtrl.allCalFin := peCluster.ctrlPath.allCalFin
   io.ctrlPath.calFin := clusterCtrl.topIO.calFin
   io.ctrlPath.peWeightLoadEn := clusterCtrl.peCtrlIO.peLoadEn
-  io.ctrlPath.glbLoadEn := clusterCtrl.glbLoadEn
+  io.ctrlPath.glbInActLoadEn := clusterCtrl.glbInActLoadEn
   // connections of data path
   // input activations
   for (i <- 0 until inActRouterNum) {
@@ -94,8 +94,11 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
       clusterCtrl.pSumAdd // when need accumulate pSum, then we need to read out pSum from GLB
     glbCluster.dataPath.pSumIO(i).outIOs.ready := (routerCluster.dataPath.routerData.pSumRIO(i).inIOs(1).ready &&
       clusterCtrl.pSumAdd) || (io.dataPath.glbDataPath.pSumIO(i).outIOs.ready && io.ctrlPath.readOutPSum)
-
-    when (!clusterCtrl.glbLoadEn) { // FIXME
+    /** pSumCtrlSel.outDataSel:
+      * true then PE cluster's pSum will be sent to GLB,
+      * false then it will be sent to vertical CGroup
+      * */
+    when (io.ctrlPath.routerClusterCtrl.pSumCtrlSel.outDataSel) {
       glbCluster.dataPath.pSumIO(i).inIOs <> routerCluster.dataPath.routerData.pSumRIO(i).outIOs(1)
       io.dataPath.glbDataPath.pSumIO(i).inIOs.ready := false.B
     } .otherwise {
@@ -250,7 +253,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
   io.peCtrlIO.pSumLoadEn := RegNext(configIncWireSeq(5) && configWrapWireSeq(4) && cgStateReg === cgCal)
   io.peCtrlIO.peLoadEn := cgLoadPEWire
   io.pSumAdd := cgReadWire
-  io.glbLoadEn := cgLoadGLBWire
+  io.glbInActLoadEn := cgLoadGLBWire
   io.topIO.calFin := cgReadWire && configG2Wrap
   if (debug) {
     io.debugIO.cgState := cgStateReg
@@ -277,7 +280,7 @@ class ClusterGroupControllerIO extends Bundle with ClusterSRAMConfig with GNMFCS
     val cgEnable: Bool = Input(Bool())
     val calFin: Bool = Output(Bool()) // current layer has finished all the computations
   }
-  val glbLoadEn: Bool = Output(Bool())
+  val glbInActLoadEn: Bool = Output(Bool())
   val debugIO = new Bundle {
     val cgState: UInt = Output(UInt(3.W))
     val inActWriteFinVecIO: Vec[Bool] = Output(Vec(inActSRAMNum, Bool()))

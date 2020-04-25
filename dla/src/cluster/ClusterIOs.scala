@@ -30,7 +30,7 @@ class ClusterGroupCtrlIO extends Bundle {
   val calFin: Bool = Output(Bool())
   val doMacEn: Bool = Input(Bool())
   val peWeightLoadEn: Bool = Output(Bool())
-  val glbLoadEn: Bool = Output(Bool())
+  val glbInActLoadEn: Bool = Output(Bool())
 }
 
 class RouterClusterIO extends Bundle {
