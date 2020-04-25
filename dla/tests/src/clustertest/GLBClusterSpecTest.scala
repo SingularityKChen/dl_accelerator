@@ -2,17 +2,27 @@ package dla.tests.clustertest
 
 import chisel3._
 import chisel3.tester._
-import chisel3.util.DecoupledIO
 import chisel3.tester.experimental.TestOptionBuilder._
+import chisel3.util.DecoupledIO
 import chiseltest.internal.WriteVcdAnnotation
 import dla.cluster._
-import dla.pe.{CSCStreamIO, StreamBitsIO}
+import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
 import scala.util.Random
 
-class GLBClusterSpecTest extends ClusterSpecTestBasic {
-  override val printLogDetails = false
-  private def readOutInAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
+object GLBDriver extends ClusterSRAMConfig with MCRENFConfig with GNMFCS2Config {
+  val printLogDetails = false
+  protected def getStreamLookUp(streamData: List[Int]): List[Int] = {
+    var lookList: List[Int] = Nil
+    lookList = lookList:::List(0)
+    for (i <- 0 until streamData.length - 1) {
+      if (streamData(i) == 0) {
+        lookList = lookList:::List(i + 1)
+      }
+    }
+    lookList.init
+  }
+  def readOutInAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
                            theData: List[Int], idx: Int, theClock: Clock, prefix: String
                           ): Unit = {
     def getDebugInfo(stage: Int) : String = {
@@ -48,8 +58,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
     }
     println(s"[$prefix] ${idx + 1} PASS $idx")
   }
-  private def readOutPSumData(OutIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, adrIO: UInt,
-                                theData: List[Int], startIndex: Int, theClock: Clock, prefix: String): Unit = {
+  def readOutPSumData(OutIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, adrIO: UInt,
+                              theData: List[Int], startIndex: Int, theClock: Clock, prefix: String): Unit = {
     for (i <- 0 until pSumOneSPadNum) {
       println(s"--------------- $i-th read cycle -----------")
       if (printLogDetails) println(
@@ -76,7 +86,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       println(s"[$prefix] PASS $i")
     }
   }
-  private def inActStateBeZero(theTopIO: GLBClusterIO, prefix: String): Unit = {
+  def inActStateBeZero(theTopIO: GLBClusterIO, prefix: String): Unit = {
     theTopIO.debugIO.inActDebugIO.zipWithIndex.foreach({ case ( x, idx) =>
       if (printLogDetails) {
         println(s"[$prefix] inActBankState$idx =  ${x.theState.peek()}")
@@ -86,8 +96,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       x.theState.expect(0.U, "every inActSRAMBank still needs to be idle")
     })
   }
-  private def topReadPSum(theTopIO: GLBClusterIO, dataStream: Seq[List[Int]], startIndexes: Seq[Int],
-                            theClock: Clock): Unit = {
+  def topReadPSum(theTopIO: GLBClusterIO, dataStream: Seq[List[Int]], startIndexes: Seq[Int],
+                          theClock: Clock): Unit = {
     val theCtrlIO = theTopIO.ctrlPath.pSumIO.map(x => x.readIO)
     val thePSumDebugIOs = theTopIO.debugIO.pSumDebugIO
     val theOutIOs = theTopIO.dataPath.pSumIO.map(x => x.outIOs)
@@ -105,9 +115,9 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       case (left, right) => left.fork(forkReadOutPSumHelper(right))
     } .join()
   }
-  private def forkReadAdrAndData(theOutIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, theEnIO: Bool,
-                                   adrStream: List[Int], dataStream: List[Int], adrStrIdx: Int, dataStrIdx: Int,
-                                   theClock: Clock, prefix: String): Unit = {
+  def forkReadAdrAndData(theOutIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, theEnIO: Bool,
+                                 adrStream: List[Int], dataStream: List[Int], adrStrIdx: Int, dataStrIdx: Int,
+                                 theClock: Clock, prefix: String): Unit = {
     var adrRdIdx = adrStrIdx
     var dataRdIdx = dataStrIdx
     theEnIO.poke(false.B)
@@ -143,8 +153,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
     theDebugIO.theState.expect(0.U, s"$prefix inActSRAM state should be idle after all read")
     if (printLogDetails) println(s"[$prefix] InActSRAMState = " + theDebugIO.theState.peek())
   }
-  private def topReadOutActAdrAndData(theTopIO: GLBClusterIO, adrStreams: Seq[List[Int]], dataStreams: Seq[List[Int]],
-                                        theClock: Clock): Unit = {
+  def topReadOutActAdrAndData(theTopIO: GLBClusterIO, adrStreams: Seq[List[Int]], dataStreams: Seq[List[Int]],
+                                      theClock: Clock): Unit = {
     val theCtrlIO = theTopIO.ctrlPath.inActIO.map(x => x.readIO)
     val theInActDebugIOs = theTopIO.debugIO.inActDebugIO
     val theOutIOs = theTopIO.dataPath.inActIO.map(x => x.outIOs)
@@ -218,8 +228,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
     }
     println("------------- all streams read finish -------------")
   }
-  private def readOutActAdrAndData(theOutIO: CSCStreamIO, theCtrlIO:MeMReWrIO, theDebugIO: InActSRAMBankDebugIO,
-                                     adrStream: List[Int], dataStream: List[Int], theClock: Clock): Unit = {
+  def readOutActAdrAndData(theOutIO: CSCStreamIO, theCtrlIO:MeMReWrIO, theDebugIO: InActSRAMBankDebugIO,
+                                   adrStream: List[Int], dataStream: List[Int], theClock: Clock): Unit = {
     var (adrRdIdx, dataRdIdx): (Int, Int) = (0, 0)
     val adrLookup = getStreamLookUp(adrStream)
     val dataLookup = getStreamLookUp(dataStream)
@@ -250,8 +260,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       }
     }
   }
-  private def writeInPSumData(inIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int],
-                                startIndex: Int, adrIO: UInt , theClock: Clock, prefix: String): Unit = {
+  def writeInPSumData(inIO: DecoupledIO[UInt], debugIO: SRAMCommonDebugIO, doneIO: Bool, theData: List[Int],
+                              startIndex: Int, adrIO: UInt , theClock: Clock, prefix: String): Unit = {
     for (i <- 0 until pSumOneSPadNum) {
       println(s"--------------- $i-th PSum write cycle -----------")
       adrIO.poke((startIndex + i).U)
@@ -266,8 +276,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       println(s"[$prefix] $i PASS")
     }
   }
-  private def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO,
-                           doneIO: Bool, theData: Seq[List[Int]], theClock: Clock, prefix: String) : Unit = {
+  def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO,
+                         doneIO: Bool, theData: Seq[List[Int]], theClock: Clock, prefix: String) : Unit = {
     require(theData.length == 2, s"it should have two group of data, but ${theData.length}")
     def pokeData(currentPokeData: List[Int], pokeIdx: Int): Unit = {
       inIO.data.bits.poke(currentPokeData(pokeIdx).U)
@@ -302,8 +312,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       println(s"[$prefix@$i] PASS $i")
     }
   }
-  private def writeInActAdrAndData(theInIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: Seq[List[Int]],
-                                     dataStream: Seq[List[Int]], theClock: Clock): Unit = {
+  def writeInActAdrAndData(theInIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: Seq[List[Int]],
+                                   dataStream: Seq[List[Int]], theClock: Clock): Unit = {
     fork {
       writeInAct(theInIO.dataIOs, theDebugIO.dataDebug.commonDebug,
         theDebugIO.dataDebug.subDone, dataStream, theClock, prefix = "inActSRAM@data"
@@ -316,7 +326,10 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       println("-------------- adr write finish ----------------")
     } .join()
   }
+}
 
+class GLBClusterSpecTest extends ClusterSpecTestBasic {
+  private val driver = GLBDriver
   behavior of "test the spec of GLB Cluster"
   it should "work well on PSumSRAMBank" in {
     test(new PSumSRAMBank(pSumSRAMSize, psDataWidth, true)) { thePSumBank =>
@@ -333,7 +346,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       thePSumBank.reset.poke(false.B)
       println("-------------- begin to write --------------")
       theTopIO.ctrlPath.writeIO.enable.poke(true.B)
-      writeInPSumData(inIO = theTopIO.dataPath.inIOs, debugIO = theTopIO.debugIO, doneIO = theTopIO.ctrlPath.writeIO.done,
+      driver.writeInPSumData(inIO = theTopIO.dataPath.inIOs, debugIO = theTopIO.debugIO, doneIO = theTopIO.ctrlPath.writeIO.done,
         theData = theData, startIndex = startIndex, adrIO = theTopIO.ctrlPath.writeIO.adr, theClock = theClock,
         prefix = "PSumSRAMBank")
       println("---------------- write finish --------------")
@@ -341,7 +354,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       theClock.step(cycles = (new Random).nextInt(5) + 1)
       println("---------------- begin to read -------------")
       theTopIO.ctrlPath.readIO.enable.poke(true.B)
-      readOutPSumData(OutIO = theTopIO.dataPath.outIOs, debugIO = theTopIO.debugIO, doneIO = theTopIO.ctrlPath.readIO.done,
+      driver.readOutPSumData(OutIO = theTopIO.dataPath.outIOs, debugIO = theTopIO.debugIO, doneIO = theTopIO.ctrlPath.readIO.done,
         adrIO = theTopIO.ctrlPath.readIO.adr , theData = theData, startIndex = startIndex, theClock = theClock,
         prefix = "PSumSRAMBank"
       )
@@ -379,7 +392,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       theTopIO.ctrlPath.readIO.enable.poke(false.B)
       theTopIO.ctrlPath.writeIO.enable.poke(true.B)
       // begin to write in data
-      writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.writeIO.done,
+      driver.writeInAct(theTopIO.dataPath.inIOs, theTopIO.debugIO, theTopIO.ctrlPath.writeIO.done,
         InActAdrStream, theClock, prefix = "inActCommonSRAM")
       theTopIO.ctrlPath.readIO.enable.poke(false.B)
       println("--------------- write finish -----------------")
@@ -403,7 +416,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
                     theTopIO.ctrlPath.readIO.enable.poke(true.B)
                     theTopIO.ctrlPath.readIO.adr.poke(inActIdx.U)
                     theTopIO.dataPath.outIOs.data.ready.poke(true.B)
-                    readOutInAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.readIO.done,
+                    driver.readOutInAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.readIO.done,
                       InActAdrStream.flatten.toList, theRdIdx, theClock, prefix = "inActCommonSRAMAdr")
                     theRdIdx = theRdIdx + 1
                   }
@@ -443,7 +456,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       theTopIO.ctrlPath.writeIO.enable.poke(true.B)
       theClock.step() // from idle to doing
       // begin to write streams into data sram and address sram
-      writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
+      driver.writeInActAdrAndData(theTopIO.dataPath.inIOs, theTopIO.debugIO, InActAdrStream, InActDataStream, theClock)
       // write finish
       theClock.step()
       theTopIO.debugIO.theState.expect(0.U, "after all write, the state should be idle now")
@@ -453,7 +466,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       theClock.step(cycles = (new Random).nextInt(5) + 1)
       println("--------------- begin to read ----------------")
       // begin to read out streams into data sram and address sram
-      readOutActAdrAndData(theTopIO.dataPath.outIOs, theTopIO.ctrlPath.readIO, theTopIO.debugIO,
+      driver.readOutActAdrAndData(theTopIO.dataPath.outIOs, theTopIO.ctrlPath.readIO, theTopIO.debugIO,
         InActAdrStream.head, InActDataStream.head, theClock)
       theClock.step()
       println(s"[inActSRAMBank] theState = ${theTopIO.debugIO.theState.peek()}")
@@ -474,7 +487,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       require(pSumStartIdx + pSumOneSPadNum < pSumSRAMSize, "pSum's start index plus oneSPad size should less than pSumSRAMSize")
       def forkWriteInPSumHelper(index: Int, startIndex: Int): Unit = {
         thePSumCtrl(index).writeIO.enable.poke(true.B)
-        writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),
+        driver.writeInPSumData(inIO = theTopIO.dataPath.pSumIO(index).inIOs, debugIO = theTopIO.debugIO.pSumDebugIO(index),
           doneIO = theTopIO.debugIO.onePSumSRAMDone(index), theData = thePSumDataStreams(index),
           startIndex = startIndex, adrIO = thePSumCtrl(index).writeIO.adr, theClock = theClock, prefix = s"PSumSRAMBank$index")
         println(s"[PSumSRAMBank$index] PSum finish")
@@ -487,7 +500,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
         theClock.step() // sub from idle to doing;
         theTopIO.debugIO.inActDebugIO(index).theState.expect(1.U, s"the inActSRAM $index should doing now")
         println(s"[inActSRAMBank$index] inActSRAMState$index =  ${theTopIO.debugIO.inActDebugIO(index).theState.peek()}")
-        writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index),
+        driver.writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index),
           pokeFormerLaterInActAdr, pokeFormerLaterInActData, theClock)
         println(s"-------- $index InAct finish")
         theInActCtrl(index).writeIO.done.expect(true.B, "after all inActSRAMs done, top inAct should done now")
@@ -527,13 +540,13 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
           case (left, right) => left.fork(forkWriteInInActHelper(index = right))
         } .join()
         println("--------- all inActSRAMs are written ----------")
-        inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
+        driver.inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
         theClock.step()
         println("----------------- one cycle later ---------------")
-        inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
+        driver.inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         println("----------- several cycles later ----------")
-        inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
+        driver.inActStateBeZero(theTopIO, prefix = "inActSRAMTop")
       } .join()
       // write test finish
       println("--------------- begin to read ----------------")
@@ -541,16 +554,16 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
         theClock.step(cycles = (new Random).nextInt(30) + 1)
         theClock.step()
         theTopIO.ctrlPath.pSumIO.head.readIO.adr.poke(pSumStartIdx.U)
-        topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams,
+        driver.topReadPSum(theTopIO = theTopIO, dataStream = thePSumDataStreams,
           startIndexes = Seq.fill(pSumSRAMNum){pSumStartIdx}, theClock = theClock)
         theClock.step()
         println("------------ all pSum read finish --------------")
       } .fork {
         theClock.step(cycles = (new Random).nextInt(5) + 1)
         // begin to read out streams into data sram and address sram
-        topReadOutActAdrAndData(theTopIO, theInActAdrStreams, theInActDataStreams, theClock)
+        driver.topReadOutActAdrAndData(theTopIO, theInActAdrStreams, theInActDataStreams, theClock)
         theClock.step()
-        if (printLogDetails) theTopIO.debugIO.oneInActSRAMDone.zipWithIndex.foreach({case (x, idx) =>
+        if (driver.printLogDetails) theTopIO.debugIO.oneInActSRAMDone.zipWithIndex.foreach({case (x, idx) =>
           println(s"[SRAM$idx] Done = ${x.peek()}")
         })
         println("------------ all inAct read finish -------------")
