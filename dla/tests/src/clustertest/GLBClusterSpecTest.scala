@@ -3,6 +3,8 @@ package dla.tests.clustertest
 import chisel3._
 import chisel3.tester._
 import chisel3.util.DecoupledIO
+import chisel3.tester.experimental.TestOptionBuilder._
+import chiseltest.internal.WriteVcdAnnotation
 import dla.cluster._
 import dla.pe.{CSCStreamIO, StreamBitsIO}
 
@@ -10,46 +12,30 @@ import scala.util.Random
 
 class GLBClusterSpecTest extends ClusterSpecTestBasic {
   override val printLogDetails = false
-  private def readOutAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
+  private def readOutInAct(outIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO, doneIO: Bool,
                            theData: List[Int], idx: Int, theClock: Clock, prefix: String
                           ): Unit = {
+    def getDebugInfo(stage: Int) : String = {
+      s"[$prefix] $idx.$stage done = ${doneIO.peek()}\n" +
+        s"[$prefix] $idx.$stage valid= ${outIO.data.valid.peek()}\n" +
+        s"[$prefix] $idx.$stage crDt = ${debugIO.currentData.peek()}\n" +
+        s"[$prefix] $idx.$stage inInc= ${debugIO.indexAcc.peek()}\n" +
+        s"[$prefix] $idx.$stage waFR = ${debugIO.waitForRead.peek()}\n" +
+        s"[$prefix] $idx.$stage doRd = ${debugIO.doReadWire.peek()}\n" +
+        s"[$prefix] $idx.$stage data = ${outIO.data.bits.peek()}\n" +
+        s"[$prefix] $idx.$stage idx  = ${debugIO.idx.peek()}"
+    }
     println(s"------------- $idx-th $prefix read cycle ------------")
     outIO.data.valid.expect(false.B, s"$prefix should not valid now")
-    if (printLogDetails) println(
-      s"[$prefix] $idx.0 done = ${doneIO.peek()}\n" +
-        s"[$prefix] $idx.0 valid= ${outIO.data.valid.peek()}\n" +
-        s"[$prefix] $idx.0 crDt = ${debugIO.currentData.peek()}\n" +
-        s"[$prefix] $idx.0 inInc= ${debugIO.indexInc.peek()}\n" +
-        s"[$prefix] $idx.0 waFR = ${debugIO.waitForRead.peek()}\n" +
-        s"[$prefix] $idx.0 doRd = ${debugIO.doReadWire.peek()}\n" +
-        s"[$prefix] $idx.0 data = ${outIO.data.bits.peek()}\n" +
-        s"[$prefix] $idx.0 idx  = ${debugIO.idx.peek()}"
-    )
+    if (printLogDetails) println(getDebugInfo(0))
     debugIO.waitForRead.expect(false.B, s"[$prefix] it should be false as this is the first read cycle")
     theClock.step()
     outIO.data.bits.expect(theData(idx).U,
       s"[$prefix] theData($idx) = ${theData(idx)}, current idx = " +
         s"${debugIO.idx.peek()}, data length = ${theData.length}\n" +
-        s"theData is\n $theData \n" +
-        s"[$prefix] $idx.5 done = ${doneIO.peek()}\n" +
-        s"[$prefix] $idx.5 valid= ${outIO.data.valid.peek()}\n" +
-        s"[$prefix] $idx.5 crDt = ${debugIO.currentData.peek()}\n" +
-        s"[$prefix] $idx.5 inInc= ${debugIO.indexInc.peek()}\n" +
-        s"[$prefix] $idx.5 waFR = ${debugIO.waitForRead.peek()}\n" +
-        s"[$prefix] $idx.5 doRd = ${debugIO.doReadWire.peek()}\n" +
-        s"[$prefix] $idx.5 data = ${outIO.data.bits.peek()}\n" +
-        s"[$prefix] $idx.5 idx  = ${debugIO.idx.peek()}")
+        s"theData is\n $theData \n" + getDebugInfo(5))
     outIO.data.valid.expect(true.B, s"$prefix should valid now")
-    if (printLogDetails) println(
-      s"[$prefix] $idx.5 done = ${doneIO.peek()}\n" +
-        s"[$prefix] $idx.5 valid= ${outIO.data.valid.peek()}\n" +
-        s"[$prefix] $idx.5 crDt = ${debugIO.currentData.peek()}\n" +
-        s"[$prefix] $idx.5 inInc= ${debugIO.indexInc.peek()}\n" +
-        s"[$prefix] $idx.5 waFR = ${debugIO.waitForRead.peek()}\n" +
-        s"[$prefix] $idx.5 doRd = ${debugIO.doReadWire.peek()}\n" +
-        s"[$prefix] $idx.5 data = ${outIO.data.bits.peek()}\n" +
-        s"[$prefix] $idx.5 idx  = ${debugIO.idx.peek()}"
-    )
+    if (printLogDetails) println(getDebugInfo(5))
     outIO.data.valid.expect(true.B, s"$prefix should valid now")
     debugIO.waitForRead.expect(true.B, s"$prefix should be true as this is the second read cycle")
     debugIO.doReadWire.expect(true.B, s"$prefix should be true")
@@ -129,7 +115,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       while (!theDebugIO.dataDebug.subDone.peek().litToBoolean) {
         theClock.step()
         theOutIO.dataIOs.data.ready.poke(true.B)
-        readOutAct(theOutIO.dataIOs, theDebugIO.dataDebug.commonDebug,
+        readOutInAct(theOutIO.dataIOs, theDebugIO.dataDebug.commonDebug,
           theDebugIO.dataDebug.subDone, dataStream, dataRdIdx,
           theClock, prefix = s"$prefix@data"
         )
@@ -143,7 +129,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       while (!theDebugIO.adrDebug.subDone.peek().litToBoolean) {
         theClock.step()
         theOutIO.adrIOs.data.ready.poke(true.B)
-        readOutAct(theOutIO.adrIOs, theDebugIO.adrDebug.commonDebug,
+        readOutInAct(theOutIO.adrIOs, theDebugIO.adrDebug.commonDebug,
           theDebugIO.adrDebug.subDone, adrStream, adrRdIdx,
           theClock, prefix = s"$prefix@adr"
         )
@@ -281,31 +267,43 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
     }
   }
   private def writeInAct(inIO: StreamBitsIO, debugIO: SRAMCommonDebugIO with InActSpecialDebugIO,
-                           doneIO: Bool, theData: List[Int], theClock: Clock, prefix: String) : Unit = {
-    for (i <- theData.indices) {
-      println(s"------------- $i-th $prefix write cycle ----------")
-      inIO.data.bits.poke(theData(i).U)
+                           doneIO: Bool, theData: Seq[List[Int]], theClock: Clock, prefix: String) : Unit = {
+    require(theData.length == 2, s"it should have two group of data, but ${theData.length}")
+    def pokeData(currentPokeData: List[Int], pokeIdx: Int): Unit = {
+      inIO.data.bits.poke(currentPokeData(pokeIdx).U)
       inIO.data.valid.poke(true.B)
-      inIO.data.ready.expect(true.B, s"$prefix@$i should be ready now")
+      inIO.data.ready.expect(true.B, s"[$prefix@$pokeIdx@former] should be ready now")
       if (printLogDetails) {
         println(
-          s"[$prefix@$i] done     = ${doneIO.peek()}\n" +
-            s"[$prefix@$i] data     = ${theData(i)}\n" +
-            s"[$prefix@$i] index    = ${debugIO.idx.peek()}\n" +
-            s"[$prefix@$i] doWrite  = ${debugIO.doWriteWire.peek()}\n" +
-            s"[$prefix@$i] lookupIdx= ${debugIO.lookupIdx.peek()}\n" +
-            s"[$prefix@$i] nextValid= ${debugIO.doReadWire.peek()}"
+          s"[$prefix@$pokeIdx] done     = ${doneIO.peek()}\n" +
+            s"[$prefix@$pokeIdx] data     = ${currentPokeData(pokeIdx)}\n" +
+            s"[$prefix@$pokeIdx] index    = ${debugIO.idx.peek()}\n" +
+            s"[$prefix@$pokeIdx] doWrite  = ${debugIO.doWriteWire.peek()}\n" +
+            s"[$prefix@$pokeIdx] lookupIdx= ${debugIO.lookupIdx.peek()}\n" +
+            s"[$prefix@$pokeIdx] nextValid= ${debugIO.doReadWire.peek()}"
         )
       }
+    }
+    for (i <- theData.head.indices) {
+      println(s"------------- $i-th $prefix write former cycle ----------")
+      pokeData(currentPokeData = theData.head, pokeIdx = i)
       theClock.step()
       if (printLogDetails) println(s"[$prefix@$i]  done     = ${doneIO.peek()}")
-      doneIO.expect((i == theData.length - 1).B,
-        s"[$prefix@$i] Data($i) = ${theData(i)}, $prefix should finish?")
+      doneIO.expect(false.B, "it shouldn't done in former group")
+      println(s"[$prefix@$i] PASS $i")
+    }
+    for (i <- theData.last.indices) {
+      println(s"------------- $i-th $prefix write later cycle ----------")
+      pokeData(currentPokeData = theData.last, pokeIdx = i)
+      theClock.step()
+      if (printLogDetails) println(s"[$prefix@$i]  done     = ${doneIO.peek()}")
+      doneIO.expect((i == theData.last.length - 1).B,
+        s"[$prefix@$i@later] Data($i) = ${theData.last(i)}, $prefix should finish?")
       println(s"[$prefix@$i] PASS $i")
     }
   }
-  private def writeInActAdrAndData(theInIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: List[Int],
-                                     dataStream: List[Int], theClock: Clock): Unit = {
+  private def writeInActAdrAndData(theInIO: CSCStreamIO, theDebugIO: InActSRAMBankDebugIO, adrStream: Seq[List[Int]],
+                                     dataStream: Seq[List[Int]], theClock: Clock): Unit = {
     fork {
       writeInAct(theInIO.dataIOs, theDebugIO.dataDebug.commonDebug,
         theDebugIO.dataDebug.subDone, dataStream, theClock, prefix = "inActSRAM@data"
@@ -353,18 +351,24 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
   }
 
   it should "work well on InActSRAMCommon" in {
-    test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)) { theAdrSRAM =>
+    test(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, true)).withAnnotations(Seq(WriteVcdAnnotation)) { theAdrSRAM =>
       val theTopIO = theAdrSRAM.io
       val theClock = theAdrSRAM.clock
-      val InActAdrStream = inActAdrStream.head
-      val inActAdrLookUp = getStreamLookUp(InActAdrStream)
+      val InActAdrStream = inActAdrStream.take(2)
+      val inActAdrLookupTmp = InActAdrStream.map(x => getStreamLookUp(x))
+      /** we need to modify the later look up table
+        * each element should add the end element of the former's last look up table value
+        * and drop the head, as it's zero */
+      val inActAdrLookupLaterTmp = inActAdrLookupTmp.last.tail.map(x => x + inActAdrLookupTmp.head.last)
+      val inActAdrLookUp = inActAdrLookupTmp.head ::: inActAdrLookupLaterTmp
       println(s"have ${inActAdrLookUp.length} inActStreams")
       println(s"inActAdrLookUp = $inActAdrLookUp")
       println(s"theDataStream = $InActAdrStream")
-      println(s"streamNum = $inActStreamNum")
-      println(s"zeroNum = ${InActAdrStream.collect({case x if x == 0 => x}).length}")
-      require(InActAdrStream.length <= inActAdrSRAMSize, s"the size of current inAct should less than inActAdrSRAMSize, " +
-        s"but ${InActAdrStream.length} > $inActAdrSRAMSize")
+      println(s"streamNum = ${inActStreamNum*2}")
+      println(s"zeroNum = ${InActAdrStream.flatten.collect({case x if x == 0 => x}).length}")
+      require(InActAdrStream.flatten.length <= inActAdrSRAMSize,
+        s"the size of current inAct should less than inActAdrSRAMSize, " +
+        s"but ${InActAdrStream.flatten.length} > $inActAdrSRAMSize")
       println("----------------- test begin -----------------")
       println("----------- InputActAdr SRAM Bank ------------")
       println("----------- test basic functions -------------")
@@ -380,10 +384,10 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       theTopIO.ctrlPath.readIO.enable.poke(false.B)
       println("--------------- write finish -----------------")
       theTopIO.ctrlPath.writeIO.enable.poke(false.B)
-      println(s"[inActCommonSRAMAdr] inInc = ${theTopIO.debugIO.indexInc.peek()}")
+      println(s"[inActCommonSRAMAdr] inInc = ${theTopIO.debugIO.indexAcc.peek()}")
       theClock.step(cycles = (new Random).nextInt(5) + 5)
       println("--------------- begin to read ----------------")
-      println(s"[inActCommonSRAMAdr] inInc = ${theTopIO.debugIO.indexInc.peek()}")
+      println(s"[inActCommonSRAMAdr] inInc = ${theTopIO.debugIO.indexAcc.peek()}")
       // begin to read out data
       for (g2 <- 0 until G2) {
         for (n2 <- 0 until N2) {
@@ -399,8 +403,8 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
                     theTopIO.ctrlPath.readIO.enable.poke(true.B)
                     theTopIO.ctrlPath.readIO.adr.poke(inActIdx.U)
                     theTopIO.dataPath.outIOs.data.ready.poke(true.B)
-                    readOutAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.readIO.done,
-                      InActAdrStream, theRdIdx, theClock, prefix = "inActCommonSRAMAdr")
+                    readOutInAct(theTopIO.dataPath.outIOs, theTopIO.debugIO, theTopIO.ctrlPath.readIO.done,
+                      InActAdrStream.flatten.toList, theRdIdx, theClock, prefix = "inActCommonSRAMAdr")
                     theRdIdx = theRdIdx + 1
                   }
                   theTopIO.ctrlPath.readIO.enable.poke(false.B)
@@ -425,9 +429,9 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
     test(new InActSRAMBank(true)) { theInAct =>
       val theTopIO = theInAct.io
       val theClock = theInAct.clock
-      val InActAdrStream = inActAdrStream.head
-      val InActDataStream = inActDataStream.head
-      println(s"----- inActReadCycle = ${InActAdrStream.length}")
+      val InActAdrStream = inActAdrStream.take(2)
+      val InActDataStream = inActDataStream.take(2)
+      println(s"----- inActReadCycle = ${InActAdrStream.flatten.length}")
       println("----------------- test begin -----------------")
       println(s"--------  theInActStreamNum = $inActStreamNum")
       println("----------- InputActAdr SRAM Bank ------------")
@@ -450,7 +454,7 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
       println("--------------- begin to read ----------------")
       // begin to read out streams into data sram and address sram
       readOutActAdrAndData(theTopIO.dataPath.outIOs, theTopIO.ctrlPath.readIO, theTopIO.debugIO,
-        InActAdrStream, InActDataStream, theClock)
+        InActAdrStream.head, InActDataStream.head, theClock)
       theClock.step()
       println(s"[inActSRAMBank] theState = ${theTopIO.debugIO.theState.peek()}")
       println("-------------- all read finish ---------------")
@@ -477,12 +481,14 @@ class GLBClusterSpecTest extends ClusterSpecTestBasic {
         thePSumCtrl(index).writeIO.enable.poke(false.B) // false the en after receiving done signal
       }
       def forkWriteInInActHelper(index: Int): Unit = {
+        val pokeFormerLaterInActAdr = Seq(theInActAdrStreams(index), theInActAdrStreams(index+inActSRAMNum))
+        val pokeFormerLaterInActData = Seq(theInActDataStreams(index), theInActDataStreams(index+inActSRAMNum))
         theInActCtrl(index).writeIO.enable.poke(true.B)
         theClock.step() // sub from idle to doing;
         theTopIO.debugIO.inActDebugIO(index).theState.expect(1.U, s"the inActSRAM $index should doing now")
         println(s"[inActSRAMBank$index] inActSRAMState$index =  ${theTopIO.debugIO.inActDebugIO(index).theState.peek()}")
         writeInActAdrAndData(theTopIO.dataPath.inActIO(index).inIOs, theTopIO.debugIO.inActDebugIO(index),
-          theInActAdrStreams(index), theInActDataStreams(index), theClock)
+          pokeFormerLaterInActAdr, pokeFormerLaterInActData, theClock)
         println(s"-------- $index InAct finish")
         theInActCtrl(index).writeIO.done.expect(true.B, "after all inActSRAMs done, top inAct should done now")
         theClock.step()
