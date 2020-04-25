@@ -2,7 +2,9 @@
 
 This project is a deep learning accelerator implementation in Chisel. The architecture of the accelerator is based on Eyeriss v2.
 
-And it will extend some custom RISC-V instructions in the near future.
+It can be integrated into Rocket Chip System SoC with extended custom RISC-V instructions.
+
+diagram
 
 ## Run
 
@@ -69,13 +71,14 @@ You can find it at [the project page](https://github.com/SingularityKChen/dl_acc
 
 This is the original fundamental component of deep learning accelerator and the PE in this project is [a little different](#Some-Differences).
 
-![Eyeriss v2 PE Architecture. The address SPad for both inAct and weight are used to store addr vector in the CSC compressed data, while the data SPad stores the data and count vectors](https://images-cdn.shimo.im/Zj7Aa6YzIis6Fhxs/image.png)
+![PE Top Architecture](./diagrams/ProcessingElement.png)
 
-At SPad for loop, the row number of the 2D partial sum matrix is `M0`, the column number of it is `F0*N0*E`, the size of partial sum matrix is must less than the size of PSumSPad, which equals to `pSumDataSPadSize`.
+
+At SPad for loops, the row number of the 2D partial sum matrix is `M0`, the column number of it is `F0*N0*E`, the size of partial sum matrix is must less than the size of PSumSPad, which equals to `pSumDataSPadSize`.
 
 The original size of 2D input activation matrix is `(R*C0, F0*N0*E)`, the size of 2D weight matrix is `(M0, R*C0)`. Due to the compressed [data format](#Compressed-Sparse-Column-Data-Format), both input activation matrix and weight matrix can be stored in a smaller SPad.
 
-All three kinds of data are stored in column's order, i.e., partial sum store the first `M0` elements, then second until `F0*N0*E` elements.
+All three kinds of data are stored in the column's order, i.e., partial sum store the first `M0` elements, then second until `F0*N0*E` elements.
 
 ![Map DNN to a Matrix Multiplication](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200305220730.png)
 
@@ -83,7 +86,7 @@ All three kinds of data are stored in column's order, i.e., partial sum store th
 
 #### Some Differences
 
-The original one use CSC format, but I changed it for convenience. More details can be found [later](#Compressed-Sparse-Column-Data-Format)
+The original one use CSC format, but I changed it for convenience. More details can be found [later](#Compressed-Sparse-Column-Data-Format).
 
 #### ProcessingElementControl
 
@@ -91,7 +94,13 @@ This is the control module of PE.
 
 #### ProcessingElementPad
 
-This is the Scratch Pad of input feature map, filter weight and partial sum. It contains seven stages.
+This is the Scratch Pad of input feature map, filter weight and partial sum. It contains seven stages. This module is similar to the graph bellow, expect the FIFOs.
+
+![Eyeriss v2 PE Architecture. The address SPad for both inAct and weight are used to store addr vector in the CSC compressed data, while the data SPad stores the data and count vectors](https://images-cdn.shimo.im/Zj7Aa6YzIis6Fhxs/image.png)
+
+The most complex part is the computation state machine.
+
+![MAC State Machine](./diagrams/cscStateMachine.jpg)
 
 #### [Scratch Pad Module](./dla/src/pe/SPadModule.scala)
 
@@ -168,7 +177,9 @@ Used for data reuse.
 
 #### [Cluster Group](./dla/src/cluster/ClusterGroup.scala)
 
-This is the top module of cluster group. It contains one GLB cluster, one Router cluster, one PE cluster.
+This is the top module of cluster group. It contains one GLB cluster, one Router cluster, one PE cluster and the cluster group control module.
+
+![Cluster Group Architecture](./diagrams/ClusterGroup.png)
 
 #### [GLB Cluster](./dla/src/cluster/GLBCluster.scala)
 
@@ -184,7 +195,9 @@ You have to poke address into partial sum SRAM banks no matter you want to read 
 
 #### [PE Cluster](./dla/src/cluster/PECluster.scala)
 
-This is the processing element cluster module. It is a PE Array which contains `peArrayColumnNum` columns and `peArrayRowNum` rows.
+This is the processing element cluster module. It is a PE Array which contains `peArrayColumnNum` columns and `peArrayRowNum` rows, also it needs a inAct controller to make things tidy.
+
+![PE Cluster Architecture](./diagrams/PECLuster.png)
 
 + dataPath:
   + inActIO: all the inAct data will be sent to `PEClusterInAct` module and sort them out.
@@ -261,13 +274,19 @@ This class is the generator of one partial sum router. `inIOs(0)` connects direc
 
 This file contains some basic static parameters needed in the Cluster Group.
 
-### [Diplomatic](./dla/src/diplomatic) and [EyerissTop](./dla/src/eyerissTop)
+### [EyerissWrapper](./dla/src/eyerissWrapper)
 
-#### [CSCSwitcher](./dla/src/eyerissTop/CSCSwitcher.scala)
+#### [ClusterGroupWrapper](./dla/src/eyerissWrapper/ClusterGroupWrapper.scala)
+
+This module is used to wrap cluster group, as I didn't connect all the cluster groups together. So in the future, if I want to connect them together, then I can simple replace the cluster group with a bigger once inside this wrapper. Also, it contains CSC switchers, which can compress the data.
+
+![Cluster Group Architecture](./diagrams/EyerissWrapper.png)
+
+#### [CSCSwitcher](./dla/src/eyerissWrapper/CSCSwitcher.scala)
 
 This module is used to compress matrix into [optimised CSC data format](#Compressed-Sparse-Column-Data-Format).
 
-+ inData: flipped decoupled IO, this is the uncompressed orgional data.
++ inData: flipped decoupled IO, this is the uncompressed original data.
 + outData:
   + adrIO: decoupled IO, this is the compressed address vector.
   + dataIO: decoupled IO. this is the compressed data vector and count vector.
@@ -275,10 +294,22 @@ This module is used to compress matrix into [optimised CSC data format](#Compres
   + matrixHeight: the height of one matrix.
   + matrixWidth: the width of one matrix.
   + vectorNum: the number of matrix, as we need `0` to be the ending flag.
+  
+### [Diplomatic](./dla/src/diplomatic)
+
+When we want to integrate Eyeriss into SoC, then we need some more things. The diagram bellow shows the architecture of Eyeriss SoC.
+
+![Eyeriss SoC](./diagrams/EyerissSoC.png)
+
+#### [EyerissTop](./dla/src/diplomatic/EyerissTop.scala)
+
+This module wrap the eyeriss wrapper, the decoder and the memory controller together, then we can verify it as in SoC environment.
+
+![Eyeriss Top Architecture](./diagrams/EyerissTop.png)
 
 #### [EyerissDecoder](./dla/src/diplomatic/EyerissDecoder.scala)
 
-This module is used to decode the instructions from CPU and outputs some config data and control signals.
+This module can decode the instructions from CPU and outputs some config data and control signals.
 
 + instruction: input, the instructions from CPU
 + calFin: input, true when pSum load finish
@@ -311,7 +342,9 @@ Also, it's able to manage all the source id.
 
 ## [Tests](./dla/tests/src)
 
-This directory contains all the test files.
+This directory contains all the test files. When it almost finishes, I found that I can mimic UVM's components, so I changed some tests.
+
+![Testbench](./diagrams/Testbench.png)
 
 ### [PE Test](./dla/tests/src/petest)
 
@@ -319,7 +352,7 @@ This directory contains PE test files.
 
 #### [PE Spec Test](./dla/tests/src/petest/ProcessingElementSpecTest.scala)
 
-This is the main body of PE test, including spec test from top level to Scratch Pad level.
+This is the main body of PE test, including spec test from the top level to Scratch Pad level.
 
 #### [CSC Format Data R/W Test](./dla/tests/src/petest/SimplyCombineAddrDataSPad.scala)
 
@@ -329,15 +362,23 @@ This is one fundamental scratch pad module to test the read and write with CSC f
 
 This directory contains cluster test files.
 
-#### [ClusterSpecTest](./dla/tests/src/clustertest/ClusterSpecTest.scala)
+#### [ClusterSpecTest](./dla/tests/src/clustertest/ClusterSpecTestBasic.scala)
 
 This is the main body of cluster group test. It contains the tests of PECluster, RouterCluster, GLBCluster and the top of three.
 
-##### test the spec of GLB Cluster
+##### [test the spec of GLB Cluster](./dla/tests/src/clustertest/GLBClusterSpecTest.scala)
 
 This behavior contains several tests related to the GLB cluster's spec, i.e., three submodules and top spec.
 
-##### test the spec of Processing Element Cluster
+##### [test the spec of Processing Element Cluster](./dla/tests/src/clustertest/PEClusterSpecTest.scala)
+
+### [diplomatictest](./dla/tests/src/diplomatictest)
+
+#### [EyerissTopSpecTest](./dla/tests/src/diplomatictest/EyerissTopSpecTest.scala)
+
+#### [EyerissDecoderSpecTest](./dla/tests/src/diplomatictest/EyerissDecoderSpecTest.scala)
+
+#### [MemCtrlSpecTest](./dla/tests/src/diplomatictest/MemCtrlSpecTest.scala)
 
 ## Instruction Set
 
