@@ -35,10 +35,115 @@ class GenOnePETestDataTest extends FlatSpec {
 
 class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
   with ClusterSRAMConfig with EyerissTopConfig {
+  object nnShape {
+    object inAct {
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*C2*C1*C0 //TODO: check G
+      val height: Int = R + E
+      val width: Int = S2*S1 + F2*F1*F0 // TODO: or (S2 + F2)*(S1 + F1)*F0
+      //require(height == width, s"inAct's height doesn't equal to width, $height == $width ?")
+    }
+    object weight {
+      val number: Int = M2*M1*M0
+      val channel: Int = G2*G1*C2*C1*C0
+      val height: Int = R
+      val width: Int = S2*S1
+      //require(height == width, s"weight's height doesn't equal to width, $height == $width ?")
+    }
+    object pSum {
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*M2*M1*M0
+      val height: Int = R
+      val width: Int = F2*F1*F0
+      //require(height == width, s"pSum's height doesn't equal to width, $height == $width ?")
+    }
+    require(inAct.number == pSum.number)
+    require(inAct.channel == weight.channel)
+    //require(weight.number == pSum.channel)
+  }
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
   protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt
   protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt
-  protected val scsDataMax: Int = pow(2, cscDataWidth).toInt
+  protected val cscDataMax: Int = pow(2, cscDataWidth).toInt
+  object dataSequencer {
+    object dram {
+      val inAct: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.inAct.number, nnShape.inAct.channel) {
+        genSparse(nnShape.inAct.width, nnShape.inAct.height, max = cscDataMax, ratio = 0.845)
+      }
+      val weight: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.weight.number, nnShape.weight.channel) {
+        genSparse(nnShape.weight.width, nnShape.weight.height, max = cscDataMax, ratio = 0.6)
+      }
+      //val pSum
+    }
+    object glb {
+
+    }
+    // for GLB level, for NoC level, // for inActWidth, for inActHeight
+    def dramToGlb(inActMem: Seq[Seq[List[List[Int]]]], weightMem: Seq[Seq[List[List[Int]]]]):
+    (Seq[Seq[List[List[Int]]]], Seq[Seq[List[List[Int]]]]) = {
+      val inActArray: Array[Array[Array[Array[Int]]]] =
+        Array.fill(inActStreamNum, inActParNum, inActMatrixWidth, inActMatrixHeight) {0}
+      val weightArray: Array[Array[Array[Array[Int]]]] =
+        Array.fill(weightStreamNum, weightParNum, weightMatrixWidth, weightMatrixHeight) {0}
+      for (g2 <- 0 until G2) {
+        for (n2 <- 0 until N2) {
+          for (m2 <- 0 until M2) {
+            for (f2 <- 0 until F2) {
+              for (c2 <- 0 until C2) {
+                for (s2 <- 0 until S2) {
+                  val inActGLBIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
+                  val weightGLBIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
+                  for (g1 <- 0 until G1) {
+                    for (n1 <- 0 until N1) {
+                      for (m1 <- 0 until M1) {
+                        for (f1 <- 0 until F1) {
+                          for (c1 <- 0 until C1) {
+                            for (s1 <- 0 until S1) {
+                              val inActNoCIdx = g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
+                              val weightNoCIdx = g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                              val weightWidth = s2*S1 + s1
+                              for (f0 <- 0 until F0) {
+                                val inActWidth = s2*S1 + f2*F1*F0 + f1*F0 + f0 // TODO: check
+                                for (n0 <- 0 until N0) {
+                                  val inActNumber = n2*N1*N0 +n1*N0 + n0
+                                  for (e <- 0 until E) {
+                                    val inActWidthIdx = f0*N0*E + n0*E + e
+                                    for (r <- 0 until R) {
+                                      val inActHeight = e + r
+                                      val weightHeight = r
+                                      for (c0 <- 0 until C0) {
+                                        val channel = g2*G1*C2*C1*C0 + g1*C2*C1*C0 + c2*C1*C0 + c1*C0 + c0
+                                        val inActHeightIdx = r*C0 + c0
+                                        val weightWidthIdx = r*C0 + c0
+                                        inActArray(inActGLBIdx)(inActNoCIdx)(inActWidthIdx)(inActHeightIdx) =
+                                          inActMem(inActNumber)(channel)(inActWidth)(inActHeight)
+                                        for (m0 <- 0 until M0) {
+                                          val weightNumber = m2*M1*M0 + m1*M0 + m0
+                                          val weightHeightIdx = m0
+                                          weightArray(weightGLBIdx)(weightNoCIdx)(weightWidthIdx)(weightHeightIdx) =
+                                            weightMem(weightNumber)(channel)(weightWidth)(weightHeight)
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      (inActArray.map(x => x.map(y => y.map(z => z.toList).toList).toSeq).toSeq,
+        weightArray.map(x => x.map(y => y.map(z => z.toList).toList).toSeq).toSeq)
+    }
+  }
   protected def genSparse(rows: Int, cols: Int, max: Int, ratio: Double): List[List[Int]] = {
     require(ratio <= 1 && ratio >= 0, "the range of ratio should be (0, 1)")
     var resultList: List[List[Int]] = Nil
@@ -167,8 +272,8 @@ class GenOnePETestData extends GenFunc {
     var weightSeq: Seq[List[Int]] = Nil
     var outPSumRand: List[Int] = Nil
     while (error) {
-      inActList = genSparse(cols = inActMatrixWidth, rows = inActMatrixHeight, max = scsDataMax, ratio =  0.845)
-      weightList = genSparse(cols = weightMatrixWidth, rows = weightMatrixHeight, max = scsDataMax, ratio =  0.6)
+      inActList = genSparse(cols = inActMatrixWidth, rows = inActMatrixHeight, max = cscDataMax, ratio =  0.845)
+      weightList = genSparse(cols = weightMatrixWidth, rows = weightMatrixHeight, max = cscDataMax, ratio =  0.6)
       inActSeq = genAdrCountData(inActList, inActOrWeight = true)
       weightSeq = genAdrCountData(weightList, inActOrWeight = false)
       outPSumRand = goldenFlatResult(weightList, inActList)
