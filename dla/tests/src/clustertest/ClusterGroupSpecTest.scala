@@ -246,7 +246,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.adrIOs.data
             pokeData(pokeIO, theInActAdrStreams.head, prefix)
             println(s"[$prefix] poke later")
-            //pokeData(pokeIO, theInActAdrStreams(inActRouterNum), s"${prefix}Later")
+            pokeData(pokeIO, theInActAdrStreams(inActRouterNum), s"${prefix}Later")
           }) {
           case (left, right) =>
             left.fork {
@@ -254,7 +254,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.adrIOs.data
               pokeData(pokeIO, theInActAdrStreams(right), prefix)
               println(s"[$prefix] poke later")
-              //pokeData(pokeIO, theInActAdrStreams(right+inActRouterNum), s"${prefix}Later")
+              pokeData(pokeIO, theInActAdrStreams(right+inActRouterNum), s"${prefix}Later")
             }
         }.join()
       } .fork.withName("pokeInActData") {
@@ -264,7 +264,7 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
             val pokeIO = theTop.dataPath.glbDataPath.inActIO.head.inIOs.dataIOs.data
             pokeData(pokeIO, theInActDataStreams.head, prefix)
             println(s"[$prefix] poke later")
-            //pokeData(pokeIO, theInActDataStreams(inActRouterNum), prefix)
+            pokeData(pokeIO, theInActDataStreams(inActRouterNum), prefix)
           }) {
           case (left, right) =>
             left.fork {
@@ -272,11 +272,11 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
               val pokeIO = theTop.dataPath.glbDataPath.inActIO(right).inIOs.dataIOs.data
               pokeData(pokeIO, theInActDataStreams(right), prefix)
               println(s"[$prefix] poke later")
-              //pokeData(pokeIO, theInActDataStreams(right+inActRouterNum), prefix)
+              pokeData(pokeIO, theInActDataStreams(right+inActRouterNum), prefix)
             }
         }.join()
       } .joinAndStep(theClock)
-      println("when it begins to cal, when it will need weight")
+      println("when it begins to cal, then it will need weight")
       theClock.step()
       theTop.ctrlPath.peWeightLoadEn.expect(true.B, "peLoadEn should be true to load weight")
       var weightReadFin = false
