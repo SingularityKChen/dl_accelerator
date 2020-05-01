@@ -34,7 +34,8 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
+class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
+  extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
   with ClusterSRAMConfig with EyerissTopConfig {
   object nnShape {
     object inAct {
@@ -74,10 +75,10 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
     /** original data, complete matrix */
     object dram {
       val inAct: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.inAct.number, nnShape.inAct.channel) {
-        genSparse(nnShape.inAct.width, nnShape.inAct.height, max = cscDataMax, ratio = 0.845)
+        genSparse(nnShape.inAct.width, nnShape.inAct.height, max = cscDataMax, ratio = inActSparseRatio)
       }
       val weight: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.weight.number, nnShape.weight.channel) {
-        genSparse(nnShape.weight.width, nnShape.weight.height, max = cscDataMax, ratio = 0.6)
+        genSparse(nnShape.weight.width, nnShape.weight.height, max = cscDataMax, ratio = weightSparseRatio)
       }
       //val pSum
     }
@@ -87,33 +88,44 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
       * the fourth dimension is the index of SPad level's matrix height */
     object glb {
       val (inAct, weight) = dramToRSDataFlow(dram.inAct, dram.weight)
-      object cscData {
+      object separatedSPadCSCData {
         val inActSeq: Seq[Seq[Seq[List[Int]]]] = inAct.map(x => x.map(y => genAdrCountData(y, inActOrWeight = true)))
         val weightSeq: Seq[Seq[Seq[List[Int]]]] = weight.map(x => x.map(y => genAdrCountData(y, inActOrWeight = false)))
         /** the first dimension is the index of NoC level's parameters,
+          * the second dimension is the index of GLB level's parameters */
+        val inActAdr: Seq[Seq[List[Int]]] = inActSeq.map(x => x.map({ y =>
+          y.head
+        }))
+        val inActData: Seq[Seq[Seq[Int]]] = inActSeq.map(x => x.map(y => y.last)).zip(inActSeq.map(x => x.map(y => y(1))))
+          .map({ case (seq, seq1) =>
+            seq.zip(seq1).map { case (data, count) =>
+              combineDataAndCount(data, count)
+            }})
+        val weightAdr: Seq[Seq[List[Int]]] = weightSeq.map(x => x.map({ y =>
+          require(y.head.length <= weightAdrSPadSize, s"weightAdrSPadSize needs at least ${y.head.length}")
+          y.head
+        }))
+        val weightData: Seq[Seq[Seq[Int]]] = weightSeq.map(x => x.map(y => y.last)).zip(weightSeq.map(x => x.map(y => y(1))))
+          .map({ case (seq, seq1) =>
+            seq.zip(seq1).map { case (data, count) =>
+              combineDataAndCount(data, count)
+            }})
+        private val inActAdrMaxLength = inActAdr.map(x => x.map(y => y.length).max).max
+        private val inActDataMaxLength = inActData.map(x => x.map(y => y.length).max).max
+        private val weightAdrMaxLength = weightAdr.map(x => x.map(y => y.length).max).max
+        private val weightDataMaxLength = weightData.map(x => x.map(y => y.length).max).max
+        require(inActAdrMaxLength <= inActAdrSPadSize, s"inActAdrSPadSize needs at least $inActAdrMaxLength")
+        require(inActDataMaxLength <= inActDataSPadSize, s"inActDataSPadSize needs at least $inActDataMaxLength")
+        require(weightAdrMaxLength <= weightAdrSPadSize, s"weightAdrSPadSize needs at least $weightAdrMaxLength")
+        require(weightDataMaxLength <= weightDataSPadSize, s"weightDataSPadSize needs at least $weightDataMaxLength")
+      }
+      object cscData {
+        /** the first dimension is the index of NoC level's parameters,
           * the second dimension is one stream of inAct address vector with 0 as an end. */
-        val inActAdr: Seq[List[Int]] = inActSeq.map(x => x.map(y => y.head)).map({ x =>
-          require(x.map(y => y.length).max <= inActAdrSPadSize, s"inActAdrSPadSize needs at least ${x.map(y => y.length).max}")
-          x.flatten.toList ::: List(0)
-        })
-        val inActData: Seq[List[Int]] = inActSeq.map(x => x.map(y => y.last)).zip(inActSeq.map(x => x.map(y => y(1))))
-          .map({ case (seq, seq1) =>
-            require(seq.map(y => y.length).max <= inActDataSPadSize,
-              s"inActDataSPadSize needs at least ${seq.map(y => y.length).max}")
-            seq.zip(seq1).flatMap { case (data, count) =>
-              combineDataAndCount(data, count)
-            }.toList:::List(0)})
-        val weightAdr: Seq[List[Int]] = weightSeq.map(x => x.map(y => y.head)).map({ x =>
-          require(x.map(y => y.length).max <= weightAdrSPadSize, s"need at least ${x.map(y => y.length).max}")
-          x.flatten.toList ::: List(0)
-        })
-        val weightData: Seq[List[Int]] = weightSeq.map(x => x.map(y => y.last)).zip(weightSeq.map(x => x.map(y => y(1))))
-          .map({ case (seq, seq1) =>
-            require(seq.map(y => y.length).max <= weightDataSPadSize,
-              s"weightDataSPadSize needs at least ${seq.map(y => y.length).max}")
-            seq.zip(seq1).flatMap { case (data, count) =>
-              combineDataAndCount(data, count)
-            }.toList:::List(0)})
+        val inActAdr: Seq[List[Int]] = separatedSPadCSCData.inActAdr.map(x => x.flatten.toList ::: List(0))
+        val inActData: Seq[List[Int]] = separatedSPadCSCData.inActData.map(x => x.flatten.toList ::: List(0))
+        val weightAdr: Seq[List[Int]] = separatedSPadCSCData.weightAdr.map(x => x.flatten.toList ::: List(0))
+        val weightData: Seq[List[Int]] = separatedSPadCSCData.weightData.map(x => x.flatten.toList ::: List(0))
         require(inActAdr.flatten.max <= inActAdrMax, s"${inActAdr.flatten.max} < $inActAdrMax?\n$inActAdr\n\n\n$inActData")
         require(weightAdr.flatten.max <= weightAdrMax, s"${weightAdr.flatten.max} < $weightAdrMax?")
         require(inActAdr.map(x => x.length).max < inActAdrSRAMSize,
@@ -165,12 +177,10 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
       val weight: List[List[Int]] = oneStream.weight.head
       object cscData {
         /** .head: inActAdr; .head: first NoC; .head: first SPad*/
-        val inActAdr: List[Int] = glb.cscData.inActSeq.head.head.head
-        val inActData: Seq[Int] = combineDataAndCount(glb.cscData.inActSeq.last.head.head,
-          glb.cscData.inActSeq(2).head.head)
-        val weightAdr: List[Int] = glb.cscData.weightSeq.head.head.head
-        val weightData: Seq[Int] = combineDataAndCount(glb.cscData.weightSeq.last.head.head,
-          glb.cscData.weightSeq(2).head.head)
+        val inActAdr: List[Int] = glb.separatedSPadCSCData.inActAdr.head.head
+        val inActData: Seq[Int] = glb.separatedSPadCSCData.inActData.head.head
+        val weightAdr: List[Int] = glb.separatedSPadCSCData.weightAdr.head.head
+        val weightData: Seq[Int] = glb.separatedSPadCSCData.weightData.head.head
       }
     }
     def dramToRSDataFlow(inActMem: Seq[Seq[List[List[Int]]]], weightMem: Seq[Seq[List[List[Int]]]]):

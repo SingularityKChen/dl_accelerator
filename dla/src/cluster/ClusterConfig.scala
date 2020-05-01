@@ -26,7 +26,7 @@ trait GNMFCS1Config {
   protected val N1: Int = 4
   protected val M1: Int = 2
   protected val F1: Int = 4
-  protected val C1: Int = 1
+  protected val C1: Int = 2
   protected val S1: Int = 3
   protected val inActParNum: Int = G1*N1*C1*(F1 + S1)
   protected val weightParNum: Int = G1*M1*C1*S1
