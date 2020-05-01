@@ -22,7 +22,7 @@ trait ClusterSRAMConfig extends ClusterConfig {
 }
 
 trait GNMFCS1Config {
-  protected val G1: Int = 2
+  protected val G1: Int = 1
   protected val N1: Int = 4
   protected val M1: Int = 2
   protected val F1: Int = 4

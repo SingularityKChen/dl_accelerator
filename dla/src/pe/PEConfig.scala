@@ -32,7 +32,7 @@ trait MCRENFConfig { // contains some scala values
 
 trait SPadSizeConfig {
   protected val pSumDataSPadSize: Int = 32
-  protected val inActDataSPadSize: Int = 16
+  protected val inActDataSPadSize: Int = 18
   protected val inActAdrSPadSize: Int = 9
   protected val weightDataSPadSize: Int = 192 // 96 if SIMD
   protected val weightAdrSPadSize: Int = 16

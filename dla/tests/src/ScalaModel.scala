@@ -14,22 +14,18 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
   behavior of "compare the efficiency of Eyeriss"
   it should "get the info of Eyeriss dla" in {
     /** model the behavior of Eyeriss cluster group */
-    val pSumResult: Array[Array[Array[Array[Int]]]] =
-      Array.fill(G2 * G1 * N2 * N1 * N0) {
-        Array.fill(M2 * M1 * M0) { // each number
-          Array.fill(E) {
-            Array.fill(F2 * F1 * F0) {
-              0
-            }
-          }
-        }
-      }
+    val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
+      sequencer.nnShape.pSum.number,
+      sequencer.nnShape.pSum.channel,
+      sequencer.nnShape.pSum.width,
+      sequencer.nnShape.pSum.height
+    ) {0}
     val monitor = new CompareMonitor
-    val inActMemNum = sequencer.inActStreamTmp.flatten.flatten.length
+    val inActMemNum = sequencer.dataSequencer.glb.inAct.flatten.flatten.flatten.length
     monitor.inActRead.mem += inActMemNum
-    monitor.inActWrite.adr.glb += sequencer.inActAdrStreamTmp.flatten.length
-    monitor.inActWrite.data.glb += sequencer.inActDataStreamTmp.flatten.length
     monitor.cycle += inActMemNum*scoreBoard.accessCost.mem
+    monitor.inActWrite.adr.glb += sequencer.dataSequencer.glb.cscData.inActAdr.flatten.length
+    monitor.inActWrite.data.glb += sequencer.dataSequencer.glb.cscData.inActData.flatten.length
     var parallelCycle = 0
     for (g2 <- 0 until G2) {
       for (n2 <- 0 until N2) {
@@ -133,69 +129,43 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
 
   it should "get the info of common data" in {
     /** read from main memory, can do 4*3 mac parallel */
-    val pSumResult: Array[Array[Array[Array[Int]]]] =
-      Array.fill(G2 * G1 * N2 * N1 * N0) {
-        Array.fill(M2 * M1 * M0) { // each number
-          Array.fill(E) {
-            Array.fill(F2 * F1 * F0) {
-              0
-            }
-          }
-        }
-      }
+    val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
+      sequencer.nnShape.pSum.number,
+      sequencer.nnShape.pSum.channel,
+      sequencer.nnShape.pSum.width,
+      sequencer.nnShape.pSum.height
+    ) {0}
     val monitor = new CompareMonitor
-    /** for every pSum */
-    for (g <- 0 until G2*G1) {
-      /** each PSum number */
-      for (n <- 0 until N2*N1) {
-        for (n0 <- 0 until N0) {
-          /** each PSum channel*/
-          for (m <- 0 until M2*M1) {
-            for (m0 <- 0 until M0) {
-              /** PSum height */
-              for (e <- 0 until E) {
-                /** PSum width*/
-                for (f2 <- 0 until F2) {
-                  for (f1 <- 0 until F1) {
-                    for (f0 <- 0 until F0) {
-                      /** inside this for loop, do mac, for the size of weight matrix */
-                      /** weight channel */
-                      for (c <- 0 until C2*C1) {
-                        for (c0 <- 0 until C0) {
-                          /** weight height */
-                          for (r <- 0 until R) {
-                            /** weight width */
-                            for (s2 <- 0 until S2) {
-                              for (s1 <- 0 until S1) {
-                                val inActWidthIdx = f0*n0*e
-                                val inActHeightIdx = r*c0
-                                val inActSeqIdx = g*n*c*(f2 + s2)*(f1 + s1)
-                                val weightWidthIdx = r*c0
-                                val weightHeightIdx = m0
-                                val weightSeqIdx = g*m*c*s2*s1
-                                val macResult = sequencer.weightStreamTmp(weightSeqIdx)(weightWidthIdx)(weightHeightIdx) *
-                                  sequencer.inActStreamTmp(inActSeqIdx)(inActWidthIdx)(inActHeightIdx)
-                                pSumResult(g*n*n0)(m)(e)(f2*f1*f0) += macResult
-                                monitor.inActRead.mem += 1
-                                monitor.weightRead.mem += 1
-                                monitor.macNum += 1
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    print(".") // finish one PSum
-                  }
+    /** each PSum number */
+    for (n <- 0 until sequencer.nnShape.pSum.number) {
+      /** each PSum channel*/
+      for (m <- 0 until sequencer.nnShape.pSum.channel) {
+        /** PSum height */
+        for (f <- 0 until sequencer.nnShape.pSum.width) {
+          /** PSum width*/
+          for (e <- 0 until sequencer.nnShape.pSum.height) {
+            /** inside this for loop, do mac, for the size of weight matrix */
+            /** weight channel */
+            for (c <- 0 until sequencer.nnShape.weight.channel) {
+              /** weight height */
+              for (s <- 0 until sequencer.nnShape.weight.width) {
+                /** weight width */
+                for (r <- 0 until sequencer.nnShape.weight.height) {
+                  pSumResult(n)(m)(f)(e) += sequencer.dataSequencer.dram.weight(m)(c)(s)(r) *
+                    sequencer.dataSequencer.dram.inAct(n)(c)(s+f)(r+e)
+                  monitor.inActRead.mem += 1
+                  monitor.weightRead.mem += 1
+                  monitor.macNum += 1
                 }
               }
-              print("*") // finish one PSum matrix
             }
+            print(".") // finish one PSum
           }
-          println("\n[INFO] finish one batch of PSum " +
-            f"${((g*N2*N1*N0 + n*N0 + n0 + 1).toFloat/(G2*G1*N2*N1*N0).toFloat)*100}%.2f%%")
         }
+        print("*") // finish one PSum matrix
       }
+      println("\n[INFO] finish one batch of PSum " +
+        f"${((n + 1).toFloat/sequencer.nnShape.pSum.number.toFloat)*100}%.2f%%")
     }
     monitor.cycle = scoreBoard.totalCycles(monitor.macNum, peNum, monitor.inActRead.mem, 0, 0)
     monitor.printMonitorInfo()
