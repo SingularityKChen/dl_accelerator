@@ -22,20 +22,21 @@ trait MCRENFConfig { // contains some scala values
   protected val N0: Int = 3
   protected val F0: Int = 1
   protected val pSumOneSPadNum: Int = M0*E*N0*F0
-  protected val inActMatrixWidth: Int = F0*N0*E
-  protected val inActMatrixHeight: Int = R*C0
-  protected val weightMatrixWidth: Int = inActMatrixHeight
-  protected val weightMatrixHeight: Int = M0
-  // C0*R0 < iacAdrSize = 9
+  protected val inActMatrixWidth: Int = F0*N0*E // column
+  protected val inActMatrixHeight: Int = R*C0 // row
+  protected val weightMatrixWidth: Int = inActMatrixHeight // column
+  protected val weightMatrixHeight: Int = M0 // row
+  // inActMatrixWidth < inActAdrSize = 9
+  // weightMatrixWidth < weightAdrSPadSize = 16
   // C0*R0*E0*N0*F0 <
 }
 
 trait SPadSizeConfig {
   protected val pSumDataSPadSize: Int = 32
-  protected val inActDataSPadSize: Int = 16
-  protected val inActAdrSPadSize: Int = 9
-  protected val weightDataSPadSize: Int = 192 // 96 if SIMD
-  protected val weightAdrSPadSize: Int = 16
+  protected val inActDataSPadSize: Int = 20
+  protected val inActAdrSPadSize: Int = 9 // bigger than inActMatrixWidth + 1
+  protected val weightDataSPadSize: Int = 96 // 192 if SIMD
+  protected val weightAdrSPadSize: Int = 16 // bigger than weightMatrixWidth + 1
   protected val inActAdrIdxWidth: Int = log2Ceil(inActAdrSPadSize)
   protected val inActDataIdxWidth: Int = log2Ceil(inActDataSPadSize)
   protected val weightAdrIdxWidth: Int = log2Ceil(weightAdrSPadSize)

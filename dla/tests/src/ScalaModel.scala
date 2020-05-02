@@ -4,205 +4,346 @@ import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 import scala.math.max
+import chisel3.util.log2Ceil
 
-class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
+class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
   with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
-  private val sequencer = new GenOneStreamData
+  /** use monitor to compare the info between different test*/
   private val scoreBoard = new ScoreBoard
-  private val peNum = peRowNum * peColNum
-  private val genFun = new GenFunc
-  behavior of "compare the efficiency of Eyeriss"
-  it should "get the info of Eyeriss dla" in {
-    /** model the behavior of Eyeriss cluster group */
-    val pSumResult: Array[Array[Array[Array[Int]]]] =
-      Array.fill(G2 * G1 * N2 * N1 * N0) {
-        Array.fill(M2 * M1 * M0) { // each number
-          Array.fill(E) {
-            Array.fill(F2 * F1 * F0) {
-              0
-            }
-          }
-        }
-      }
-    val monitor = new CompareMonitor
-    val inActMemNum = sequencer.inActStreamTmp.flatten.flatten.length
-    monitor.inActRead.mem += inActMemNum
-    monitor.inActWrite.adr.glb += sequencer.inActAdrStreamTmp.flatten.length
-    monitor.inActWrite.data.glb += sequencer.inActDataStreamTmp.flatten.length
-    monitor.cycle += inActMemNum*scoreBoard.accessCost.mem
-    var parallelCycle = 0
-    for (g2 <- 0 until G2) {
-      for (n2 <- 0 until N2) {
-        for (m2 <- 0 until M2) {
-          for (f2 <- 0 until F2) {
-            for (c2 <- 0 until C2) {
-              for (s2 <- 0 until S2) {
-                val weightReadAdr = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
-                val inActReadAdr = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
-                var inActAdrParallelReadNum = 0
-                var inActDataParallelReadNum = 0
-                var weightMemParallelReadNum = 0
-                /** NoC level */
-                for (g1 <- 0 until G1) {
-                  for (n1 <- 0 until N1) {
-                    for (m1 <- 0 until M1) {
-                      for (f1 <- 0 until F1) {
-                        for (c1 <- 0 until C1) {
-                          for (s1 <- 0 until S1) {
-                            /** SPad level */
-                            val weightGLBIdx = weightReadAdr*weightParNum + g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
-                            val inActGLBIdx = inActReadAdr*inActParNum + g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
-                            require(inActGLBIdx < sequencer.inActAdrStreamTmp.length,
-                              s"$inActGLBIdx, ${sequencer.inActAdrStreamTmp.length}")
-                            val inActAdrSPad = sequencer.inActAdrStreamTmp(inActGLBIdx)
-                            val inActDataSPad = genFun.combineDataAndCount(sequencer.inActDataStreamTmp(inActGLBIdx),
-                              sequencer.inActCountStreamTmp(inActGLBIdx))
-                            val weightAdrSPad = sequencer.weightAdrStreamTmp(weightGLBIdx)
-                            val weightDataSPad = genFun.combineDataAndCount(sequencer.weightDataStreamTmp(weightGLBIdx),
-                              sequencer.weightCountStreamTmp(weightGLBIdx))
-                            val pSumSPad: Array[Array[Int]] = Array.fill(F0*N0*E, M0) {0}
-                            val inActGLBAccessNumMax = max(inActAdrSPad.length, inActDataSPad.length)
-                            val weightMemAccessNum = sequencer.weightStreamTmp(weightGLBIdx).flatten.length
-                            inActAdrParallelReadNum += inActAdrSPad.length
-                            monitor.inActWrite.adr.sPad += inActAdrSPad.length
-                            inActDataParallelReadNum += inActDataSPad.length
-                            monitor.inActWrite.data.sPad += inActDataSPad.length
-                            weightMemParallelReadNum += weightMemAccessNum
-                            monitor.weightWrite.adr.sPad += weightAdrSPad.length
-                            monitor.weightWrite.data.sPad += weightDataSPad.length
-                            parallelCycle += max(inActGLBAccessNumMax*scoreBoard.accessCost.glb,
-                              weightMemAccessNum*scoreBoard.accessCost.mem)
-                            var inActDataSPadIdx = 0
-                            for (inActAdrSPadIdx <- inActAdrSPad.indices) {
-                              /** padInActAdr: read each column of current inAct Matrix */
-                              val inActAdr = inActAdrSPad(inActAdrSPadIdx)
-                              monitor.inActRead.adr.sPad += 1
-                              parallelCycle += 1
-                              if (inActAdr != inActZeroColumnCode || inActAdr == 0) {
-                                /** padInActData: read each row of current column */
-                                while (inActDataSPadIdx < inActAdr) {
-                                  val inActDataRead = inActDataSPad(inActDataSPadIdx)
-                                  val inActData = BigInt(inActDataRead.toBinaryString.take(cscDataWidth), 2).toInt
-                                  val inActRow = BigInt(inActDataRead.toBinaryString.takeRight(cscCountWidth), 2).toInt
-                                  monitor.inActRead.data.sPad += 1
+  val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
+    sequencer.nnShape.pSum.number,
+    sequencer.nnShape.pSum.channel,
+    sequencer.nnShape.pSum.height,
+    sequencer.nnShape.pSum.width
+  ) {0}
+  /** assume the data stored in Mem is pre-processed */
+  private val inActAdrSRAMBanks = Array.fill(monitor.clusterNum, inActSRAMNum, inActAdrSRAMSize) {0}
+  private val inActDataSRAMBanks = Array.fill(monitor.clusterNum, 3, inActDataSRAMSize) {0}
+  private var parallelCycle = 0
+  require(G1 == 1)
+  // mapping <> physical
+  require(S1 == peRowNum)
+  require(F1 == peColNum) // TODO: use %peColNum == 0 instead
+  require(M1*C1*N1*G1 == monitor.clusterNum)
+  /** NoC level */
+  private var inActSRAMBankWriteRecord: List[Seq[Int]] = Nil
+  for (g1 <- 0 until G1) {
+    for (n1 <- 0 until N1) {
+      for (m1 <- 0 until M1) {
+        for (f1 <- 0 until F1) {
+          for (c1 <- 0 until C1) {
+            for (s1 <- 0 until S1) {
+              val weightNoCLevelIdx = g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+              val inActNoCLevelIdx = g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
+              val clusterIdx = n1*M1*C1 + m1*C1 + c1
+              val bankIdx = (s1+f1)%3
+              val inActSRAMBankWriteRecordSeq = Seq(clusterIdx, bankIdx)
+              val formerOrLater = (s1+f1) < inActSRAMNum
+              if (!inActSRAMBankWriteRecord.contains(inActSRAMBankWriteRecordSeq)) {
+                /** as it needs write into SRAM Bank for former and later, so we need
+                  * another NoCIdx*/
+                val anotherNoCIdx = if (formerOrLater) inActNoCLevelIdx + inActSRAMNum else
+                  inActNoCLevelIdx - inActSRAMNum
+                if (formerOrLater) {
+                  inActAdrSRAMBanks(clusterIdx)(bankIdx) =
+                    (sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx):::
+                      sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx)).toArray
+                  inActDataSRAMBanks(clusterIdx)(bankIdx) =
+                    (sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx):::
+                      sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx)).toArray
+                } else {
+                  inActAdrSRAMBanks(clusterIdx)(bankIdx) =
+                    (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx):::
+                      sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx)).toArray
+                  inActDataSRAMBanks(clusterIdx)(bankIdx) =
+                    (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx):::
+                      sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx)).toArray
+                }
+                // update scoreBoard
+                /** the times read directly from mem in uncompressed data format */
+                val inActMemReadNum = sequencer.dataSequencer.glb.inAct(inActNoCLevelIdx).flatten.flatten.length +
+                  sequencer.dataSequencer.glb.inAct(anotherNoCIdx).flatten.flatten.length
+                monitor.inActRead.mem += inActMemReadNum
+                monitor.cycle += inActMemReadNum*scoreBoard.accessCost.mem
+                val inActAdrGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx).length
+                  + sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx).length)
+                val inActDataGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx).length
+                  + sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx).length)
+                require(M1 == 2 || M1 == 1, "M1 needs equals to 2 or 1, or shouldn't divide M1 directly")
+                /** divide M1, as inAct could be shared horizontally */
+                monitor.inActWrite.adr.glb += inActAdrGLBWriteNum/M1
+                monitor.inActWrite.data.glb += inActDataGLBWriteNum/M1
+                inActSRAMBankWriteRecord = inActSRAMBankWriteRecord:::List(inActSRAMBankWriteRecordSeq)
+              }
+              /** GLB level */
+              for (g2 <- 0 until G2) {
+                for (n2 <- 0 until N2) {
+                  for (m2 <- 0 until M2) {
+                    for (f2 <- 0 until F2) {
+                      for (c2 <- 0 until C2) {
+                        for (s2 <- 0 until S2) {
+                          val weightGLBLevelIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
+                          val inActGLBLevelIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
+                          /** SPad level */
+                          val inActAdrSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
+                            inActAdr(inActNoCLevelIdx)(inActGLBLevelIdx)
+                          val inActDataSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
+                            inActData(inActNoCLevelIdx)(inActGLBLevelIdx)
+                          val weightAdrSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
+                            weightAdr(weightNoCLevelIdx)(weightGLBLevelIdx)
+                          val weightDataSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
+                            weightData(weightNoCLevelIdx)(weightGLBLevelIdx)
+                          val pSumSPad: Array[Array[Int]] = Array.fill(F0*N0*E, M0) {0}
+                          val inActGLBReadNum = max(inActAdrSPad.length, inActDataSPad.length)
+                          val weightMemReadNum = sequencer.dataSequencer.glb.
+                            weight(weightNoCLevelIdx)(weightGLBLevelIdx).flatten.length
+                          /** only read once from Mem and send into several PEs */
+                          if (f1 == 0 && n1 == 0) {
+                            monitor.weightRead.mem += weightMemReadNum
+                            parallelCycle += max(inActGLBReadNum*scoreBoard.accessCost.glb,
+                              weightMemReadNum*scoreBoard.accessCost.mem)
+                          } else {
+                            parallelCycle += inActGLBReadNum*scoreBoard.accessCost.glb
+                          }
+                          /** read from GLB once and send into diagonal PEs
+                            * and if m1 = 1 or more, then other cluster can receive inAct via Router */
+                          if (formerOrLater) {
+                            if (f1 == 0 && m1 == 0) {
+                              monitor.inActRead.adr.glb += inActAdrSPad.length
+                              monitor.inActRead.data.glb += inActDataSPad.length
+                            }
+                          } else {
+                            if (f1 == inActSRAMNum && m1 == 0) {
+                              monitor.inActRead.adr.glb += inActAdrSPad.length
+                              monitor.inActRead.data.glb += inActDataSPad.length
+                            }
+                          }
+                          monitor.inActWrite.adr.sPad += inActAdrSPad.length
+                          monitor.inActWrite.data.sPad += inActDataSPad.length
+                          monitor.weightWrite.adr.sPad += weightAdrSPad.length
+                          monitor.weightWrite.data.sPad += weightDataSPad.length
+                          var inActDataSPadIdx = 0
+                          for (inActAdrSPadIdx <- inActAdrSPad.indices) {
+                            /** padInActAdr: read each column of current inAct Matrix */
+                            val inActAdr = inActAdrSPad(inActAdrSPadIdx)
+                            monitor.inActRead.adr.sPad += 1
+                            parallelCycle += 1
+                            if (inActAdr != inActZeroColumnCode || inActAdr == 0) {
+                              /** padInActData: read each row of current column */
+                              while (inActDataSPadIdx < inActAdr) {
+                                val inActDataRead = inActDataSPad(inActDataSPadIdx)
+                                val inActData = BigInt(inActDataRead.toBinaryString.take(cscDataWidth), 2).toInt
+                                val inActRow = BigInt(inActDataRead.toBinaryString.takeRight(cscCountWidth), 2).toInt
+                                monitor.inActRead.data.sPad += 1
+                                parallelCycle += 1
+                                if (inActDataRead != 0) {
+                                  /** padWeightAdr */
+                                  val weightAdr = weightAdrSPad(inActRow)
+                                  val weightDataSPadStartIdx = if (inActRow == 0) 0 else weightAdrSPad(inActRow - 1)
+                                  monitor.weightRead.adr.sPad += 1
                                   parallelCycle += 1
-                                  if (inActDataRead != 0) {
-                                    /** padWeightAdr */
-                                    val weightAdr = weightAdrSPad(inActRow)
-                                    val weightDataSPadStartIdx = if (inActRow == 0) 0 else weightAdrSPad(inActRow - 1)
-                                    monitor.weightRead.adr.sPad += 1
-                                    parallelCycle += 1
-                                    if (weightAdr != weightZeroColumnCode || weightAdr == 0) {
-                                      /** padWeightData */
-                                      for (weightDataSPadIdx <- weightDataSPadStartIdx until weightAdr) {
-                                        val weightDataRead = weightDataSPad(weightDataSPadIdx)
-                                        val weightData = BigInt(weightDataRead.toBinaryString.take(cscDataWidth), 2).toInt
-                                        val weightRow = BigInt(weightDataRead.toBinaryString.takeRight(cscCountWidth), 2).toInt
-                                        monitor.weightRead.data.sPad += 1
-                                        parallelCycle += 2 // need 2 cycles to read from SRAM
-                                        pSumSPad(inActAdrSPadIdx)(weightRow) += weightData * inActData
-                                        monitor.macNum += 1
-                                        parallelCycle += 2 // one for mpy, one for write back
-                                      }
+                                  if (weightAdr != weightZeroColumnCode || weightAdr == 0) {
+                                    /** padWeightData */
+                                    for (weightDataSPadIdx <- weightDataSPadStartIdx until weightAdr) {
+                                      val weightDataRead = weightDataSPad(weightDataSPadIdx)
+                                      val weightData = BigInt(weightDataRead.toBinaryString.take(cscDataWidth), 2).toInt
+                                      val weightRow = BigInt(weightDataRead.toBinaryString.takeRight(cscCountWidth), 2).toInt
+                                      monitor.weightRead.data.sPad += 1
+                                      parallelCycle += 2 // need 2 cycles to read from SRAM
+                                      pSumSPad(inActAdrSPadIdx)(weightRow) += weightData * inActData
+                                      monitor.macNum += 1
+                                      parallelCycle += 2 // one for mpy, one for write back
                                     }
                                   }
-                                  inActDataSPadIdx += 1
                                 }
+                                inActDataSPadIdx += 1
                               }
                             }
-                            print(".") // finish SPad Level
                           }
+                          //print(".") // finish SPad Level
+                          /** accumulate PSum vertically */
                         }
                       }
                     }
                   }
                 }
-                monitor.inActRead.adr.glb += inActAdrParallelReadNum/2 // TODO
-                monitor.inActRead.data.glb += inActDataParallelReadNum/2 // TODO
-                monitor.weightRead.mem += weightMemParallelReadNum/peColNum
-                print("*\n") // finish GLB Level
               }
+              //print("*\n") // finish GLB Level
             }
           }
         }
       }
     }
-    monitor.cycle += parallelCycle/peNum
-    monitor.printMonitorInfo()
   }
-
-  it should "get the info of common data" in {
-    /** read from main memory, can do 4*3 mac parallel */
-    val pSumResult: Array[Array[Array[Array[Int]]]] =
-      Array.fill(G2 * G1 * N2 * N1 * N0) {
-        Array.fill(M2 * M1 * M0) { // each number
-          Array.fill(E) {
-            Array.fill(F2 * F1 * F0) {
-              0
-            }
-          }
-        }
-      }
-    val monitor = new CompareMonitor
-    /** for every pSum */
-    for (g <- 0 until G2*G1) {
-      /** each PSum number */
-      for (n <- 0 until N2*N1) {
-        for (n0 <- 0 until N0) {
-          /** each PSum channel*/
-          for (m <- 0 until M2*M1) {
-            for (m0 <- 0 until M0) {
-              /** PSum height */
-              for (e <- 0 until E) {
-                /** PSum width*/
-                for (f2 <- 0 until F2) {
-                  for (f1 <- 0 until F1) {
-                    for (f0 <- 0 until F0) {
-                      /** inside this for loop, do mac, for the size of weight matrix */
-                      /** weight channel */
-                      for (c <- 0 until C2*C1) {
-                        for (c0 <- 0 until C0) {
-                          /** weight height */
-                          for (r <- 0 until R) {
-                            /** weight width */
-                            for (s2 <- 0 until S2) {
-                              for (s1 <- 0 until S1) {
-                                val inActWidthIdx = f0*n0*e
-                                val inActHeightIdx = r*c0
-                                val inActSeqIdx = g*n*c*(f2 + s2)*(f1 + s1)
-                                val weightWidthIdx = r*c0
-                                val weightHeightIdx = m0
-                                val weightSeqIdx = g*m*c*s2*s1
-                                val macResult = sequencer.weightStreamTmp(weightSeqIdx)(weightWidthIdx)(weightHeightIdx) *
-                                  sequencer.inActStreamTmp(inActSeqIdx)(inActWidthIdx)(inActHeightIdx)
-                                pSumResult(g*n*n0)(m)(e)(f2*f1*f0) += macResult
-                                monitor.inActRead.mem += 1
-                                monitor.weightRead.mem += 1
-                                monitor.macNum += 1
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                    print(".") // finish one PSum
-                  }
-                }
-              }
-              print("*") // finish one PSum matrix
-            }
-          }
-          println("\n[INFO] finish one batch of PSum " +
-            f"${((g*N2*N1*N0 + n*N0 + n0 + 1).toFloat/(G2*G1*N2*N1*N0).toFloat)*100}%.2f%%")
-        }
-      }
-    }
-    monitor.cycle = scoreBoard.totalCycles(monitor.macNum, peNum, monitor.inActRead.mem, 0, 0)
+  monitor.cycle += parallelCycle/monitor.peNum
+  if (printDetails) {
     monitor.printMonitorInfo()
+    sequencer.nnShape.printNNShapeInfo()
   }
 }
 
-class CompareMonitor {
+class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
+  with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
+  private val scoreBoard = new ScoreBoard
+  val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
+    sequencer.nnShape.pSum.number,
+    sequencer.nnShape.pSum.channel,
+    sequencer.nnShape.pSum.height,
+    sequencer.nnShape.pSum.width
+  ) {0}
+  /** each PSum number */
+  for (n <- 0 until sequencer.nnShape.pSum.number) {
+    /** each PSum channel*/
+    for (m <- 0 until sequencer.nnShape.pSum.channel) {
+      /** PSum height */
+      for (f <- 0 until sequencer.nnShape.pSum.width) {
+        /** PSum width*/
+        for (e <- 0 until sequencer.nnShape.pSum.height) {
+          /** inside this for loop, do mac, for the size of weight matrix */
+          /** weight channel */
+          for (c <- 0 until sequencer.nnShape.weight.channel) {
+            /** weight height */
+            for (s <- 0 until sequencer.nnShape.weight.width) {
+              /** weight width */
+              for (r <- 0 until sequencer.nnShape.weight.height) {
+                pSumResult(n)(m)(e)(f) += sequencer.dataSequencer.dram.weight(m)(c)(r)(s) *
+                  sequencer.dataSequencer.dram.inAct(n)(c)(r+e)(s+f)
+                monitor.inActRead.mem += 1
+                monitor.weightRead.mem += 1
+                monitor.macNum += 1
+              }
+            }
+          }
+          //print(".") // finish one PSum
+        }
+      }
+      //print("*") // finish one PSum matrix
+    }
+    /*println("\n[INFO] finish one batch of PSum " +
+      f"${((n + 1).toFloat/sequencer.nnShape.pSum.number.toFloat)*100}%.2f%%")*/
+  }
+  monitor.cycle = scoreBoard.totalCycles(monitor.macNum, monitor.peNum, monitor.inActRead.mem, 0, 0)
+  if (printDetails) {
+    monitor.printMonitorInfo()
+    sequencer.nnShape.printNNShapeInfo()
+  }
+}
+
+class ScalaModel extends FlatSpec {
+  behavior of "compare the efficiency of Eyeriss"
+  /** model the behavior of Eyeriss cluster group */
+  it should "compare the info across sparse ratio between eyeriss and common device" in {
+    object inActRatioSeq {
+      val start = 4
+      val end = 10
+      val during: Int = end - start
+    }
+    object weightRatioSeq {
+      val start = 4
+      val end = 10
+      val during: Int = end - start
+    }
+    val monitorSeq = Seq.fill(inActRatioSeq.during, weightRatioSeq.during, 2){new CompareMonitor}
+    /** the min size of inAct adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[inActAdrSPadSize]] and [[SPadSizeConfig]].[[inActDataSPadSize]]*/
+    val inActSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min size of inAct adr SRAM and data SRAM to meet the requirement.
+      * [[ClusterSRAMConfig]].[[inActAdrSRAMSize]] and [[ClusterSRAMConfig]].[[inActDataSRAMSize]]*/
+    val inActSRAMSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min bits of inAct adr to meet the requirement. [[PESizeConfig]].[[inActAdrWidth]]*/
+    val inActAdrWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min bits of inAct data to meet the requirement. [[PESizeConfig]].[[inActDataWidth]]*/
+    val inActDataWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min size of weight adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[weightAdrSPadSize]] and [[SPadSizeConfig]].[[weightDataSPadSize]]*/
+    val weightSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min bits of weight adr to meet the requirement. [[PESizeConfig]].[[weightAdrWidth]]*/
+    val weightAdrWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min bits of weight data to meet the requirement. [[PESizeConfig]].[[weightDataWidth]]*/
+    val weightDataWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
+      for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
+        val sequencer = new GenFunc(inActSparseRatio = inActRatio.toDouble/10,
+          weightSparseRatio = weightRatio.toDouble/10)
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
+        val eyerissModel = new EyerissModel(sequencer,
+          monitorSeq(inActRatioIdx)(weightRatioIdx).head,
+          printDetails = false)
+        val common = new CommonModel(sequencer,
+          monitorSeq(inActRatioIdx)(weightRatioIdx)(1),
+          printDetails = false)
+        inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActAdr.map(x => x.map(y => y.length).max).max
+        inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActData.map(x => x.map(y => y.length).max).max
+        inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.cscData.inActAdr.map(x => x.length).max
+        inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.cscData.inActData.map(x => x.length).max
+        inActAdrWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        inActDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
+        weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightAdr.map(x => x.map(y => y.length).max).max
+        weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightData.map(x => x.map(y => y.length).max).max
+        weightAdrWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        weightDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
+        println(s"[INFO] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
+      }
+    }
+    println("|iRa\t|wRa\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
+    for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
+      for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
+        val eyerissMonitor = monitorSeq(inActRatioIdx)(weightRatioIdx).head
+        val commonMonitor = monitorSeq(inActRatioIdx)(weightRatioIdx).last
+        val inActGLBWriteTotal = eyerissMonitor.inActWrite.adr.glb + eyerissMonitor.inActWrite.data.glb
+        val inActGLBReadTotal = eyerissMonitor.inActRead.adr.glb + eyerissMonitor.inActRead.data.glb
+        val inActSPadWriteTotal = eyerissMonitor.inActWrite.adr.sPad + eyerissMonitor.inActWrite.data.sPad
+        val inActSPadReadTotal = eyerissMonitor.inActRead.adr.sPad + eyerissMonitor.inActRead.data.sPad
+        /**inAct GLB  R / GLB W */
+        val eyerissInActGLBRW = f"${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%"
+        /**inAct SPad W / GLB R */
+        val eyerissInActSPadReuse = f"${(inActSPadWriteTotal.toFloat/inActGLBReadTotal.toFloat)*100}%.2f%%"
+        val cycleEfficiency = f"${(eyerissMonitor.cycle.toFloat / commonMonitor.cycle.toFloat)*100}%.4f%%"
+        val macEfficiency = f"${(eyerissMonitor.macNum.toFloat / commonMonitor.macNum.toFloat)*100}%.4f%%"
+        val inActMemReadEfficiency =
+          f"${(eyerissMonitor.inActRead.mem.toFloat / commonMonitor.inActRead.mem.toFloat)*100}%.4f%%"
+        val weightMemReadEfficiency =
+          f"${(eyerissMonitor.weightRead.mem.toFloat / commonMonitor.weightRead.mem.toFloat)*100}%.4f%%"
+        println(s"|${inActRatio.toDouble/10}\t|${weightRatio.toDouble/10}\t|$cycleEfficiency\t|" +
+          s"$macEfficiency\t|$inActMemReadEfficiency\t|$weightMemReadEfficiency\t|" +
+          s"$eyerissInActGLBRW\t|$eyerissInActSPadReuse\t|")
+      }
+    }
+    println("\n|iRa\t|wRa\t|inActAdrSPad\t|inActDataSPad\t|weightAdrSPad\t|weightDataSPad\t|inActAdrSRAM\t|inActDataSRAM\t|")
+    for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
+      for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
+        println(s"|0.$inActRatio\t|0.$weightRatio\t|" +
+          s"${inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t${inActAdrWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t${inActDataWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t${weightAdrWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t${weightDataWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t|" +
+          s"${inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t|"
+        )
+      }
+    }
+  }
+}
+
+class CompareMonitor extends ClusterSRAMConfig {
+  val clusterNum: Int = 8 * 2 // 8 rows, 2 columns
+  private val peArraySize = peRowNum * peColNum
+  val peNum: Int = peArraySize * clusterNum
   var cycle: BigInt = 0 // the number of clock cycles
   var macNum: BigInt = 0 // the number of mac
   class CSCAccess {
@@ -221,7 +362,9 @@ class CompareMonitor {
   def printMonitorInfo(): Unit = {
     val inActGLBWriteTotal = inActWrite.adr.glb + inActWrite.data.glb
     val inActGLBReadTotal = inActRead.adr.glb + inActRead.data.glb
-    println("[INFO] computation finishes")
+    val inActSPadWriteTotal = inActWrite.adr.sPad + inActWrite.data.sPad
+    val inActSPadReadTotal = inActRead.adr.sPad + inActRead.data.sPad
+    println(s"[INFO] computation finishes, using $peNum PEs")
     println(s"------ time = $cycle cycles")
     println(s"------ mac num = $macNum")
     println(s"------ inActAccess ")
@@ -234,10 +377,10 @@ class CompareMonitor {
     println(s"                                   | glbAdrRead: ${inActRead.adr.glb}")
     println(s"                                   | glbDataRead: ${inActRead.data.glb}")
     println(s"                   | sPad")
-    println(s"                        | sPadWrite: ${inActWrite.adr.sPad + inActWrite.data.sPad}")
+    println(s"                        | sPadWrite: $inActSPadWriteTotal")
     println(s"                                   | sPadAdrWrite: ${inActWrite.adr.sPad}")
     println(s"                                   | sPadDataWrite: ${inActWrite.data.sPad}")
-    println(s"                        | sPadRead: ${inActRead.adr.sPad + inActRead.data.sPad}")
+    println(s"                        | sPadRead: $inActSPadReadTotal")
     println(s"                                   | sPadAdrRead: ${inActRead.adr.sPad}")
     println(s"                                   | sPadDataRead: ${inActRead.data.sPad}")
     println(s"------ weightAccess")
@@ -249,8 +392,11 @@ class CompareMonitor {
     println(s"                        | sPadRead: ${weightRead.adr.sPad + weightRead.data.sPad}")
     println(s"                                   | sPadAdrRead: ${weightRead.adr.sPad}")
     println(s"                                   | sPadDataRead: ${weightRead.data.sPad}")
-    println(s"------ dataReuse") // data reuse for overlap
-    println(f"                   | inAct:  ${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%")
+    println(s"------ dataReuse")
+    println("                | inAct GLB  R / GLB W: " +
+      f"${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%")
+    println("                | inAct SPad W / GLB R: " +
+      f"${(inActSPadWriteTotal.toFloat/inActGLBReadTotal.toFloat)*100}%.2f%%")
   }
 }
 

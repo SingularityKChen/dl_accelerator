@@ -7,6 +7,7 @@ import org.scalatest._
 
 import scala.math.{max, pow}
 import scala.util.Random
+
 class GenOnePETestDataTest extends FlatSpec {
   val genHp = new GenOnePETestData
   private val inActList: List[List[Int]] = genHp.inActList
@@ -33,12 +34,234 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
+class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
+  extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
   with ClusterSRAMConfig with EyerissTopConfig {
+  object nnShape {
+    object inAct {
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*C2*C1*C0 //TODO: check G
+      /** although the width of inAct in RS+ data flow is (S2 + F2)*(S1 + F1)*F0,
+        * which is much greater than this width. It's caused by the overlap.*/
+      val height: Int = R + E
+      val width: Int = S2*S1 + F2*F1*F0
+      //require(height == width, s"inAct's height doesn't equal to width, $height == $width ?")
+    }
+    object weight {
+      val number: Int = M2*M1*M0
+      val channel: Int = G2*G1*C2*C1*C0
+      val height: Int = R
+      val width: Int = S2*S1
+      //require(height == width, s"weight's height doesn't equal to width, $height == $width ?")
+    }
+    object pSum {
+      require(pSumDataSPadSize > pSumOneSPadNum,
+        s"pSumSPad can not contains all the pSum, $pSumDataSPadSize > $pSumOneSPadNum?")
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*M2*M1*M0
+      val height: Int = E
+      val width: Int = F2*F1*F0
+      //require(height == width, s"pSum's height doesn't equal to width, $height == $width ?")
+    }
+    require(inAct.number == pSum.number)
+    require(inAct.channel == weight.channel)
+    require(weight.number == pSum.channel)
+    def printNNShapeInfo(): Unit = {
+      println(s"[INFO] the NN shape")
+      println(s"                   |\ttype\t|\tnum\t|\tchn\t|\th\t|\tw\t|")
+      println(s"                   |\tweight\t|\t${weight.number}\t|\t${weight.channel}\t|\t${weight.height}\t|\t${weight.width}\t|")
+      println(s"                   |\tinAct\t|\t${inAct.number}\t|\t${inAct.channel}\t|\t${inAct.height}\t|\t${inAct.width}\t|")
+      println(s"                   |\tpSum\t|\t${pSum.number}\t|\t${pSum.channel}\t|\t${pSum.height}\t|\t${pSum.width}\t|")
+    }
+  }
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
-  protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt
-  protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt
-  protected val scsDataMax: Int = pow(2, cscDataWidth).toInt
+  protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt - 1 // zeroCode
+  protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt - 1 // zeroCode
+  protected val cscDataMax: Int = pow(2, cscDataWidth).toInt
+  object dataSequencer {
+    /** original data, complete matrix */
+    object dram {
+      val inAct: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.inAct.number, nnShape.inAct.channel) {
+        genSparse(rows = nnShape.inAct.height, cols = nnShape.inAct.width, max = cscDataMax, ratio = inActSparseRatio)
+      }
+      val weight: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.weight.number, nnShape.weight.channel) {
+        genSparse(rows = nnShape.weight.height, cols = nnShape.weight.width, max = cscDataMax, ratio = weightSparseRatio)
+      }
+      //val pSum
+    }
+    /** the first dimension is the index of NoC level's parameters,
+      * the second dimension is the index of GLB level's parameters,
+      * the third dimension is the index of SPad level's matrix width,
+      * the fourth dimension is the index of SPad level's matrix height */
+    object glb {
+      val (inAct, weight) = dramToRSDataFlow(dram.inAct, dram.weight)
+      object separatedSPadCSCData {
+        val inActSeq: Seq[Seq[Seq[List[Int]]]] = inAct.map(x => x.map(y => genAdrCountData(y, inActOrWeight = true)))
+        val weightSeq: Seq[Seq[Seq[List[Int]]]] = weight.map(x => x.map(y => genAdrCountData(y, inActOrWeight = false)))
+        /** the first dimension is the index of NoC level's parameters,
+          * the second dimension is the index of GLB level's parameters */
+        val inActAdr: Seq[Seq[List[Int]]] = inActSeq.map(x => x.map({ y =>
+          y.head
+        }))
+        val inActData: Seq[Seq[Seq[Int]]] = inActSeq.map(x => x.map(y => y.last)).zip(inActSeq.map(x => x.map(y => y(1))))
+          .map({ case (seq, seq1) =>
+            seq.zip(seq1).map { case (data, count) =>
+              combineDataAndCount(data, count)
+            }})
+        val weightAdr: Seq[Seq[List[Int]]] = weightSeq.map(x => x.map({ y =>
+          y.head
+        }))
+        val weightData: Seq[Seq[Seq[Int]]] = weightSeq.map(x => x.map(y => y.last)).zip(weightSeq.map(x => x.map(y => y(1))))
+          .map({ case (seq, seq1) =>
+            seq.zip(seq1).map { case (data, count) =>
+              combineDataAndCount(data, count)
+            }})
+        /*println(s"one stream of inActAdr = ${inActAdr.head}")
+        println(s"the length of inActAdr = ${inActAdr.head.head.length}")
+        println(s"one stream of inActData = ${inActData.head}")
+        println(s"the length of one inActData = ${inActData.head.head.length}")
+        println(s"one stream of weightAdr = ${weightAdr.head}")
+        println(s"the length of weightAdr = ${weightAdr.head.head.length}")
+        println(s"one stream of weightData = ${weightData.head}")
+        println(s"the length of weightData = ${weightData.head.head.length}")*/
+        private val inActAdrMaxLength = inActAdr.map(x => x.map(y => y.length).max).max
+        private val inActDataMaxLength = inActData.map(x => x.map(y => y.length).max).max
+        private val weightAdrMaxLength = weightAdr.map(x => x.map(y => y.length).max).max
+        private val weightDataMaxLength = weightData.map(x => x.map(y => y.length).max).max
+        require(inActAdrMaxLength <= inActAdrSPadSize, s"inActAdrSPadSize needs at least $inActAdrMaxLength")
+        require(inActDataMaxLength <= inActDataSPadSize, s"inActDataSPadSize needs at least $inActDataMaxLength")
+        require(weightAdrMaxLength <= weightAdrSPadSize, s"weightAdrSPadSize needs at least $weightAdrMaxLength")
+        require(weightDataMaxLength <= weightDataSPadSize, s"weightDataSPadSize needs at least $weightDataMaxLength")
+      }
+      object cscData {
+        /** the first dimension is the index of NoC level's parameters,
+          * the second dimension is one stream of inAct address vector with 0 as an end. */
+        val inActAdr: Seq[List[Int]] = separatedSPadCSCData.inActAdr.map(x => x.flatten.toList ::: List(0))
+        val inActData: Seq[List[Int]] = separatedSPadCSCData.inActData.map(x => x.flatten.toList ::: List(0))
+        val weightAdr: Seq[List[Int]] = separatedSPadCSCData.weightAdr.map(x => x.flatten.toList ::: List(0))
+        val weightData: Seq[List[Int]] = separatedSPadCSCData.weightData.map(x => x.flatten.toList ::: List(0))
+        require(inActAdr.flatten.max <= inActAdrMax, s"${inActAdr.flatten.max} < $inActAdrMax?\n$inActAdr\n\n\n$inActData")
+        require(weightAdr.flatten.max <= weightAdrMax, s"${weightAdr.flatten.max} < $weightAdrMax?")
+        require(inActAdr.map(x => x.length).max < inActAdrSRAMSize,
+          s"inActAdrSRAMSize needs at least ${inActAdr.map(x => x.length).max}")
+        require(inActData.map(x => x.length).max < inActDataSRAMSize,
+          s"inActDataSRAMSize needs at least ${inActData.map(x => x.length).max}")
+        private def checkConstrain(theInActSeq: Seq[List[Int]], theWeightSeq: Seq[List[Int]]): Boolean = {
+          var error = false
+          if (
+            theInActSeq.head.head == inActZeroColumnCode || // TODO: remove this requirement
+              theWeightSeq.head.head == weightZeroColumnCode || // TODO: remove this requirement
+              theInActSeq.head.length > inActAdrSPadSize ||
+              theInActSeq.last.length > inActDataSPadSize ||
+              theWeightSeq.head.length > weightAdrSPadSize ||
+              theWeightSeq.last.length > weightDataSPadSize
+              //|| thePSumList.max > pSumMax
+          ) {
+            error = true
+          }
+          if (error) {
+            print("x")
+            //println("[Waring] Ops!!! those are not what you need!!!")
+          } else {
+            print(".")
+            //println("[Info] Congratulate!!! you've got what you want!!!")
+          }
+          error
+        }
+      }
+    }
+    /** GLB level, for one Group Cluster */
+    object oneStream {
+      /** the first dimension is the index of GLB levels' parameters,
+        * the second dimension is the index of SPad level's matrix width,
+        * the third dimension is the index of SPad level's matrix height */
+      val inAct: Seq[List[List[Int]]] = glb.inAct.head
+      val weight: Seq[List[List[Int]]] = glb.weight.head
+      object cscData {
+        /** the combination of address, count and data */
+        val inActAdr: List[Int] = glb.cscData.inActAdr.head
+        val inActData: List[Int] = glb.cscData.inActData.head
+        val weightAdr: List[Int] = glb.cscData.weightAdr.head
+        val weightData: List[Int] = glb.cscData.weightData.head
+      }
+    }
+    /** SPad level, for one PE */
+    object oneSPad {
+      val inAct: List[List[Int]] = oneStream.inAct.head
+      val weight: List[List[Int]] = oneStream.weight.head
+      object cscData {
+        /** .head: inActAdr; .head: first NoC; .head: first SPad*/
+        val inActAdr: List[Int] = glb.separatedSPadCSCData.inActAdr.head.head
+        val inActData: Seq[Int] = glb.separatedSPadCSCData.inActData.head.head
+        val weightAdr: List[Int] = glb.separatedSPadCSCData.weightAdr.head.head
+        val weightData: Seq[Int] = glb.separatedSPadCSCData.weightData.head.head
+      }
+    }
+    def dramToRSDataFlow(inActMem: Seq[Seq[List[List[Int]]]], weightMem: Seq[Seq[List[List[Int]]]]):
+    (Seq[Seq[List[List[Int]]]], Seq[Seq[List[List[Int]]]]) = {
+      val inActArray: Array[Array[Array[Array[Int]]]] =
+        Array.fill(inActParNum, inActStreamNum, inActMatrixHeight, inActMatrixWidth) {0}
+      val weightArray: Array[Array[Array[Array[Int]]]] =
+        Array.fill(weightParNum, weightStreamNum, weightMatrixHeight, weightMatrixWidth) {0}
+      for (g1 <- 0 until G1) {
+        for (n1 <- 0 until N1) {
+          for (m1 <- 0 until M1) {
+            for (f1 <- 0 until F1) {
+              for (c1 <- 0 until C1) {
+                for (s1 <- 0 until S1) {
+                  val inActNoCIdx = g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
+                  val weightNoCIdx = g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
+                  for (g2 <- 0 until G2) {
+                    for (n2 <- 0 until N2) {
+                      for (m2 <- 0 until M2) {
+                        for (f2 <- 0 until F2) {
+                          for (c2 <- 0 until C2) {
+                            for (s2 <- 0 until S2) {
+                              val inActGLBIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
+                              val weightGLBIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
+                              val weightWidth = s2*S1 + s1
+                              for (f0 <- 0 until F0) {
+                                val inActWidth = s2*S1 + f2*F1*F0 + f1*F0 + f0
+                                for (n0 <- 0 until N0) {
+                                  val inActNumber = n2*N1*N0 +n1*N0 + n0
+                                  for (e <- 0 until E) {
+                                    val inActWidthIdx = f0*N0*E + n0*E + e
+                                    for (r <- 0 until R) {
+                                      val inActHeight = e + r
+                                      val weightHeight = r
+                                      for (c0 <- 0 until C0) {
+                                        val channel = g2*G1*C2*C1*C0 + g1*C2*C1*C0 + c2*C1*C0 + c1*C0 + c0
+                                        val inActHeightIdx = r*C0 + c0
+                                        val weightWidthIdx = r*C0 + c0
+                                        inActArray(inActNoCIdx)(inActGLBIdx)(inActHeightIdx)(inActWidthIdx) =
+                                          inActMem(inActNumber)(channel)(inActHeight)(inActWidth)
+                                        for (m0 <- 0 until M0) {
+                                          val weightNumber = m2*M1*M0 + m1*M0 + m0
+                                          val weightHeightIdx = m0
+                                          weightArray(weightNoCIdx)(weightGLBIdx)(weightHeightIdx)(weightWidthIdx) =
+                                            weightMem(weightNumber)(channel)(weightHeight)(weightWidth)
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      (inActArray.map(x => x.map(y => y.map(z => z.toList).toList).toSeq).toSeq,
+        weightArray.map(x => x.map(y => y.map(z => z.toList).toList).toSeq).toSeq)
+    }
+  }
   protected def genSparse(rows: Int, cols: Int, max: Int, ratio: Double): List[List[Int]] = {
     require(ratio <= 1 && ratio >= 0, "the range of ratio should be (0, 1)")
     var resultList: List[List[Int]] = Nil
@@ -112,6 +335,7 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
   }
   def genAdrCountData(listA: List[List[Int]], inActOrWeight: Boolean): Seq[List[Int]] = {
     val zeroCode: Int = if (inActOrWeight) inActZeroColumnCode else weightZeroColumnCode
+    val max: Int = if (inActOrWeight) inActAdrMax else weightAdrMax
     var adrList: List[Int] = Nil
     var countList: List[Int] = Nil
     var dataList: List[Int] = Nil
@@ -136,6 +360,9 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
     adrList = adrList:::List(0)
     countList = countList:::List(0)
     dataList = dataList:::List(0)
+    if (adrList.max > max) {
+      println(s"${adrList.max} <= $max?\n$adrList\n\n$dataList\n")
+    }
     Seq(adrList, countList, dataList)
   }
   protected def toBinary(i: Int, digits: Int = 8): String =
@@ -143,7 +370,8 @@ class GenFunc extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GN
   def combineDataAndCount(theData: Seq[Int], theCount: Seq[Int]): Seq[Int] = {
     // input data and count, and combine them together
     val theDataWithCount: Seq[(Int, Int)] = theData zip theCount
-    val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) => toBinary(x) + toBinary(y, 4)}
+    val theDataCountBinary: Seq[String] = theDataWithCount.map{case (x: Int, y: Int) =>
+      toBinary(x, cscDataWidth) + toBinary(y, cscCountWidth)}
     val theDataCountDec: Seq[Int] = theDataCountBinary.map(x => BigInt(x, 2).toInt)
     theDataCountDec
   }
@@ -167,8 +395,8 @@ class GenOnePETestData extends GenFunc {
     var weightSeq: Seq[List[Int]] = Nil
     var outPSumRand: List[Int] = Nil
     while (error) {
-      inActList = genSparse(cols = inActMatrixWidth, rows = inActMatrixHeight, max = scsDataMax, ratio =  0.845)
-      weightList = genSparse(cols = weightMatrixWidth, rows = weightMatrixHeight, max = scsDataMax, ratio =  0.6)
+      inActList = genSparse(rows = inActMatrixHeight, cols = inActMatrixWidth, max = cscDataMax, ratio =  0.845)
+      weightList = genSparse(rows = weightMatrixHeight, cols = weightMatrixWidth, max = cscDataMax, ratio =  0.6)
       inActSeq = genAdrCountData(inActList, inActOrWeight = true)
       weightSeq = genAdrCountData(weightList, inActOrWeight = false)
       outPSumRand = goldenFlatResult(weightList, inActList)
@@ -278,15 +506,6 @@ class GenOneStreamData extends GenFunc {
                   val pSumIdx = i*pSumParNum + g1*N1*M1*F1 + n1*M1*F1 + m1*F1 + f1
                   pSumDataTmp = pSumDataTmp:::List(outPSumStreamTmp(pSumIdx))
                 }
-                /*
-                println(s"inActAdrTmp = ${inActAdrTmp.flatten:::List(0)}")
-                println(s"inActDataTmp = ${inActDataTmp.flatten:::List(0)}")
-                println(s"pSumDataTmp = ${pSumDataTmp.flatten:::List(0)}")
-                println(s"the length of inActAdrTmp = ${inActAdrTmp.flatten.length}")
-                println(s"the length of inActDataTmp = ${inActDataTmp.flatten.length}")
-                println(s"the length of pSumDataTmp = ${pSumDataTmp.flatten.length}")
-                println(s"inActTest = $inActIdxTest")
-                println(s"the length of inActTest = ${inActIdxTest.length}")*/
                 require(inActAdrTmp.flatten.length <= inActAdrSRAMSize, s"current inActAdr should fit in one inActSRAM, " +
                   s"but ${inActAdrTmp.flatten.length} > $inActAdrSRAMSize")
                 require(inActDataTmp.flatten.length <= inActDataSRAMSize, s"current inActData should fit in one inActDataSRAM, " +

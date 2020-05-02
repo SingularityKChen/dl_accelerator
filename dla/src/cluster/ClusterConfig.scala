@@ -14,19 +14,20 @@ trait ClusterConfig extends PESizeConfig { // if any changes, you're supposed to
 }
 
 trait ClusterSRAMConfig extends ClusterConfig {
-  protected val inActDataSRAMSize: Int = 862 // 1.5KB*1024*8/12-bit
-  protected val inActAdrSRAMSize: Int = 520 // 486/3=162, 162+862=1024=1.5KB*1024*8/12-bit
+  // 1.5KB*1024*8/12-bit
+  protected val inActDataSRAMSize: Int = 1000 // to meet the requirements for sparse radio for 0.5 or bigger
+  protected val inActAdrSRAMSize: Int = 400 // (inActMatrixWidth + 1)*inActStreamNum + 1
   protected val pSumSRAMSize: Int = 768 // 1.875KB*1024*8/20-bit
   protected val inActSRAMNum: Int = inActRouterNum
   protected val pSumSRAMNum: Int = pSumRouterNum
 }
 
 trait GNMFCS1Config {
-  protected val G1: Int = 2
+  protected val G1: Int = 1
   protected val N1: Int = 4
   protected val M1: Int = 2
   protected val F1: Int = 4
-  protected val C1: Int = 1
+  protected val C1: Int = 2
   protected val S1: Int = 3
   protected val inActParNum: Int = G1*N1*C1*(F1 + S1)
   protected val weightParNum: Int = G1*M1*C1*S1
