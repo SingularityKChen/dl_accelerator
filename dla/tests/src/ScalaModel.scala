@@ -13,24 +13,22 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
     val common: Array[Array[Array[Array[Int]]]] = Array.fill(
       sequencer.nnShape.pSum.number,
       sequencer.nnShape.pSum.channel,
-      sequencer.nnShape.pSum.width,
-      sequencer.nnShape.pSum.height
+      sequencer.nnShape.pSum.height,
+      sequencer.nnShape.pSum.width
     ) {0}
     val eyeriss: Array[Array[Array[Array[Int]]]] = Array.fill(
       sequencer.nnShape.pSum.number,
       sequencer.nnShape.pSum.channel,
-      sequencer.nnShape.pSum.width,
-      sequencer.nnShape.pSum.height
+      sequencer.nnShape.pSum.height,
+      sequencer.nnShape.pSum.width
     ) {0}
   }
+
   behavior of "compare the efficiency of Eyeriss"
   /** model the behavior of Eyeriss cluster group */
   it should "get the info of Eyeriss dla with inAct horizontally Sharing" in { //TODO: add a weight horizontally sharing
     val monitor = new CompareMonitor
     /** assume the data stored in Mem is pre-processed */
-    val inActMemNum = sequencer.dataSequencer.glb.inAct.flatten.flatten.flatten.length
-    monitor.inActRead.mem += inActMemNum
-    monitor.cycle += inActMemNum*scoreBoard.accessCost.mem
     val inActAdrSRAMBanks = Array.fill(monitor.clusterNum, inActSRAMNum, inActAdrSRAMSize) {0}
     val inActDataSRAMBanks = Array.fill(monitor.clusterNum, 3, inActDataSRAMSize) {0}
     var parallelCycle = 0
@@ -73,14 +71,20 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
                       (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx):::
                         sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx)).toArray
                   }
-                  /** divide M1, as inAct could be shared horizontally */
-                  val currentAdrSize = (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx).length
+                  // update scoreBoard
+                  /** the times read directly from mem in uncompressed data format */
+                  val inActMemReadNum = sequencer.dataSequencer.glb.inAct(inActNoCLevelIdx).flatten.flatten.length +
+                    sequencer.dataSequencer.glb.inAct(anotherNoCIdx).flatten.flatten.length
+                  monitor.inActRead.mem += inActMemReadNum
+                  monitor.cycle += inActMemReadNum*scoreBoard.accessCost.mem
+                  val inActAdrGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx).length
                     + sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx).length)
-                  val currentDataSize = (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx).length
+                  val inActDataGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx).length
                     + sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx).length)
                   require(M1 == 2 || M1 == 1, "M1 needs equals to 2 or 1, or shouldn't divide M1 directly")
-                  monitor.inActWrite.adr.glb += currentAdrSize/M1
-                  monitor.inActWrite.data.glb += currentDataSize/M1
+                  /** divide M1, as inAct could be shared horizontally */
+                  monitor.inActWrite.adr.glb += inActAdrGLBWriteNum/M1
+                  monitor.inActWrite.data.glb += inActDataGLBWriteNum/M1
                   inActSRAMBankWriteRecord = inActSRAMBankWriteRecord:::List(inActSRAMBankWriteRecordSeq)
                 }
                 /** GLB level */
@@ -99,16 +103,19 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
                               inActData(inActNoCLevelIdx)(inActGLBLevelIdx)
                             val weightAdrSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
                               weightAdr(weightNoCLevelIdx)(weightGLBLevelIdx)
-                            println(s"weightAdrNum = ${weightAdrSPad.length}")
                             val weightDataSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
                               weightData(weightNoCLevelIdx)(weightGLBLevelIdx)
                             val pSumSPad: Array[Array[Int]] = Array.fill(F0*N0*E, M0) {0}
-                            val inActGLBAccessNumMax = max(inActAdrSPad.length, inActDataSPad.length)
-                            val weightMemAccessNum = sequencer.dataSequencer.glb.
+                            val inActGLBReadNum = max(inActAdrSPad.length, inActDataSPad.length)
+                            val weightMemReadNum = sequencer.dataSequencer.glb.
                               weight(weightNoCLevelIdx)(weightGLBLevelIdx).flatten.length
                             /** only read once from Mem and send into several PEs */
                             if (f1 == 0 && n1 == 0) {
-                              monitor.weightRead.mem += weightMemAccessNum
+                              monitor.weightRead.mem += weightMemReadNum
+                              parallelCycle += max(inActGLBReadNum*scoreBoard.accessCost.glb,
+                                weightMemReadNum*scoreBoard.accessCost.mem)
+                            } else {
+                              parallelCycle += inActGLBReadNum*scoreBoard.accessCost.glb
                             }
                             /** read from GLB once and send into diagonal PEs
                               * and if m1 = 1 or more, then other cluster can receive inAct via Router */
@@ -127,8 +134,6 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
                             monitor.inActWrite.data.sPad += inActDataSPad.length
                             monitor.weightWrite.adr.sPad += weightAdrSPad.length
                             monitor.weightWrite.data.sPad += weightDataSPad.length
-                            parallelCycle += max(inActGLBAccessNumMax*scoreBoard.accessCost.glb,
-                              weightMemAccessNum*scoreBoard.accessCost.mem)
                             var inActDataSPadIdx = 0
                             for (inActAdrSPadIdx <- inActAdrSPad.indices) {
                               /** padInActAdr: read each column of current inAct Matrix */
@@ -167,7 +172,7 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
                                 }
                               }
                             }
-                            print(".") // finish SPad Level
+                            //print(".") // finish SPad Level
                             /** accumulate PSum vertically */
                           }
                         }
@@ -175,7 +180,7 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
                     }
                   }
                 }
-                print("*\n") // finish GLB Level
+                //print("*\n") // finish GLB Level
               }
             }
           }
@@ -184,6 +189,7 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
     }
     monitor.cycle += parallelCycle/monitor.peNum
     monitor.printMonitorInfo()
+    sequencer.nnShape.printNNShapeInfo()
   }
 
   /** read from main memory, can do 4*3 mac parallel */
@@ -204,24 +210,25 @@ class ScalaModel extends FlatSpec with PESizeConfig with SPadSizeConfig
               for (s <- 0 until sequencer.nnShape.weight.width) {
                 /** weight width */
                 for (r <- 0 until sequencer.nnShape.weight.height) {
-                  pSumResult.common(n)(m)(f)(e) += sequencer.dataSequencer.dram.weight(m)(c)(s)(r) *
-                    sequencer.dataSequencer.dram.inAct(n)(c)(s+f)(r+e)
+                  pSumResult.common(n)(m)(e)(f) += sequencer.dataSequencer.dram.weight(m)(c)(r)(s) *
+                    sequencer.dataSequencer.dram.inAct(n)(c)(r+e)(s+f)
                   monitor.inActRead.mem += 1
                   monitor.weightRead.mem += 1
                   monitor.macNum += 1
                 }
               }
             }
-            print(".") // finish one PSum
+            //print(".") // finish one PSum
           }
         }
-        print("*") // finish one PSum matrix
+        //print("*") // finish one PSum matrix
       }
-      println("\n[INFO] finish one batch of PSum " +
-        f"${((n + 1).toFloat/sequencer.nnShape.pSum.number.toFloat)*100}%.2f%%")
+      /*println("\n[INFO] finish one batch of PSum " +
+        f"${((n + 1).toFloat/sequencer.nnShape.pSum.number.toFloat)*100}%.2f%%")*/
     }
     monitor.cycle = scoreBoard.totalCycles(monitor.macNum, monitor.peNum, monitor.inActRead.mem, 0, 0)
     monitor.printMonitorInfo()
+    sequencer.nnShape.printNNShapeInfo()
   }
 }
 
@@ -247,6 +254,8 @@ class CompareMonitor extends ClusterSRAMConfig {
   def printMonitorInfo(): Unit = {
     val inActGLBWriteTotal = inActWrite.adr.glb + inActWrite.data.glb
     val inActGLBReadTotal = inActRead.adr.glb + inActRead.data.glb
+    val inActSPadWriteTotal = inActWrite.adr.sPad + inActWrite.data.sPad
+    val inActSPadReadTotal = inActRead.adr.sPad + inActRead.data.sPad
     println(s"[INFO] computation finishes, using $peNum PEs")
     println(s"------ time = $cycle cycles")
     println(s"------ mac num = $macNum")
@@ -260,10 +269,10 @@ class CompareMonitor extends ClusterSRAMConfig {
     println(s"                                   | glbAdrRead: ${inActRead.adr.glb}")
     println(s"                                   | glbDataRead: ${inActRead.data.glb}")
     println(s"                   | sPad")
-    println(s"                        | sPadWrite: ${inActWrite.adr.sPad + inActWrite.data.sPad}")
+    println(s"                        | sPadWrite: $inActSPadWriteTotal")
     println(s"                                   | sPadAdrWrite: ${inActWrite.adr.sPad}")
     println(s"                                   | sPadDataWrite: ${inActWrite.data.sPad}")
-    println(s"                        | sPadRead: ${inActRead.adr.sPad + inActRead.data.sPad}")
+    println(s"                        | sPadRead: $inActSPadReadTotal")
     println(s"                                   | sPadAdrRead: ${inActRead.adr.sPad}")
     println(s"                                   | sPadDataRead: ${inActRead.data.sPad}")
     println(s"------ weightAccess")
@@ -275,8 +284,11 @@ class CompareMonitor extends ClusterSRAMConfig {
     println(s"                        | sPadRead: ${weightRead.adr.sPad + weightRead.data.sPad}")
     println(s"                                   | sPadAdrRead: ${weightRead.adr.sPad}")
     println(s"                                   | sPadDataRead: ${weightRead.data.sPad}")
-    println(s"------ dataReuse") // data reuse for overlap
-    println(f"                   | inAct:  ${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%")
+    println(s"------ dataReuse")
+    println("                | inAct GLB  R / GLB W: " +
+      f"${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%")
+    println("                | inAct SPad W / GLB R: " +
+      f"${(inActSPadWriteTotal.toFloat/inActGLBReadTotal.toFloat)*100}%.2f%%")
   }
 }
 

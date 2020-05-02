@@ -26,7 +26,8 @@ trait MCRENFConfig { // contains some scala values
   protected val inActMatrixHeight: Int = R*C0 // row
   protected val weightMatrixWidth: Int = inActMatrixHeight // column
   protected val weightMatrixHeight: Int = M0 // row
-  // C0*R0 < iacAdrSize = 9
+  // inActMatrixWidth < inActAdrSize = 9
+  // weightMatrixWidth < weightAdrSPadSize = 16
   // C0*R0*E0*N0*F0 <
 }
 
