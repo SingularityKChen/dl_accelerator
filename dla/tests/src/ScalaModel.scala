@@ -4,6 +4,7 @@ import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
 import scala.math.max
+import chisel3.util.log2Ceil
 
 class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
   with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
@@ -243,24 +244,65 @@ class ScalaModel extends FlatSpec {
       val during: Int = end - start
     }
     val monitorSeq = Seq.fill(inActRatioSeq.during, weightRatioSeq.during, 2){new CompareMonitor}
+    /** the min size of inAct adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[inActAdrSPadSize]] and [[SPadSizeConfig]].[[inActDataSPadSize]]*/
+    val inActSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min size of inAct adr SRAM and data SRAM to meet the requirement.
+      * [[ClusterSRAMConfig]].[[inActAdrSRAMSize]] and [[ClusterSRAMConfig]].[[inActDataSRAMSize]]*/
+    val inActSRAMSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min bits of inAct adr to meet the requirement. [[PESizeConfig]].[[inActAdrWidth]]*/
+    val inActAdrWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min bits of inAct data to meet the requirement. [[PESizeConfig]].[[inActDataWidth]]*/
+    val inActDataWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min size of weight adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[weightAdrSPadSize]] and [[SPadSizeConfig]].[[weightDataSPadSize]]*/
+    val weightSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during, 2) {0}
+    /** the min bits of weight adr to meet the requirement. [[PESizeConfig]].[[weightAdrWidth]]*/
+    val weightAdrWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
+    /** the min bits of weight data to meet the requirement. [[PESizeConfig]].[[weightDataWidth]]*/
+    val weightDataWidthNeed: Array[Array[Int]] = Array.fill(inActRatioSeq.during, weightRatioSeq.during) {0}
     for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
       for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
         val sequencer = new GenFunc(inActSparseRatio = inActRatio.toDouble/10,
           weightSparseRatio = weightRatio.toDouble/10)
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
         val eyerissModel = new EyerissModel(sequencer,
-          monitorSeq(inActRatio - inActRatioSeq.start)(weightRatio - weightRatioSeq.start).head,
+          monitorSeq(inActRatioIdx)(weightRatioIdx).head,
           printDetails = false)
         val common = new CommonModel(sequencer,
-          monitorSeq(inActRatio - inActRatioSeq.start)(weightRatio - weightRatioSeq.start)(1),
+          monitorSeq(inActRatioIdx)(weightRatioIdx)(1),
           printDetails = false)
+        inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActAdr.map(x => x.map(y => y.length).max).max
+        inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActData.map(x => x.map(y => y.length).max).max
+        inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.cscData.inActAdr.map(x => x.length).max
+        inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.cscData.inActData.map(x => x.length).max
+        inActAdrWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        inActDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
+        weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightAdr.map(x => x.map(y => y.length).max).max
+        weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightData.map(x => x.map(y => y.length).max).max
+        weightAdrWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        weightDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
         println(s"[INFO] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
       }
     }
     println("|iRa\t|wRa\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
     for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
       for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
-        val eyerissMonitor = monitorSeq(inActRatio - inActRatioSeq.start)(weightRatio - weightRatioSeq.start).head
-        val commonMonitor = monitorSeq(inActRatio - inActRatioSeq.start)(weightRatio - weightRatioSeq.start).last
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
+        val eyerissMonitor = monitorSeq(inActRatioIdx)(weightRatioIdx).head
+        val commonMonitor = monitorSeq(inActRatioIdx)(weightRatioIdx).last
         val inActGLBWriteTotal = eyerissMonitor.inActWrite.adr.glb + eyerissMonitor.inActWrite.data.glb
         val inActGLBReadTotal = eyerissMonitor.inActRead.adr.glb + eyerissMonitor.inActRead.data.glb
         val inActSPadWriteTotal = eyerissMonitor.inActWrite.adr.sPad + eyerissMonitor.inActWrite.data.sPad
@@ -278,6 +320,21 @@ class ScalaModel extends FlatSpec {
         println(s"|${inActRatio.toDouble/10}\t|${weightRatio.toDouble/10}\t|$cycleEfficiency\t|" +
           s"$macEfficiency\t|$inActMemReadEfficiency\t|$weightMemReadEfficiency\t|" +
           s"$eyerissInActGLBRW\t|$eyerissInActSPadReuse\t|")
+      }
+    }
+    println("\n|iRa\t|wRa\t|inActAdrSPad\t|inActDataSPad\t|weightAdrSPad\t|weightDataSPad\t|inActAdrSRAM\t|inActDataSRAM\t|")
+    for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
+      for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
+        val inActRatioIdx = inActRatio - inActRatioSeq.start
+        val weightRatioIdx = weightRatio - weightRatioSeq.start
+        println(s"|0.$inActRatio\t|0.$weightRatio\t|" +
+          s"${inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t${inActAdrWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t${inActDataWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t${weightAdrWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t${weightDataWidthNeed(inActRatioIdx)(weightRatioIdx)}-bit\t|" +
+          s"${inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(0)}\t|" +
+          s"${inActSRAMSizeNeed(inActRatioIdx)(weightRatioIdx)(1)}\t|"
+        )
       }
     }
   }
