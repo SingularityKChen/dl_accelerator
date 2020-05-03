@@ -294,6 +294,8 @@ class ScalaModel extends FlatSpec {
         weightDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
           log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
         println(s"[INFO] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
+        if (inActRatio == inActRatioSeq.end - 1 && weightRatio == weightRatioSeq.end - 1)
+          sequencer.nnShape.printNNShapeInfo()
       }
     }
     println("|iRa\t|wRa\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
