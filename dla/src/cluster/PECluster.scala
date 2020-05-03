@@ -12,14 +12,14 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
   //   true then broad-cast, and read the index of router that should be broad-casted; false then only get the
   //   corresponding index of input activations router;
   // io.ctrlPath.inActCtrlSel.outDataSel should be assigned to the index of router port when broad-cast;
-  private val peArray = Seq.fill(peRowNum, peColNum){Module(new ProcessingElement(debug = debug))}
+  protected val peArray: Seq[Seq[ProcessingElement]] = Seq.fill(peRowNum, peColNum){Module(new ProcessingElement(debug = debug))}
   peArray.zipWithIndex.foreach({case (pe, row) =>
     pe.zipWithIndex.foreach({ case (o, col) => o.suggestName(s"pe($row)($col)")
     })})
-  private val peArrayIO = peArray.map(x => x.map(y => y.io))
-  private val peClusterInAct = Module(new PEClusterInAct(debug = debug))
+  protected val peArrayIO: Seq[Seq[ProcessingElementIO]] = peArray.map(x => x.map(y => y.io))
+  protected val peClusterInAct: PEClusterInAct = Module(new PEClusterInAct(debug = debug))
   peClusterInAct.suggestName("peClusterInAct")
-  private val peClusterInActIO = peClusterInAct.io
+  protected val peClusterInActIO: PEClusterInActIO = peClusterInAct.io
   // connections of peClusterInAct
   peClusterInActIO.inActCtrlSel <> io.ctrlPath.inActCtrlSel
   peClusterInActIO.inActWriteFinVec.zip(peArrayIO).foreach({ case (os, peCol) =>
@@ -27,18 +27,18 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
       o := onePE.padWF.inActWriteFin
     })})
   peClusterInActIO.inActToArrayData.inActIO <> io.dataPath.inActIO
-  private val oneColumnPSumAddFinRegVec = Seq.fill(peColNum){RegInit(false.B)}
+  protected val oneColumnPSumAddFinRegVec: Seq[Bool] = Seq.fill(peColNum){RegInit(false.B)}
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, col) => bool.suggestName(s"pePSumAddFin$col")})
   oneColumnPSumAddFinRegVec.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"col${i}PSumAddFinReg")})
-  private val allColPSumAddFin = oneColumnPSumAddFinRegVec.reduce(_ && _)
-  private val onePECalFinReg = Seq.fill(peRowNum, peColNum){RegInit(false.B)}
+  protected val allColPSumAddFin: Bool = oneColumnPSumAddFinRegVec.reduce(_ && _)
+  protected val onePECalFinReg: Seq[Seq[Bool]] = Seq.fill(peRowNum, peColNum){RegInit(false.B)}
   onePECalFinReg.zipWithIndex.foreach({ case (bools, row) => bools.zipWithIndex.foreach({ case (bool, col) =>
     bool.suggestName(s"peCalFin$row$col")
   })})
-  private val allCalFinWire = Wire(Bool())
+  protected val allCalFinWire: Bool = Wire(Bool())
   allCalFinWire := onePECalFinReg.map(_.reduce(_ && _)).reduce(_ && _)
   // connections of peClusterPSum
-  private val muxInPSumDataWire = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
+  protected val muxInPSumDataWire: Vec[DecoupledIO[UInt]] = Wire(Vec(peColNum, Decoupled(UInt(psDataWidth.W))))
   muxInPSumDataWire.suggestName("muxInPSumDataWire")
   for (col <- 0 until peColNum) {
     // connect output partial sum produced by the PE at the head of each column to one output partial sum top IO
@@ -96,8 +96,8 @@ class PECluster(debug: Boolean) extends HasConnectAllExpRdModule with ClusterCon
 
 class PEClusterInAct(debug: Boolean) extends Module with ClusterConfig {
   val io: PEClusterInActIO = IO(new PEClusterInActIO)
-  private val dataPart = Module(new PEClusterInActDataConnections).io
-  private val ctrlPart = Module(new PEClusterInActController(debug)).io// connections of enWires
+  protected val dataPart: PEClusterInActDataIO = Module(new PEClusterInActDataConnections).io
+  protected val ctrlPart: PEClusterInActCtrlIO = Module(new PEClusterInActController(debug)).io// connections of enWires
   io.inActWriteFinVec <> ctrlPart.inActWriteFinVec
   for (i <- 0 until peRowNum) {
     for (j <- 0 until peColNum) {
@@ -113,9 +113,9 @@ class PEClusterInAct(debug: Boolean) extends Module with ClusterConfig {
   }
   // inActRoutingMode: whether the input activations should be broad-cast;
   // true then all PEs' data receive from the same router whose index equals to outDataSel's value;
-  private val inActRoutingMode = Wire(Bool())
+  protected val inActRoutingMode: Bool = Wire(Bool())
   inActRoutingMode.suggestName("inActRoutingMode")
-  private val inActBroadCastIdxWire = Wire(UInt(2.W))
+  protected val inActBroadCastIdxWire: UInt = Wire(UInt(2.W))
   inActBroadCastIdxWire.suggestName("inActBroadCastIdxWire")
   inActRoutingMode := io.inActCtrlSel.inDataSel // true for broad-cast
   inActBroadCastIdxWire := io.inActCtrlSel.outDataSel
@@ -154,10 +154,10 @@ class PEClusterInAct(debug: Boolean) extends Module with ClusterConfig {
 
 class PEClusterInActDataConnections extends HasConnectAllExpRdModule with ClusterConfig {
   val io: PEClusterInActDataIO = IO(new PEClusterInActDataIO)
-  private val muxInActDataWire = Wire(Vec(peRowNum, Vec(peColNum, new CSCStreamIO(inActAdrWidth, inActDataWidth))))
+  protected val muxInActDataWire: Vec[Vec[CSCStreamIO]] = Wire(Vec(peRowNum, Vec(peColNum, new CSCStreamIO(inActAdrWidth, inActDataWidth))))
   muxInActDataWire.suggestName("muxInActDataWire")
   // oneInActIOReadyWires: used for each inActIO's ready signal, adr/data (2), inIO number (inActRouterNum)
-  private val oneInActIOReadyWires = Seq.fill(2, inActRouterNum) {Wire(Bool())}
+  protected val oneInActIOReadyWires: Seq[Seq[Bool]] = Seq.fill(2, inActRouterNum) {Wire(Bool())}
   oneInActIOReadyWires.zipWithIndex.foreach({ case (bools, i) => bools.zipWithIndex.foreach({ case (bool, j) =>
     bool.suggestName(s"oneInAct${i}IOReadyWires$j")})
   })
@@ -205,29 +205,29 @@ class PEClusterInActDataConnections extends HasConnectAllExpRdModule with Cluste
 class PEClusterInActController(debug: Boolean) extends Module with ClusterConfig {
   val io: PEClusterInActCtrlIO = IO(new PEClusterInActCtrlIO)// state machine of inAct in the PE Cluster
   // inActWriteEnWires: inAct address and data writeEn wires, used to `and` with valid data
-  private val inActWriteEnWires = Seq.fill(peRowNum, peColNum){Wire(Bool())}
+  protected val inActWriteEnWires: Seq[Seq[Bool]] = Seq.fill(peRowNum, peColNum){Wire(Bool())}
   inActWriteEnWires.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActWriteEnWires($i)($j)")})
   })
-  private val inActLoadFormer :: inActLoadLater :: Nil = Enum(2)
+  protected val inActLoadFormer :: inActLoadLater :: Nil = Enum(2)
   // inActLoadFormer: inAct load data for former peArray
   // inActLoadLater: inAct load data for later peArray
   // TODO: use counter to get configurable load state
-  private val inActDataIOStateRegs = Seq.fill(inActRouterNum){RegInit(inActLoadFormer)} // three inIOs
+  protected val inActDataIOStateRegs: Seq[UInt] = Seq.fill(inActRouterNum){RegInit(inActLoadFormer)} // three inIOs
   inActDataIOStateRegs.zipWithIndex.foreach({ case (int, i) => int.suggestName(s"inActDataIOStateRegs[$i]")})
-  private val inActDataIOZeroWires = Seq.fill(inActRouterNum){Wire(Bool())}
+  protected val inActDataIOZeroWires: Seq[Bool] = Seq.fill(inActRouterNum){Wire(Bool())}
   inActDataIOZeroWires.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActDataIOZeroWires[$i]")})
-  private val inActDataIOOneWires = Seq.fill(inActRouterNum){Wire(Bool())}
+  protected val inActDataIOOneWires: Seq[Bool] = Seq.fill(inActRouterNum){Wire(Bool())}
   inActDataIOOneWires.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"inActDataIOOneWires[$i]")})
   inActDataIOZeroWires.zip(inActDataIOStateRegs).foreach({ case (bool, int) => bool := int === inActLoadFormer})
   inActDataIOOneWires.zip(inActDataIOStateRegs).foreach({ case (bool, int) => bool := int === inActLoadLater})
   require(peColNum == 4 && peRowNum == 3, "you need to change the following dataPath connections for non default value")
-  private val inActWriteDoneRegVec = Seq.fill(2, peRowNum, peColNum){RegInit(false.B)}
+  protected val inActWriteDoneRegVec: Seq[Seq[Seq[Bool]]] = Seq.fill(2, peRowNum, peColNum){RegInit(false.B)}
   // .head for address, .last for data
   inActWriteDoneRegVec.zipWithIndex.foreach({ case (seq, i) => seq.zipWithIndex.foreach({ case (bools, j) =>
     bools.zipWithIndex.foreach({ case (bool, k) => bool.suggestName(s"inActWriteDoneRegVec($i)($j)($k)")})
   })})
-  private val inActWriteDoneWireVec = Seq.fill(peRowNum, peColNum){Wire(Bool())}
+  protected val inActWriteDoneWireVec: Seq[Seq[Bool]] = Seq.fill(peRowNum, peColNum){Wire(Bool())}
   // true then both inActAddress and inActData have finished write
   // used for jump inActDataIOStateRegs
   inActWriteDoneWireVec.zipWithIndex.foreach({ case (bools, i) =>
@@ -250,7 +250,7 @@ class PEClusterInActController(debug: Boolean) extends Module with ClusterConfig
       }
     }
   }
-  private val inActDataStateJumpWires = Seq.fill(2, inActRouterNum){Wire(Bool())}
+  protected val inActDataStateJumpWires: Seq[Seq[Bool]] = Seq.fill(2, inActRouterNum){Wire(Bool())}
   // each inActIO has two Jump wires
   inActDataStateJumpWires.zipWithIndex.foreach({ case (bools, i) =>
     bools.zipWithIndex.foreach({ case (bool, j) => bool.suggestName(s"inActDataStateJumpWires($i)($j)")})

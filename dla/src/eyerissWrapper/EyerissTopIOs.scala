@@ -2,16 +2,16 @@ package dla.eyerissWrapper
 
 import chisel3._
 import chisel3.util._
-import dla.cluster.{ClusterGroup, CommonClusterCtrlTwoBoolIO, CommonClusterCtrlTwoUIntIO, GLBClusterDataIO}
+import dla.cluster.{ClusterGroup, ClusterGroupIO, CommonClusterCtrlTwoBoolIO, CommonClusterCtrlTwoUIntIO, GLBClusterDataIO}
 
 class Eyeriss(debug: Boolean) extends Module with EyerissTopConfig {
   require(cgColNum == 2, "the default design is based on 2 columns, you need to change the connections now")
   //require(cgRowNum == 8)
   val io: EyerissIO = IO(new EyerissIO)
-  private val cgArray = Seq.fill(cgRowNum, cgColNum){Module(new ClusterGroup(debug)).io}
-  private val layerType = RegInit(0.U(2.W)) // 0: CONY layers, 1: depth-wise CONV layers, 2: fully-connected layers
-  private val inActMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
-  private val weightMode = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal multi-cast, 2: broadcast
+  protected val cgArray: Seq[Seq[ClusterGroupIO]] = Seq.fill(cgRowNum, cgColNum){Module(new ClusterGroup(debug)).io}
+  protected val layerType: UInt = RegInit(0.U(2.W)) // 0: CONY layers, 1: depth-wise CONV layers, 2: fully-connected layers
+  protected val inActMode: UInt = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
+  protected val weightMode: UInt = RegInit(0.U(2.W)) // 0: uni-cast, 1: horizontal multi-cast, 2: broadcast
   inActMode := MuxLookup(layerType, 0.U, Seq({
     0.asUInt -> 1.U // TODO: check when should be vertical multi-cast when should be horizontal
     1.asUInt -> 0.U

@@ -36,25 +36,25 @@ class EyerissMemCtrlIO()(implicit val p: EyerissMemCtrlParameters) extends Bundl
 class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends Module
   with PESizeConfig {
   val io: EyerissMemCtrlIO = IO(new EyerissMemCtrlIO()(p))
-  private val inActIdMap = Module(new EyerissIDMapGenerator(p.inActIds))
+  protected val inActIdMap: EyerissIDMapGenerator = Module(new EyerissIDMapGenerator(p.inActIds))
   inActIdMap.suggestName("inActIdMap")
-  private val weightIdMap = Module(new EyerissIDMapGenerator(p.weightIds))
+  protected val weightIdMap: EyerissIDMapGenerator = Module(new EyerissIDMapGenerator(p.weightIds))
   weightIdMap.suggestName("weightIdMap")
-  private val pSumIdMap = Module(new EyerissIDMapGenerator(p.pSumIds))
+  protected val pSumIdMap: EyerissIDMapGenerator = Module(new EyerissIDMapGenerator(p.pSumIds))
   pSumIdMap.suggestName("pSumIdMap")
-  private val inActIdMapIO = inActIdMap.io
-  private val weightIdMapIO = weightIdMap.io
-  private val pSumIdMapIO = pSumIdMap.io
-  private val inActStarAdrReg = RegInit(0.U(p.addressBits.W))
-  private val weightStarAdrReg = RegInit(0.U(p.addressBits.W))
-  private val pSumStarAdrReg = RegInit(0.U(p.addressBits.W))
-  private val inActReqAdrReg = RegInit(0.U(p.addressBits.W))
-  private val weightReqAdrReg = RegInit(0.U(p.addressBits.W))
-  private val pSumReqAdrReg = RegInit(0.U(p.addressBits.W))
-  private val inActReqSizeReg = RegInit(0.U(p.inActSizeBits.W))
+  protected val inActIdMapIO: EyerissIDMapGenIO = inActIdMap.io
+  protected val weightIdMapIO: EyerissIDMapGenIO = weightIdMap.io
+  protected val pSumIdMapIO: EyerissIDMapGenIO = pSumIdMap.io
+  protected val inActStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val weightStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val pSumStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val inActReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val weightReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val pSumReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val inActReqSizeReg: UInt = RegInit(0.U(p.inActSizeBits.W))
   inActReqSizeReg.suggestName("inActReqSizeReg")
-  private val weightReqSizeReg = RegInit(0.U(p.weightSizeBits.W))
-  private val pSumReqSizeReg = RegInit(0.U(p.pSumSizeBits.W))
+  protected val weightReqSizeReg: UInt = RegInit(0.U(p.weightSizeBits.W))
+  protected val pSumReqSizeReg: UInt = RegInit(0.U(p.pSumSizeBits.W))
   /** connections of input and source generate module */
   io.inActIO.sourceAlloc <> inActIdMapIO.alloc
   io.inActIO.sourceFree <> inActIdMapIO.free
@@ -71,12 +71,12 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   weightReqSizeReg := io.weightIO.reqSize
   pSumReqSizeReg := io.pSumIO.reqSize
   /** each require address */
-  private val inActReqAdrAcc = RegInit(0.U(p.addressBits.W))
+  protected val inActReqAdrAcc: UInt = RegInit(0.U(p.addressBits.W))
   inActReqAdrAcc.suggestName("inActReqAdrAcc")
-  private val weightReqAdrAcc = RegInit(0.U(p.addressBits.W))
+  protected val weightReqAdrAcc: UInt = RegInit(0.U(p.addressBits.W))
   weightReqAdrAcc.suggestName("weightReqAdrAcc")
-  private val pSumReqAdrAcc = RegInit(0.U(p.addressBits.W))
-  private val inActReqFinOnce = RegInit(false.B) // true when have finished once
+  protected val pSumReqAdrAcc: UInt = RegInit(0.U(p.addressBits.W))
+  protected val inActReqFinOnce: Bool = RegInit(false.B) // true when have finished once
   inActReqFinOnce.suggestName("inActReqFinOnce")
   /** as inAct needs require 2 times of SRAM number
     * while `inActReqFinOnce && inActIdMapIO.finish` then that's the second time
@@ -115,28 +115,28 @@ class EyerissIDMapGenerator(val numIds: Int) extends Module {
     * [[respBitmap]] true indicates that the id has received response;
     * both of them have [[numIds]] bits, and each bit represents one id;
     * */
-  private val reqBitmap: UInt = RegInit(((BigInt(1) << numIds) - 1).U(numIds.W)) // True indicates that the id is available
-  private val respBitmap: UInt = RegInit(0.U(numIds.W)) // false means haven't receive response
+  protected val reqBitmap: UInt = RegInit(((BigInt(1) << numIds) - 1).U(numIds.W)) // True indicates that the id is available
+  protected val respBitmap: UInt = RegInit(0.U(numIds.W)) // false means haven't receive response
   /** [[select]] is the oneHot code which represents the lowest bit that equals to true;
     * Then use `OHToUInt` to get its binary value.
     * */
-  private val select: UInt = (~(leftOR(reqBitmap) << 1)).asUInt & reqBitmap
+  protected val select: UInt = (~(leftOR(reqBitmap) << 1)).asUInt & reqBitmap
   io.alloc.bits := OHToUInt(select)
   io.alloc.valid := reqBitmap.orR() // valid when there is any id hasn't sent require signal
 
-  private val clr: UInt = WireDefault(0.U(numIds.W))
+  protected val clr: UInt = WireDefault(0.U(numIds.W))
   when(io.alloc.fire()) {
     clr := UIntToOH(io.alloc.bits)
   }
 
-  private val set: UInt = WireDefault(0.U(numIds.W))
+  protected val set: UInt = WireDefault(0.U(numIds.W))
   when(io.free.fire()) {
     set := UIntToOH(io.free.bits) // this is the sourceId that finishes
   }
   respBitmap := respBitmap | set
   reqBitmap := (reqBitmap & (~clr).asUInt)
   /** when all the sources receive response*/
-  private val finishWire = respBitmap.andR()
+  protected val finishWire: Bool = respBitmap.andR()
   when (finishWire) {
     respBitmap := 0.U
     reqBitmap := ((BigInt(1) << numIds) - 1).U

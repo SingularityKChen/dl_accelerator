@@ -17,7 +17,7 @@ trait HasEyeriss { this: BaseSubsystem =>
   private val portName = "Eyeriss"
   val eyeriss: LazyEyeriss = LazyModule(new LazyEyeriss(EyerissParams(address, pbus.beatBytes))(p))
   /** attach control reg at periphery bus */
-  val xbar = LazyModule(new TLXbar()(p)).node
+  val xbar: TLNexusNode = LazyModule(new TLXbar()(p)).node
   cbus.coupleTo(name = portName) { eyeriss.controlXing(NoCrossing) := TLFragmenter(cbus) := _ }
   /** attach interrupt signal */
   ibus.fromSync := eyeriss.intXing(NoCrossing) // or use fromAsync
@@ -76,13 +76,13 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
   lazy val module: LazyModuleImp = new LazyModuleImp(this) {
     val instructionWidth = 32
     /** store instructions from CPU */
-    private val instructionReg = RegInit(0.U(instructionWidth.W))
+    protected val instructionReg: UInt = RegInit(0.U(instructionWidth.W))
     instructionReg.suggestName("instructionReg")
     regmap(
       0x00 -> Seq(RegField.w(n = instructionWidth, w = instructionReg, // offset: 2 hex
         desc = RegFieldDesc(name = "instructionReg", desc = "for CPU to write in instructions"))),
     )
-    private val eyerissTop = Module(new EyerissTop(EyerissTopParam(
+    protected val eyerissTop: EyerissTop = Module(new EyerissTop(EyerissTopParam(
       addressBits = memInActNode.out.head._2.manager.maxAddress.toInt,
       inActDataBits = memInActNode.out.head._1.params.dataBits,
       inActSourceBits = memInActNode.out.head._1.params.sourceBits,
@@ -92,7 +92,7 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
       pSumSourceBits = memPSumNode.out.head._1.params.sourceBits
     )))
     /** */
-    private val eyerissTopIO = eyerissTop.io
+    protected val eyerissTopIO = eyerissTop.io
     /** */
     /** interrupts */
     interrupts.head := eyerissTopIO.ctrlPath.interrupts
@@ -100,15 +100,15 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     eyerissTopIO.ctrlPath.instructions := instructionReg
     /** memory get and put */
     /** the logic of input activation */
-    private val getInActSourceId = eyerissTopIO.ctrlPath.bundles.memInActBundles.a.bits.source
-    private val getInActAddress = eyerissTopIO.ctrlPath.bundles.memInActBundles.address
-    private val getInActSize = eyerissTopIO.ctrlPath.bundles.memInActBundles.reqSize
+    protected val getInActSourceId: UInt = eyerissTopIO.ctrlPath.bundles.memInActBundles.a.bits.source
+    protected val getInActAddress: UInt = eyerissTopIO.ctrlPath.bundles.memInActBundles.address
+    protected val getInActSize: UInt = eyerissTopIO.ctrlPath.bundles.memInActBundles.reqSize
     val (memInActBundle, memInActEdge) = memInActNode.out.head
-    private val inActLegalDest = memInActEdge.manager.containsSafe(getInActAddress)
+    protected val inActLegalDest: Bool = memInActEdge.manager.containsSafe(getInActAddress)
     val (getInActLegal, getInActBits) = memInActEdge.Get(getInActSourceId, getInActAddress, getInActSize)
-    private val inActLegal = inActLegalDest && getInActLegal
-    private val (inActReqFirst, inActReqLast, inActReqDone) = memInActEdge.firstlast(memInActBundle.a)
-    private val (inActRespFirst, inActRespLast, inActRespDone) = memInActEdge.firstlast(memInActBundle.d)
+    protected val inActLegal: Bool = inActLegalDest && getInActLegal
+    protected val (inActReqFirst, inActReqLast, inActReqDone) = memInActEdge.firstlast(memInActBundle.a)
+    protected val (inActRespFirst, inActRespLast, inActRespDone) = memInActEdge.firstlast(memInActBundle.d)
     memInActBundle.a.bits := getInActBits // TODO: check
     memInActBundle.a.valid := eyerissTopIO.ctrlPath.bundles.memInActBundles.a.valid
     memInActBundle.d.ready := true.B
@@ -120,15 +120,15 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     eyerissTopIO.ctrlPath.bundles.memInActBundles.respFirst := inActRespFirst
     eyerissTopIO.ctrlPath.bundles.memInActBundles.legal := inActLegal
     /** the logic of weight */
-    private val getWeightSourceId = eyerissTopIO.ctrlPath.bundles.memWeightBundles.a.bits.source
-    private val getWeightAddress = eyerissTopIO.ctrlPath.bundles.memWeightBundles.address
-    private val getWeightSize = eyerissTopIO.ctrlPath.bundles.memWeightBundles.reqSize
+    protected val getWeightSourceId: UInt = eyerissTopIO.ctrlPath.bundles.memWeightBundles.a.bits.source
+    protected val getWeightAddress: UInt = eyerissTopIO.ctrlPath.bundles.memWeightBundles.address
+    protected val getWeightSize: UInt = eyerissTopIO.ctrlPath.bundles.memWeightBundles.reqSize
     val (memWeightBundle, memWeightEdge) = memWeightNode.out.head
-    private val weightLegalDest = memWeightEdge.manager.containsSafe(getWeightAddress)
+    protected val weightLegalDest: Bool = memWeightEdge.manager.containsSafe(getWeightAddress)
     val (getWeightLegal, getWeightBits) = memWeightEdge.Get(getWeightSourceId, getWeightAddress, getWeightSize)
-    private val weightLegal = weightLegalDest && getWeightLegal
-    private val (weightReqFirst, weightReqLast, weightReqDone) = memWeightEdge.firstlast(memWeightBundle.a)
-    private val (weightRespFirst, weightRespLast, weightRespDone) = memWeightEdge.firstlast(memWeightBundle.d)
+    protected val weightLegal: Bool = weightLegalDest && getWeightLegal
+    protected val (weightReqFirst, weightReqLast, weightReqDone) = memWeightEdge.firstlast(memWeightBundle.a)
+    protected val (weightRespFirst, weightRespLast, weightRespDone) = memWeightEdge.firstlast(memWeightBundle.d)
     memWeightBundle.a.bits := getWeightBits
     memWeightBundle.a.valid := eyerissTopIO.ctrlPath.bundles.memWeightBundles.a.valid
     memWeightBundle.d.ready := true.B
@@ -140,16 +140,16 @@ class LazyEyeriss(params: EyerissParams)(implicit p: Parameters) extends Registe
     eyerissTopIO.ctrlPath.bundles.memWeightBundles.legal := weightLegal
     eyerissTopIO.ctrlPath.bundles.memWeightBundles.respFirst := weightRespFirst
     /** the logic of partial sum */
-    private val pSumSourceId = eyerissTopIO.ctrlPath.bundles.memPSumBundles.a.bits.source
-    private val pSumAddress = eyerissTopIO.ctrlPath.bundles.memPSumBundles.address
-    private val pSumSize = eyerissTopIO.ctrlPath.bundles.memPSumBundles.reqSize
-    private val putPSumData = eyerissTopIO.ctrlPath.bundles.memPSumBundles.a.bits.data
+    protected val pSumSourceId: UInt = eyerissTopIO.ctrlPath.bundles.memPSumBundles.a.bits.source
+    protected val pSumAddress: UInt = eyerissTopIO.ctrlPath.bundles.memPSumBundles.address
+    protected val pSumSize: UInt = eyerissTopIO.ctrlPath.bundles.memPSumBundles.reqSize
+    protected val putPSumData: UInt = eyerissTopIO.ctrlPath.bundles.memPSumBundles.a.bits.data
     val (memPSumBundle, memPSumEdge) = memPSumNode.out.head
-    private val pSumLegalDest = memPSumEdge.manager.containsSafe(pSumAddress)
+    protected val pSumLegalDest: Bool = memPSumEdge.manager.containsSafe(pSumAddress)
     val (putPSumLegal, putPSumBits) = memPSumEdge.Put(pSumSourceId, pSumAddress, pSumSize, putPSumData)
-    private val pSumLegal = pSumLegalDest && putPSumLegal
-    private val (pSumReqFirst, pSumReqLast, pSumReqDone) = memPSumEdge.firstlast(memPSumBundle.a)
-    private val (pSumRespFirst, pSumRespLast, pSumRespDone) = memPSumEdge.firstlast(memPSumBundle.d)
+    protected val pSumLegal: Bool = pSumLegalDest && putPSumLegal
+    protected val (pSumReqFirst, pSumReqLast, pSumReqDone) = memPSumEdge.firstlast(memPSumBundle.a)
+    protected val (pSumRespFirst, pSumRespLast, pSumRespDone) = memPSumEdge.firstlast(memPSumBundle.d)
     memPSumBundle.a.bits := putPSumBits
     memPSumBundle.a.valid := eyerissTopIO.ctrlPath.bundles.memPSumBundles.a.valid
     memPSumBundle.d.ready := true.B

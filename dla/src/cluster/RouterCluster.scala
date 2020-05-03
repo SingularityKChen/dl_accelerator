@@ -6,9 +6,9 @@ import dla.pe.CSCStreamIO
 
 class RouterCluster(debug: Boolean) extends Module with ClusterConfig {
   val io: RouterClusterIO = IO(new RouterClusterIO)
-  private val iRouters = Seq.fill(inActRouterNum){ Module(new InActRouter).io }
-  private val wRouters = Seq.fill(weightRouterNum){ Module(new WeightRouter).io }
-  private val pSRouters = Seq.fill(pSumRouterNum){ Module(new PSumRouter).io }
+  protected val iRouters: Seq[CommonRouterUIntIO] = Seq.fill(inActRouterNum){ Module(new InActRouter).io }
+  protected val wRouters: Seq[CommonRouterBoolIO] = Seq.fill(weightRouterNum){ Module(new WeightRouter).io }
+  protected val pSRouters: Seq[PSumRouterIO] = Seq.fill(pSumRouterNum){ Module(new PSumRouter).io }
   io.dataPath.routerData.iRIO.zip(iRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.wRIO.zip(wRouters).foreach({case (x, y) => x <> y.dataPath})
   io.dataPath.routerData.pSumRIO.zip(pSRouters).foreach({case (x, y) => x <> y.dataPath})
@@ -31,19 +31,19 @@ class InActRouter extends CSCRouter with ClusterConfig {
   // io.dataPath.outIOs(1): inActRouterToNorth
   // io.dataPath.outIOs(2): inActRouterToSouth
   // io.dataPath.outIOs(3): inActRouterToHorizontal
-  private val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
+  protected val inSelWire: UInt = Wire(UInt(2.W)) // 0  for GLB Cluster, 1 for north, 2 for south, 3 for horizontal
   inSelWire.suggestName("inActRouterInSelWire")
-  private val outSelWire: UInt = Wire(UInt(2.W))
+  protected val outSelWire: UInt = Wire(UInt(2.W))
   outSelWire.suggestName("inActRouterOutSelWire")
   // outSelWire: 0: uni-cast, 1: horizontal, 2: vertical, 3: broadcast
-  private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
+  protected val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(inActAdrWidth, inActDataWidth))
   internalDataWire.suggestName("inActInternalDataWire")
-  private val inSelEqWires = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
+  protected val inSelEqWires: Seq[Bool] = Seq.fill(io.dataPath.inIOs.length){Wire(Bool())}
   inSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
     bool.suggestName(s"inActInSelEq${i}Wire")
     bool := inSelWire === i.asUInt
   })
-  private val outSelEqWires = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
+  protected val outSelEqWires: Seq[Bool] = Seq.fill(io.dataPath.outIOs.length){Wire(Bool())}
   outSelEqWires.zipWithIndex.foreach({ case (bool, i) =>
     bool.suggestName(s"inActOutSelEq${i}Wire")
     bool := outSelWire === i.asUInt
@@ -100,12 +100,12 @@ class WeightRouter extends CSCRouter with ClusterConfig {
   //io.dataPath.outIOs(0): weightRouterToPEArray
   //io.dataPath.outIOs(1): weightRouterToHorizontal
   // inSelWire: 0, receive the data come from GLB Cluster; 1, receive it come from its neighborhood WeightRouter
-  private val inSelWire: Bool = Wire(Bool())
+  protected val inSelWire: Bool = Wire(Bool())
   inSelWire.suggestName("weightRouterInSelWire")
   // outSelWire: always send the data to PE Cluster; if true, send it to its neighborhood WeightRouter and PE Cluster
-  private val outSelWire: Bool = Wire(Bool())
+  protected val outSelWire: Bool = Wire(Bool())
   outSelWire.suggestName("weightRouterOutSelWire")
-  private val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
+  protected val internalDataWire: CSCStreamIO = Wire(new CSCStreamIO(weightAdrWidth, weightDataWidth))
   internalDataWire.suggestName("weightInternalDataWire")
   when (inSelWire) {
     internalDataWire <> io.dataPath.inIOs(1)
@@ -137,11 +137,11 @@ class PSumRouter extends Module with ClusterConfig {
   //io.dataPath.outIOs(0): pSumRouterToPEArray
   //io.dataPath.outIOs(1): pSumRouterToGLB
   //io.dataPath.outIOs(2): pSumRouterToSouthern
-  private val inSelWire = Wire(Bool()) // true for GLB Cluster, false for vertical
+  protected val inSelWire: Bool = Wire(Bool()) // true for GLB Cluster, false for vertical
   inSelWire.suggestName("pSumRouterInSelWire")
-  private val outSelWire = Wire(Bool()) // true for PE Cluster, false for vertical
+  protected val outSelWire: Bool = Wire(Bool()) // true for PE Cluster, false for vertical
   outSelWire.suggestName("pSumRouterOutSelWire")
-  private val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
+  protected val internalDataWire: DecoupledIO[UInt] = Wire(Decoupled(UInt(psDataWidth.W)))
   internalDataWire.suggestName("pSumInternalDataWire")
   // connect inData from PECluster with outData to GLBCluster
   io.dataPath.outIOs(1) <> io.dataPath.inIOs(0)

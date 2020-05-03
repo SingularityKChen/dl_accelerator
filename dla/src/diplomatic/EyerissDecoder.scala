@@ -31,25 +31,25 @@ class DecoderIO extends Bundle {
   * */
 class EyerissDecoder extends Module {
   val io: DecoderIO = IO(new DecoderIO)
-  private val func3 = Wire(UInt(3.W))
-  private val rs1 = Wire(UInt(5.W))
-  private val rd = Wire(UInt(5.W))
-  private val imm = Wire(UInt(12.W))
-  private val inActStrAdr = RegInit(0.U(5.W))
-  private val weightStrAdr = RegInit(0.U(5.W))
-  private val pSumStrAdr = RegInit(0.U(5.W))
-  private val gnmfcsRegVec = Seq.fill(12) {
+  protected val func3: UInt = Wire(UInt(3.W))
+  protected val rs1: UInt = Wire(UInt(5.W))
+  protected val rd: UInt = Wire(UInt(5.W))
+  protected val imm: UInt = Wire(UInt(12.W))
+  protected val inActStrAdr: UInt = RegInit(0.U(5.W))
+  protected val weightStrAdr: UInt = RegInit(0.U(5.W))
+  protected val pSumStrAdr: UInt = RegInit(0.U(5.W))
+  protected val gnmfcsRegVec: Seq[UInt] = Seq.fill(12) {
     RegInit(0.U(3.W))
   }
-  private val fnercmRegVec = Seq.fill(6) {
+  protected val fnercmRegVec: Seq[UInt] = Seq.fill(6) {
     RegInit(0.U(3.W))
   }
   imm := io.instruction(31, 20)
   rs1 := io.instruction(19, 15)
   func3 := io.instruction(14, 12)
   rd := io.instruction(11, 7)
-  private val pSumIdle :: pSumValid :: Nil = Enum(2)
-  private val pSumWBStateReg = RegInit(pSumIdle)
+  protected val pSumIdle :: pSumValid :: Nil = Enum(2)
+  protected val pSumWBStateReg: UInt = RegInit(pSumIdle)
   switch(pSumWBStateReg) {
     is (pSumIdle) {
       when (io.calFin) {
@@ -95,10 +95,10 @@ class EyerissDecoder extends Module {
     }
   }
   // TODO: use the configurations via instructions rather than those configs
-  private val rc0 = fnercmRegVec(3)*fnercmRegVec(4)
-  private val f0n0e = fnercmRegVec.take(3).reduce(_ * _)
-  private val g2n2c2f2Pluss2 = gnmfcsRegVec.head*gnmfcsRegVec(1)*gnmfcsRegVec(4)*(gnmfcsRegVec(3) + gnmfcsRegVec(5))
-  private val g2m2c2s2 = gnmfcsRegVec.head*gnmfcsRegVec(2)*gnmfcsRegVec(4)*gnmfcsRegVec(5)
+  protected val rc0: UInt = fnercmRegVec(3)*fnercmRegVec(4)
+  protected val f0n0e: UInt = fnercmRegVec.take(3).reduce(_ * _)
+  protected val g2n2c2f2Pluss2: UInt = gnmfcsRegVec.head*gnmfcsRegVec(1)*gnmfcsRegVec(4)*(gnmfcsRegVec(3) + gnmfcsRegVec(5))
+  protected val g2m2c2s2: UInt = gnmfcsRegVec.head*gnmfcsRegVec(2)*gnmfcsRegVec(4)*gnmfcsRegVec(5)
   io.inActIO.starAdr := inActStrAdr
   // io.inActIO.reqSize: G2*N2*C2*(F2 + S2) * R*C0 * F0*N0*E
   io.inActIO.reqSize :=  g2n2c2f2Pluss2 * rc0 * f0n0e

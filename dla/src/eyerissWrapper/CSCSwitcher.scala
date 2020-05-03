@@ -43,25 +43,25 @@ class CSCSwitcher(private val adrWidth: Int, debug: Boolean) extends Module
   private val zeroCode = if (adrWidth == inActAdrWidth) inActZeroColumnCode else weightZeroColumnCode
   private val lgVectorNum = if (adrWidth == inActAdrWidth) log2Ceil(inActStreamNum) else log2Ceil(weightStreamNum)
   // TODO: generate SIMD csc for weight
-  private val inData = Queue(io.inData, fifoSize, flow = true, pipe = true)
-  private val outAdr = Wire(Decoupled(UInt(adrWidth.W)))
-  private val outData = Wire(Decoupled(UInt(dataWidth.W)))
-  private val cscCountReg = RegInit(0.U(cscCountWidth.W))
-  private val cscCountPlusOne = cscCountReg + 1.U
-  private val cscAdrReg = RegInit(0.U(adrWidth.W))
-  private val cscAdrPlusOne = cscAdrReg + 1.U
-  private val columnCounter = RegInit(0.U(5.W))
-  private val columnCounterPlusOne = columnCounter + 1.U
-  private val zeroColReg = RegInit(true.B) // true when current column contains zero only
+  protected val inData: DecoupledIO[UInt] = Queue(io.inData, fifoSize, flow = true, pipe = true)
+  protected val outAdr: DecoupledIO[UInt] = Wire(Decoupled(UInt(adrWidth.W)))
+  protected val outData: DecoupledIO[UInt] = Wire(Decoupled(UInt(dataWidth.W)))
+  protected val cscCountReg: UInt = RegInit(0.U(cscCountWidth.W))
+  protected val cscCountPlusOne: UInt = cscCountReg + 1.U
+  protected val cscAdrReg: UInt = RegInit(0.U(adrWidth.W))
+  protected val cscAdrPlusOne: UInt = cscAdrReg + 1.U
+  protected val columnCounter: UInt = RegInit(0.U(5.W))
+  protected val columnCounterPlusOne: UInt = columnCounter + 1.U
+  protected val zeroColReg: Bool = RegInit(true.B) // true when current column contains zero only
   /** [[vectorNumCounter]] will count current padNumber.
     * TODO: change [[lgVectorNum]] to SRAMSize/padSize */
-  private val vectorNumCounter = RegInit(0.U(lgVectorNum.W))
-  private val vectorNumPlusOne = vectorNumCounter + 1.U
-  private val meetNoneZeroWire = Wire(Bool())
-  private val oneColFinWire = Wire(Bool())
-  private val oneMatrixFinWire = Wire(Bool())
-  private val oneVectorFinRegNext = RegNext(oneColFinWire && oneMatrixFinWire) // true when process one pad data
-  private val oneStreamFinRegNext = RegNext(oneVectorFinRegNext && (io.ctrlPath.vectorNum === vectorNumPlusOne))
+  protected val vectorNumCounter: UInt = RegInit(0.U(lgVectorNum.W))
+  protected val vectorNumPlusOne: UInt = vectorNumCounter + 1.U
+  protected val meetNoneZeroWire: Bool = Wire(Bool())
+  protected val oneColFinWire: Bool = Wire(Bool())
+  protected val oneMatrixFinWire: Bool = Wire(Bool())
+  protected val oneVectorFinRegNext: Bool = RegNext(oneColFinWire && oneMatrixFinWire) // true when process one pad data
+  protected val oneStreamFinRegNext: Bool = RegNext(oneVectorFinRegNext && (io.ctrlPath.vectorNum === vectorNumPlusOne))
   /** when cscCountReg equals to the height of matrix, then current column finishes */
   oneColFinWire := io.ctrlPath.matrixHeight === cscCountPlusOne
   oneMatrixFinWire := io.ctrlPath.matrixWidth === columnCounterPlusOne
@@ -70,14 +70,14 @@ class CSCSwitcher(private val adrWidth: Int, debug: Boolean) extends Module
   /** when meet none a zero element, zeroColReg will be assigned to false, otherwise keep its value
     * After every column, it will be reset */
   zeroColReg := Mux(oneColFinWire, true.B, Mux(meetNoneZeroWire, false.B, zeroColReg))
-  private val currentZeroColumn = oneColFinWire && !meetNoneZeroWire && zeroColReg
+  protected val currentZeroColumn: Bool = oneColFinWire && !meetNoneZeroWire && zeroColReg
   // true then its the first none zero element in current column
-  private val firstNoneZeroValue = meetNoneZeroWire && zeroColReg
-  private val outDataShouldValid = meetNoneZeroWire && inData.valid
+  protected val firstNoneZeroValue: Bool = meetNoneZeroWire && zeroColReg
+  protected val outDataShouldValid: Bool = meetNoneZeroWire && inData.valid
   // TODO: remove `cscAdrReg =/= 0.U` for zero column
   /** address vector will emmit one element at the beginning of each column */
-  private val outAdrShouldValid = (currentZeroColumn || firstNoneZeroValue) && inData.valid && cscAdrReg =/= 0.U
-  private val endFlag = oneStreamFinRegNext || oneVectorFinRegNext
+  protected val outAdrShouldValid: Bool = (currentZeroColumn || firstNoneZeroValue) && inData.valid && cscAdrReg =/= 0.U
+  protected val endFlag: Bool = oneStreamFinRegNext || oneVectorFinRegNext
   /** when its the last element of one Pad or the whole stream, then ready will be false to stop deq from in queue
     * when any of the out queues is full (out queue.ready is false) then stop deq from in queue
     * but when out queue is full but current data is zero, then we can deq it from in queue*/

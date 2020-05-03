@@ -3,7 +3,7 @@ package dla.eyerissWrapper
 import chisel3._
 import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import chisel3.util._
-import dla.cluster.{ClusterGroup, ClusterGroupCtrlIO, ClusterSRAMConfig, GNMFCS2Config, PSumSRAMDataIO}
+import dla.cluster.{ClusterGroup, ClusterGroupCtrlIO, ClusterGroupIO, ClusterSRAMConfig, GNMFCS2Config, PSumSRAMDataIO}
 import dla.pe.StreamBitsIO
 import firrtl.options.TargetDirAnnotation
 
@@ -23,15 +23,15 @@ class ClusterGroupWrapper extends Module with ClusterSRAMConfig {
       val cscSwitcherCtrlPath = new CSCSwitcherCtrlPath
     }
   })
-  private val cgModule = Module(new ClusterGroup(debug = false)).io
-  private val inActCSCSwitchersModule = Seq.fill(inActSRAMNum){
+  protected val cgModule: ClusterGroupIO = Module(new ClusterGroup(debug = false)).io
+  protected val inActCSCSwitchersModule: Seq[CSCSwitcher] = Seq.fill(inActSRAMNum){
     Module(new CSCSwitcher(debug = false, adrWidth = inActAdrWidth))
   }
-  private val weightCSCSwitchersModule = Seq.fill(weightRouterNum){
+  protected val weightCSCSwitchersModule: Seq[CSCSwitcher] = Seq.fill(weightRouterNum){
     Module(new CSCSwitcher(adrWidth = weightAdrWidth, debug = false))
   }
-  private val inActCSCSwitchersIO = inActCSCSwitchersModule.map(x => x.io)
-  private val weightCSCSwitchersIO = weightCSCSwitchersModule.map(x => x.io)
+  protected val inActCSCSwitchersIO: Seq[CSCSwitcherIO] = inActCSCSwitchersModule.map(x => x.io)
+  protected val weightCSCSwitchersIO: Seq[CSCSwitcherIO] = weightCSCSwitchersModule.map(x => x.io)
   cgModule.ctrlPath <> io.ctrlPath.cgCtrlPath
   cgModule.dataPath.glbDataPath.pSumIO <> io.dataPath.pSumIO
   /** connections between cscSwitcher and cgModule*/

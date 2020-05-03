@@ -7,10 +7,10 @@ import dla.pe.SPadSizeConfig
 
 class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with ClusterConfig {
   val io: ClusterGroupIO = IO(new ClusterGroupIO)
-  private val peCluster = Module(new PECluster(debug)).io
-  private val glbCluster = Module(new GLBCluster(debug)).io
-  private val routerCluster = Module(new RouterCluster(debug)).io
-  private val clusterCtrl = Module(new ClusterGroupController(debug = debug)).io
+  protected val peCluster: PEClusterIO = Module(new PECluster(debug)).io
+  protected val glbCluster: GLBClusterIO = Module(new GLBCluster(debug)).io
+  protected val routerCluster: RouterClusterIO = Module(new RouterCluster(debug)).io
+  protected val clusterCtrl: ClusterGroupControllerIO = Module(new ClusterGroupController(debug = debug)).io
   // suggest name
   // connections of control path
   require(DataMirror.directionOf(io.ctrlPath.routerClusterCtrl.inActCtrlSel.inDataSel) == Direction.Input, "it should be input")
@@ -124,31 +124,31 @@ class ClusterGroup(debug: Boolean) extends HasConnectAllExpRdModule with Cluster
 
 class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config with ClusterSRAMConfig with SPadSizeConfig{
   val io: ClusterGroupControllerIO = IO(new ClusterGroupControllerIO)
-  private val configFixValSeq = Seq(G2, N2, M2, F2, C2, S2) // FIXME: read that from outside
-  private val configIncWireSeq = Seq.fill(6){Wire(Bool())}
+  protected val configFixValSeq = Seq(G2, N2, M2, F2, C2, S2) // FIXME: read that from outside
+  protected val configIncWireSeq: Seq[Bool] = Seq.fill(6){Wire(Bool())}
   configIncWireSeq.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"configIncWire$i")})
-  private val (configG2Val, configG2Wrap) = Counter(configIncWireSeq.head, configFixValSeq.head)
-  private val (configN2Val, configN2Wrap) = Counter(configIncWireSeq(1), configFixValSeq(1))
-  private val (configM2Val, configM2Wrap) = Counter(configIncWireSeq(2), configFixValSeq(2))
-  private val (configF2Val, configF2Wrap) = Counter(configIncWireSeq(3), configFixValSeq(3))
-  private val (configC2Val, configC2Wrap) = Counter(configIncWireSeq(4), configFixValSeq(4))
-  private val (configS2Val, configS2Wrap) = Counter(configIncWireSeq(5), configFixValSeq(5))
-  private val configWrapWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
+  protected val (configG2Val, configG2Wrap) = Counter(configIncWireSeq.head, configFixValSeq.head)
+  protected val (configN2Val, configN2Wrap) = Counter(configIncWireSeq(1), configFixValSeq(1))
+  protected val (configM2Val, configM2Wrap) = Counter(configIncWireSeq(2), configFixValSeq(2))
+  protected val (configF2Val, configF2Wrap) = Counter(configIncWireSeq(3), configFixValSeq(3))
+  protected val (configC2Val, configC2Wrap) = Counter(configIncWireSeq(4), configFixValSeq(4))
+  protected val (configS2Val, configS2Wrap) = Counter(configIncWireSeq(5), configFixValSeq(5))
+  protected val configWrapWireSeq = Seq(configG2Wrap, configN2Wrap, configM2Wrap, configF2Wrap, configC2Wrap, configS2Wrap)
   //private val configValWireVec = Seq(configG2Val, configN2Val, configM2Val, configF2Val, configC2Val, configS2Val)
   // 0g, 1n, 2m, 3f, 4c, 5s
-  private val inActReadTwoReg = RegInit(false.B) // for inAct, which needs former and later data read
+  protected val inActReadTwoReg: Bool = RegInit(false.B) // for inAct, which needs former and later data read
   inActReadTwoReg.suggestName("inActReadTwoReg")
-  private val glbInActWriteFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
+  protected val glbInActWriteFinReg: Seq[Bool] = Seq.fill(inActSRAMNum){RegInit(false.B)}
   glbInActWriteFinReg.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"glbInActWriteFin$i")})
-  private val glbInActReadFinReg = Seq.fill(inActSRAMNum){RegInit(false.B)}
+  protected val glbInActReadFinReg: Seq[Bool] = Seq.fill(inActSRAMNum){RegInit(false.B)}
   glbInActReadFinReg.zipWithIndex.foreach({ case (bool, i) => bool.suggestName(s"glbInActReadFin$i")})
-  private val glbPSumWriteFinReg = Seq.fill(pSumSRAMNum){RegInit(false.B)}
+  protected val glbPSumWriteFinReg: Seq[Bool] = Seq.fill(pSumSRAMNum){RegInit(false.B)}
   // true when inAct data have loaded into GLB from off chip
-  private val glbInActWriteFinWire = glbInActWriteFinReg.reduce(_ && _)
-  private val glbInActReadFinOnceWire = glbInActReadFinReg.reduce(_ && _)
-  private val glbInActReadFinWire = glbInActReadFinOnceWire && inActReadTwoReg
+  protected val glbInActWriteFinWire: Bool = glbInActWriteFinReg.reduce(_ && _)
+  protected val glbInActReadFinOnceWire: Bool = glbInActReadFinReg.reduce(_ && _)
+  protected val glbInActReadFinWire: Bool = glbInActReadFinOnceWire && inActReadTwoReg
   // true when pSum data have loaded into GLB from PECluster
-  private val glbPSumLoadFinWire = glbPSumWriteFinReg.reduce(_ && _)
+  protected val glbPSumLoadFinWire: Bool = glbPSumWriteFinReg.reduce(_ && _)
   glbInActWriteFinReg.zip(io.glbInActCtrlIOs.map(x => x.writeIO.done)).foreach({ case (reg, doneIO) =>
     reg := Mux(glbInActWriteFinWire, false.B, Mux(doneIO, true.B, reg))
   })
@@ -166,8 +166,8 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     * cgRead: PE read PSum into the tails of PEArray to
     * accumulate them and get out put PSum
     * */
-  private val cgIdle :: cgLoadGLB :: cgLoadPE :: cgCal :: cgRead :: Nil = Enum(5)
-  private val cgStateReg = RegInit(cgIdle)
+  protected val cgIdle :: cgLoadGLB :: cgLoadPE :: cgCal :: cgRead :: Nil = Enum(5)
+  protected val cgStateReg: UInt = RegInit(cgIdle)
   cgStateReg.suggestName("cgStateReg")
   switch (cgStateReg) {
     is (cgIdle) {
@@ -210,7 +210,7 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     }
   }
   // logic
-  private val c2WrapReg = RegInit(false.B)
+  protected val c2WrapReg: Bool = RegInit(false.B)
   when (configWrapWireSeq(4)) { // c2 warp, then f2 will increase
     c2WrapReg := true.B
   } .elsewhen (configIncWireSeq(3)) { // after use this value
@@ -225,14 +225,14 @@ class ClusterGroupController(debug: Boolean) extends Module with GNMFCS2Config w
     configIncWireSeq(i - 1) := configWrapWireSeq(i)
   }
   // Outputs
-  private val pSumAdrL2 = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
-  private val inActReadAdrL2 = configG2Val*(N2*C2*(F2+S2)).U + configN2Val*(C2*(F2+S2)).U +
+  protected val pSumAdrL2: UInt = configG2Val*(N2*M2*F2).U + configN2Val*(M2*F2).U + configM2Val*F2.U + configF2Val
+  protected val inActReadAdrL2: UInt = configG2Val*(N2*C2*(F2+S2)).U + configN2Val*(C2*(F2+S2)).U +
     configC2Val*(F2+S2).U + configF2Val + configS2Val
-  private val pSumWriteAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
-  private val pSumReadAdrL4Reg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
-  private val cgLoadGLBWire = cgStateReg === cgLoadGLB
-  private val cgLoadPEWire = cgStateReg === cgLoadPE
-  private val cgReadWire = cgStateReg === cgRead
+  protected val pSumWriteAdrL4Reg: UInt = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  protected val pSumReadAdrL4Reg: UInt = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  protected val cgLoadGLBWire: Bool = cgStateReg === cgLoadGLB
+  protected val cgLoadPEWire: Bool = cgStateReg === cgLoadPE
+  protected val cgReadWire: Bool = cgStateReg === cgRead
   // FIXME: need reset, need fire(), check whether .head is correct
   pSumReadAdrL4Reg := Mux(io.glbPSumCtrlIOs.head.readIO.done, pSumReadAdrL4Reg + 1.U, pSumReadAdrL4Reg)
   pSumWriteAdrL4Reg := Mux(io.glbPSumCtrlIOs.head.writeIO.done, pSumWriteAdrL4Reg + 1.U, pSumWriteAdrL4Reg)

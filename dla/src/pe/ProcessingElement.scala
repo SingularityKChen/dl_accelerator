@@ -5,12 +5,12 @@ import chisel3.util._
 
 class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
   val io: ProcessingElementIO = IO(new ProcessingElementIO)
-  private val peCtrl = Module(new ProcessingElementControl(debug = debug))
+  protected val peCtrl: ProcessingElementControl = Module(new ProcessingElementControl(debug = debug))
   peCtrl.suggestName("peCtrlModule")
-  private val peCtrlIO = peCtrl.io
-  private val pePad = Module(new ProcessingElementPad(debug = debug))
+  protected val peCtrlIO: ProcessingElementControlIO = peCtrl.io
+  protected val pePad: ProcessingElementPad = Module(new ProcessingElementPad(debug = debug))
   pePad.suggestName("pePadModule")
-  private val pePadIO = pePad.io
+  protected val pePadIO: ProcessingElementPadIO = pePad.io
   if (fifoEn) {
     pePadIO.dataStream.inActIOs.adrIOs.data <> Queue(io.dataStream.inActIOs.adrIOs.data, fifoSize, flow = true, pipe = true)
     pePadIO.dataStream.inActIOs.dataIOs.data <> Queue(io.dataStream.inActIOs.dataIOs.data, fifoSize, flow = true, pipe = true)
@@ -20,19 +20,19 @@ class ProcessingElement(debug: Boolean) extends Module with PESizeConfig {
     pePadIO.dataStream.inActIOs <> io.dataStream.inActIOs
     pePadIO.dataStream.weightIOs <> io.dataStream.weightIOs
  }
-  private val inActAndWeightWFIOs = Seq(pePadIO.padWF.inActWriteFin, pePadIO.padWF.weightWriteFin)
-  private val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
+  protected val inActAndWeightWFIOs = Seq(pePadIO.padWF.inActWriteFin, pePadIO.padWF.weightWriteFin)
+  protected val inActAndWeightTopWFIOs = Seq(io.padWF.inActWriteFin, io.padWF.weightWriteFin)
   inActAndWeightWFIOs.zip(inActAndWeightTopWFIOs).foreach{case (x, y) => y <> x}
   io.padWF.pSumAddFin := pePadIO.padWF.pSumAddFin
   peCtrlIO.ctrlPad <> pePadIO.padCtrl
   peCtrlIO.ctrlTop.pSumEnqEn := io.topCtrl.pSumEnqEn
   io.topCtrl.calFinish := peCtrlIO.ctrlTop.calFinish
   peCtrlIO.ctrlTop.doLoadEn := io.topCtrl.doLoadEn
-  private val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
+  protected val SPadWFSeq = Seq(inActAndWeightWFIOs.head.adrWriteFin, inActAndWeightWFIOs.head.dataWriteFin,
     inActAndWeightWFIOs.last.adrWriteFin, inActAndWeightWFIOs.last.dataWriteFin)
-  private val writeFinishWire: Bool = Wire(Bool())
+  protected val writeFinishWire: Bool = Wire(Bool())
   writeFinishWire.suggestName("inActAndWeightWFWire")
-  private val writeFinishRegVec = Seq.fill(SPadWFSeq.length){RegInit(false.B)}
+  protected val writeFinishRegVec: Seq[Bool] = Seq.fill(SPadWFSeq.length){RegInit(false.B)}
   writeFinishRegVec.head.suggestName("inActAdrWFReg")
   writeFinishRegVec(1).suggestName("inActDataWFReg")
   writeFinishRegVec(2).suggestName("weightAdrWFReg")
@@ -60,8 +60,8 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
   // psIdle: wait for signal
   // psLoad: load input activations, weights, partial sums outside and read out output partial sum
   // psCal: do MAC computations
-  private val psIdle :: psLoad :: psCal :: Nil = Enum(3)
-  private val stateMac: UInt = RegInit(psIdle) // the state of the mac process
+  protected val psIdle :: psLoad :: psCal :: Nil = Enum(3)
+  protected val stateMac: UInt = RegInit(psIdle) // the state of the mac process
   stateMac.suggestName("PEStateReg")
   io.ctrlTop.calFinish := io.ctrlPad.fromTopIO.calFinish && stateMac === psCal
   io.ctrlPad.fromTopIO.pSumEnqEn := io.ctrlTop.pSumEnqEn
@@ -94,7 +94,7 @@ class ProcessingElementControl(debug: Boolean) extends Module with MCRENFConfig 
 
 class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with SPadSizeConfig with PESizeConfig {
   val io: ProcessingElementPadIO = IO(new ProcessingElementPadIO)
-  private def nextSPadInActAdr(): Unit = {
+  protected def nextSPadInActAdr(): Unit = {
     sPad := padInActAdr
     inActAdrSPadReadEnReg := true.B
     inActDataSPadReadEnReg := false.B
@@ -102,7 +102,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     weightDataSPadReadEnReg := false.B
     weightDataSPadFirstRead := true.B // if need read a new column of input activation matrix, then true
   }
-  private def nextSPadInActData(): Unit = {
+  protected def nextSPadInActData(): Unit = {
     sPad := padInActData
     inActAdrSPadReadEnReg := false.B
     inActDataSPadReadEnReg := true.B
@@ -110,95 +110,95 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     weightDataSPadReadEnReg := false.B
     weightDataSPadFirstRead := true.B // if need to read a new data, also a new weight matrix column
   }
-  private def nextSPadWeightAdr(): Unit = {
+  protected def nextSPadWeightAdr(): Unit = {
     sPad := padWeightAdr
     inActAdrSPadReadEnReg := false.B
     inActDataSPadReadEnReg := false.B
     weightAdrSPadReadEnReg := true.B
     weightDataSPadReadEnReg := false.B
   }
-  private def nextSPadWeightData(): Unit = {
+  protected def nextSPadWeightData(): Unit = {
     sPad := padWeightData1
     inActAdrSPadReadEnReg := false.B
     inActDataSPadReadEnReg := false.B
     weightAdrSPadReadEnReg := false.B
     weightDataSPadReadEnReg := true.B
   }
-  private def readOff(): Unit = {
+  protected def readOff(): Unit = {
     inActAdrSPadReadEnReg := false.B
     inActDataSPadReadEnReg := false.B
     weightAdrSPadReadEnReg := false.B
     weightDataSPadReadEnReg := false.B
   }
-  private def readFinish(): Unit = {
+  protected def readFinish(): Unit = {
     sPad := padIdle
     inActDataSPadFirstReadReg := true.B
     inActMatrixColumnReg := 0.U
   }
   // reg, partial sum scratch pad
-  private val pSumSPad = Module(new PSumSPad(debug = debug))
+  protected val pSumSPad: PSumSPad = Module(new PSumSPad(debug = debug))
   pSumSPad.suggestName("pSumSPadModule")
-  private val inActAdrSPad = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
+  protected val inActAdrSPad: SPadAdrModule = Module(new SPadAdrModule(inActAdrSPadSize, inActAdrWidth))
   inActAdrSPad.suggestName("inActAdrSPadModule")
-  private val inActDataSPad = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
+  protected val inActDataSPad: SPadDataModule = Module(new SPadDataModule(inActDataSPadSize, inActDataWidth, false))
   inActDataSPad.suggestName("inActDataSPadModule")
-  private val weightAdrSPad = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth))
+  protected val weightAdrSPad: WeightSPadAdrModule = Module(new WeightSPadAdrModule(weightAdrSPadSize, weightAdrWidth))
   weightAdrSPad.suggestName("weightAdrSPadModule")
-  private val weightDataSPad = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true))
+  protected val weightDataSPad: SPadDataModule = Module(new SPadDataModule(weightDataSPadSize, weightDataWidth, true))
   weightDataSPad.suggestName("weightDataSPadModule")
   // get the IOs
-  private val pSumSPadIO = pSumSPad.io
-  private val inActAdrSPadIO = inActAdrSPad.io
-  private val inActDataSPadIO = inActDataSPad.io
-  private val weightAdrSPadIO = weightAdrSPad.io
-  private val weightDataSPadIO = weightDataSPad.io
+  protected val pSumSPadIO: PSumSPadIO = pSumSPad.io
+  protected val inActAdrSPadIO: SPadCommonModuleIO = inActAdrSPad.io
+  protected val inActDataSPadIO: SPadCommonModuleIO = inActDataSPad.io
+  protected val weightAdrSPadIO: SPadCommonModuleIO = weightAdrSPad.io
+  protected val weightDataSPadIO: SPadCommonModuleIO = weightDataSPad.io
   // SPadToCtrl
   // several signals which can help to indicate the process
-  private val mightInActZeroColumnWire: Bool = Wire(Bool())
-  private val inActSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
-  private val mightInActIdxIncWire: Bool = Wire(Bool())
-  private val mightWeightZeroColumnWire: Bool = Wire(Bool())
-  private val mightWeightIdxIncWire: Bool = Wire(Bool())
-  private val mightInActReadFinish: Bool = Wire(Bool())
+  protected val mightInActZeroColumnWire: Bool = Wire(Bool())
+  protected val inActSPadZeroColumnReg: Bool = RegInit(false.B) // true, it is a zero column, then need read again
+  protected val mightInActIdxIncWire: Bool = Wire(Bool())
+  protected val mightWeightZeroColumnWire: Bool = Wire(Bool())
+  protected val mightWeightIdxIncWire: Bool = Wire(Bool())
+  protected val mightInActReadFinish: Bool = Wire(Bool())
   mightInActReadFinish.suggestName("mightInActReadFinish")
-  private val mightWeightReadFinish: Bool = Wire(Bool())
-  private val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
+  protected val mightWeightReadFinish: Bool = Wire(Bool())
+  protected val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
   // InActSPad
-  private val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
-  private val inActAdrDataWire: UInt = Wire(UInt(inActAdrWidth.W))
+  protected val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
+  protected val inActAdrDataWire: UInt = Wire(UInt(inActAdrWidth.W))
   inActAdrDataWire.suggestName("inActAdrData")
-  private val inActDataIndexWire: UInt = Wire(UInt(inActDataIdxWidth.W)) // use for address vector readEn
-  private val inActAdrSPadReadEnReg: Bool = RegInit(false.B)
-  private val inActDataSPadReadEnReg: Bool = RegInit(false.B)
-  private val inActAdrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of inAct address SPad
-  private val inActDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of inAct data SPad
-  private val inActMatrixColumnReg: UInt = RegInit(0.U(inActAdrIdxWidth.W))
-  private val inActZeroColumnNumber: UInt = RegInit(0.U(inActAdrIdxWidth.W)) // use for get the right column number
-  private val inActDataSPadFirstReadReg: Bool = RegInit(true.B)
+  protected val inActDataIndexWire: UInt = Wire(UInt(inActDataIdxWidth.W)) // use for address vector readEn
+  protected val inActAdrSPadReadEnReg: Bool = RegInit(false.B)
+  protected val inActDataSPadReadEnReg: Bool = RegInit(false.B)
+  protected val inActAdrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of inAct address SPad
+  protected val inActDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of inAct data SPad
+  protected val inActMatrixColumnReg: UInt = RegInit(0.U(inActAdrIdxWidth.W))
+  protected val inActZeroColumnNumber: UInt = RegInit(0.U(inActAdrIdxWidth.W)) // use for get the right column number
+  protected val inActDataSPadFirstReadReg: Bool = RegInit(true.B)
   inActDataSPadFirstReadReg.suggestName("inActFirstRead")
-  private val inActMatrixRowWire: UInt = Wire(UInt(cscCountWidth.W))
+  protected val inActMatrixRowWire: UInt = Wire(UInt(cscCountWidth.W))
   inActMatrixRowWire.suggestName("inActMatrixRowWire")
-  private val inActMatrixDataWire: UInt = Wire(UInt(cscDataWidth.W))
+  protected val inActMatrixDataWire: UInt = Wire(UInt(cscDataWidth.W))
   inActMatrixDataWire.suggestName("inActMatrixDataWire")
   // WeightSPad
-  private val weightAdrIndexWire: UInt = Wire(UInt(weightAdrIdxWidth.W))
-  private val weightAdrDataWire: UInt = Wire(UInt(weightAdrWidth.W))
-  private val weightDataIndexWire: UInt = Wire(UInt(weightDataIdxWidth.W)) // use for address vector readEn
-  private val weightAdrSPadReadEnReg: Bool = RegInit(false.B)
-  private val weightDataSPadReadEnReg: Bool = RegInit(false.B)
-  private val weightAdrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight address SPad
-  private val weightDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight data SPad
-  private val weightMatrixDataReg: UInt = Wire(UInt(cscDataWidth.W))
-  private val weightDataSPadFirstRead: Bool = RegInit(true.B)
-  private val weightDataIdxMuxWire: Bool = Wire(Bool()) // false, then means need to read the first column of weight Matrix
-  private val weightAdrSPadReadIdxWire: UInt = Wire(UInt(cscCountWidth.W))
-  private val weightDataIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
-  private val weightAdrIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
-  private val weightMatrixReadFirstColumn: Bool = Wire(Bool())
+  protected val weightAdrIndexWire: UInt = Wire(UInt(weightAdrIdxWidth.W))
+  protected val weightAdrDataWire: UInt = Wire(UInt(weightAdrWidth.W))
+  protected val weightDataIndexWire: UInt = Wire(UInt(weightDataIdxWidth.W)) // use for address vector readEn
+  protected val weightAdrSPadReadEnReg: Bool = RegInit(false.B)
+  protected val weightDataSPadReadEnReg: Bool = RegInit(false.B)
+  protected val weightAdrSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight address SPad
+  protected val weightDataSPadIdxIncWire: Bool = Wire(Bool()) // true, then increase the read index of weight data SPad
+  protected val weightMatrixDataReg: UInt = Wire(UInt(cscDataWidth.W))
+  protected val weightDataSPadFirstRead: Bool = RegInit(true.B)
+  protected val weightDataIdxMuxWire: Bool = Wire(Bool()) // false, then means need to read the first column of weight Matrix
+  protected val weightAdrSPadReadIdxWire: UInt = Wire(UInt(cscCountWidth.W))
+  protected val weightDataIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
+  protected val weightAdrIdxEnWire: Bool = Wire(Bool()) // true then assign a special one for data index
+  protected val weightMatrixReadFirstColumn: Bool = Wire(Bool())
   // pSumSPadIO
-  private val productReg: UInt = RegInit(0.U(psDataWidth.W))
-  private val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
-  private val pSumSPadLoadWire: UInt = Wire(UInt(psDataWidth.W))
+  protected val productReg: UInt = RegInit(0.U(psDataWidth.W))
+  protected val pSumSPadLoadReg: UInt = RegInit(0.U(psDataWidth.W))
+  protected val pSumSPadLoadWire: UInt = Wire(UInt(psDataWidth.W))
   // State Machine
   // padIdle: the pad is idle, and if received valid signal from control, then read and send data to mac
   // padInActAdr: read the input activation address
@@ -208,23 +208,23 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   // padWeightData2: wait one cycle as SRAM
   // padMpy: wait for mac computation
   // padWriteBack: write the partial sum back
-  private val padIdle :: padInActAdr :: padInActData :: padWeightAdr :: padWeightData1 :: padWeightData2 :: padMpy :: padWriteBack :: Nil = Enum(8)
-  private val sPad: UInt = RegInit(padIdle)
+  protected val padIdle :: padInActAdr :: padInActData :: padWeightAdr :: padWeightData1 :: padWeightData2 :: padMpy :: padWriteBack :: Nil = Enum(8)
+  protected val sPad: UInt = RegInit(padIdle)
   sPad.suggestName("PESPadStateReg")
-  private val padEqIA: Bool = Wire(Bool())
-  private val padEqID: Bool = Wire(Bool())
-  private val padEqWA: Bool = Wire(Bool())
-  private val padEqMpy: Bool = Wire(Bool())
-  private val padEqWB: Bool = Wire(Bool())
+  protected val padEqIA: Bool = Wire(Bool())
+  protected val padEqID: Bool = Wire(Bool())
+  protected val padEqWA: Bool = Wire(Bool())
+  protected val padEqMpy: Bool = Wire(Bool())
+  protected val padEqWB: Bool = Wire(Bool())
   padEqIA := sPad === padInActAdr
   padEqMpy := sPad === padMpy
   padEqWB := sPad === padWriteBack
   padEqWA := sPad === padWeightAdr
   padEqID := sPad === padInActData
   weightMatrixReadFirstColumn := inActMatrixRowWire === 0.U
-  private val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
+  protected val weightMatrixRowReg: UInt = Wire(UInt(cscCountWidth.W))
   weightMatrixRowReg.suggestName("weightMatrixRowReg")
-  private val SPadSeq = Seq(inActAdrSPadIO, inActDataSPadIO, weightAdrSPadIO, weightDataSPadIO)
+  protected val SPadSeq = Seq(inActAdrSPadIO, inActDataSPadIO, weightAdrSPadIO, weightDataSPadIO)
   // Connections
   SPadSeq.map(_.ctrlPath.writeEn := io.padCtrl.fromTopIO.doLoadEn)
   io.padCtrl.fromTopIO.writeFinish := DontCare
@@ -269,20 +269,20 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   weightDataSPadIO.ctrlPath.indexInc := weightDataSPadIdxIncWire
   weightDataSPadIO.ctrlPath.readInIdxEn := weightDataIdxEnWire
   // Partial Sum Scratch Pad
-  private val pSumLoadStateReg = RegInit(false.B) // true when load PSum out
+  protected val pSumLoadStateReg: Bool = RegInit(false.B) // true when load PSum out
   pSumLoadStateReg.suggestName("pSumLoadStateReg")
-  private val pSumAddResultWire: UInt = Mux(pSumLoadStateReg, pSumSPadLoadWire, pSumSPadLoadReg) +
+  protected val pSumAddResultWire: UInt = Mux(pSumLoadStateReg, pSumSPadLoadWire, pSumSPadLoadReg) +
     Mux(pSumLoadStateReg, io.dataStream.ipsIO.bits, productReg) // to save adder
-  private val pSumResultWire = Mux(padEqWB, pSumAddResultWire, 0.U)
-  private val pSumPadReadIdxReg = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
+  protected val pSumResultWire: UInt = Mux(padEqWB, pSumAddResultWire, 0.U)
+  protected val pSumPadReadIdxReg: UInt = RegInit(0.U(log2Ceil(pSumDataSPadSize).W))
   pSumPadReadIdxReg.suggestName("pSumPadReadIdxReg")
-  private val pSumPadReadIdxIncWire = Wire(Bool())
+  protected val pSumPadReadIdxIncWire: Bool = Wire(Bool())
   pSumPadReadIdxIncWire.suggestName("pSumPadReadIdxIncWire")
-  private val pSumPadReadWrap = Wire(Bool())
+  protected val pSumPadReadWrap: Bool = Wire(Bool())
   pSumPadReadWrap.suggestName("pSumPadReadWrap")
   pSumLoadStateReg := Mux(io.padWF.pSumAddFin, false.B,
     Mux(io.padCtrl.fromTopIO.pSumEnqEn, true.B, pSumLoadStateReg))
-  private val pSumReadOutValid = io.dataStream.ipsIO.valid && pSumLoadStateReg
+  protected val pSumReadOutValid: Bool = io.dataStream.ipsIO.valid && pSumLoadStateReg
   // top connections
   io.padWF.pSumAddFin := pSumPadReadWrap && pSumLoadStateReg // when need read and wrap
   io.dataStream.ipsIO.ready := io.dataStream.opsIO.ready && pSumLoadStateReg

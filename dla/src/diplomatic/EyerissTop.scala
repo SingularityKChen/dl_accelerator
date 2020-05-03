@@ -3,12 +3,12 @@ package dla.diplomatic
 import chisel3._
 import chisel3.util._
 import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
-import dla.cluster.{ClusterConfig, ClusterSRAMConfig}
+import dla.cluster.{ClusterConfig, ClusterGroupCtrlIO, ClusterSRAMConfig}
 import dla.eyerissWrapper.ClusterGroupWrapper
 import firrtl.options.TargetDirAnnotation
 
 class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig with ClusterSRAMConfig {
-  private implicit val addressBits: Int = param.addressBits
+  protected implicit val addressBits: Int = param.addressBits
   val io = IO(new Bundle {
     val ctrlPath = new Bundle {
       val interrupts: Bool = Output(Bool())
@@ -20,14 +20,14 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
       }
     }
   })
-  private val cGroup = Module(new ClusterGroupWrapper)
+  protected val cGroup: ClusterGroupWrapper = Module(new ClusterGroupWrapper)
   cGroup.suggestName("ClusterGroupWrapper")
-  private val cGroupIO = cGroup.io
+  protected val cGroupIO = cGroup.io
   /** Decoder */
-  private val decoder = Module(new EyerissDecoder)
+  protected val decoder: EyerissDecoder = Module(new EyerissDecoder)
   decoder.suggestName("decoderModule")
-  private val decoderIO = decoder.io
-  private val memCtrl = Module(new EyerissMemCtrlModule()(EyerissMemCtrlParameters(
+  protected val decoderIO: DecoderIO = decoder.io
+  protected val memCtrl: EyerissMemCtrlModule = Module(new EyerissMemCtrlModule()(EyerissMemCtrlParameters(
     addressBits = param.addressBits,
     inActSizeBits = 12, // TODO: check
     weightSizeBits = 12,
@@ -37,9 +37,9 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
     pSumIds = pSumRouterNum
   )))
   memCtrl.suggestName("EyerissMemCtrlModule")
-  private val memCtrlIO = memCtrl.io
+  protected val memCtrlIO: EyerissMemCtrlIO = memCtrl.io
   /** cGroupIO ctrl path*/
-  private val cgCtrlPath = cGroupIO.ctrlPath.cgCtrlPath
+  protected val cgCtrlPath: ClusterGroupCtrlIO = cGroupIO.ctrlPath.cgCtrlPath
   cgCtrlPath.routerClusterCtrl.inActCtrlSel.inDataSel := 0.U // from inAct SRAM bank
   cgCtrlPath.routerClusterCtrl.inActCtrlSel.outDataSel := 0.U // uni-cast
   cgCtrlPath.routerClusterCtrl.weightCtrlSel.inDataSel := false.B // from GLB Cluster
@@ -80,11 +80,11 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
       ((!io.ctrlPath.bundles.memPSumBundles.reqFirst && outDataValid) ||
         memCtrlIO.pSumIO.sourceAlloc.valid && decoderIO.pSumIO.pSumLoadEn)
   }
-  private val inActInIOs = cGroupIO.dataPath.inActIO.map(x => x.data)
+  protected val inActInIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.inActIO.map(x => x.data)
   sourceInputDataMux(offChip = io.ctrlPath.bundles.memInActBundles.d, onChip = inActInIOs)
-  private val weightInIOs = cGroupIO.dataPath.weightIO.map(x => x.data)
+  protected val weightInIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.weightIO.map(x => x.data)
   sourceInputDataMux(offChip = io.ctrlPath.bundles.memWeightBundles.d, onChip = weightInIOs)
-  private val pSumOutIOs = cGroupIO.dataPath.pSumIO.map(x => x.outIOs)
+  protected val pSumOutIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.pSumIO.map(x => x.outIOs)
   pSumBundleMux(offChip = io.ctrlPath.bundles.memPSumBundles.a, onChip = pSumOutIOs)
   /** memory module address and size */
   memCtrlIO.inActIO.startAdr := decoderIO.inActIO.starAdr

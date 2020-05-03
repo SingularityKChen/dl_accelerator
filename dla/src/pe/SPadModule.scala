@@ -11,7 +11,7 @@ class WeightSPadAdrModule(PadSize: Int, DataWidth: Int) extends SPadAdrModule(Pa
 
 class SPadAdrModule(PadSize: Int, val DataWidth: Int)
   extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
-  private val adrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
+  protected val adrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
   adrSPad.suggestName("addressSPad")
   // write logic 2
   when (writeFire) {
@@ -89,9 +89,9 @@ class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
 
 class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeConfig {
   val io: PSumSPadIO = IO(new PSumSPadIO)
-  private val pSumDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
+  protected val pSumDataSPadReg: Vec[UInt] = RegInit(VecInit(Seq.fill(pSumDataSPadSize)(0.U(psDataWidth.W))))
   pSumDataSPadReg.suggestName("pSumDataSPadReg")
-  private val readOutDataWire = Wire(UInt(psDataWidth.W))
+  protected val readOutDataWire = Wire(UInt(psDataWidth.W))
   readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
   io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read
   io.dataPath.opsIO.valid := !io.dataPath.ipsIO.valid // when not write

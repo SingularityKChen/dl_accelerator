@@ -6,15 +6,15 @@ import dla.pe.{CSCStreamIO, MCRENFConfig, StreamBitsIO}
 
 class GLBCluster(debug: Boolean) extends Module with ClusterSRAMConfig with GNMFCS2Config {
   val io: GLBClusterIO = IO(new GLBClusterIO)
-  private val iSRAMs = Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug))}
+  protected val iSRAMs: Seq[InActSRAMBank] = Seq.fill(inActSRAMNum){Module(new InActSRAMBank(debug))}
   iSRAMs.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"inActSRAM$i")})
-  private val iSRAMsIO = iSRAMs.map(x => x.io)
-  private val pSRAMs = Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug))}
+  protected val iSRAMsIO: Seq[InActSRAMBankIO] = iSRAMs.map(x => x.io)
+  protected val pSRAMs: Seq[PSumSRAMBank] = Seq.fill(pSumSRAMNum){Module(new PSumSRAMBank(pSumSRAMSize, psDataWidth, debug))}
   pSRAMs.zipWithIndex.foreach({ case (o, i) => o.suggestName(s"pSumSRAM$i")})
-  private val pSRAMsIO = pSRAMs.map(x => x.io)
-  private val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
-  private val theSRAMsCtrl = Seq(iSRAMsIO.map(x => x.ctrlPath), pSRAMsIO.map(x => x.ctrlPath))
-  private val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
+  protected val pSRAMsIO: Seq[PSumSRAMBankIO] = pSRAMs.map(x => x.io)
+  protected val theTopCtrls = Seq(io.ctrlPath.inActIO, io.ctrlPath.pSumIO)
+  protected val theSRAMsCtrl = Seq(iSRAMsIO.map(x => x.ctrlPath), pSRAMsIO.map(x => x.ctrlPath))
+  protected val theSRAMsNum = Seq(inActSRAMNum, pSumSRAMNum)
   // connections of inAct and PSum
   for (i <- 0 until 2) { // inAct and PSum
     // connections of control path
@@ -63,9 +63,9 @@ class PSumSRAMBank(private val theSRAMSize: Int, private val theDataWidth: Int, 
   val io: PSumSRAMBankIO = IO(new PSumSRAMBankIO)
   // write logic
   writeLogic(io.dataPath.inIOs, io.ctrlPath.writeIO.enable, io.ctrlPath.writeIO.adr)
-  private val writeCounter = RegInit(0.U(log2Ceil(pSumOneSPadNum).W))
+  protected val writeCounter: UInt = RegInit(0.U(log2Ceil(pSumOneSPadNum).W))
   writeCounter.suggestName("writeCounter")
-  private val writeDone = writeCounter === (pSumOneSPadNum - 1).U && io.dataPath.inIOs.fire()
+  protected val writeDone: Bool = writeCounter === (pSumOneSPadNum - 1).U && io.dataPath.inIOs.fire()
   writeDone.suggestName("writeDone")
   writeCounter := Mux(writeDone, 0.U, Mux(io.dataPath.inIOs.fire(), writeCounter + 1.U, writeCounter))
   // read logic
@@ -121,26 +121,26 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   theSRAM.suggestName("oneInActSRAM")
   val io: InACTSRAMCommonIO = IO(new InACTSRAMCommonIO(theSRAMSize, theDataWidth))
   // use lookup table to store the start address in the SRAM of each stream
-  private val adrLookUpTable = Mem(2*inActStreamNum + 1, UInt(log2Ceil(theSRAMSize).W))
+  protected val adrLookUpTable: Mem[UInt] = Mem(2*inActStreamNum + 1, UInt(log2Ceil(theSRAMSize).W))
   adrLookUpTable.suggestName("addressLookUpTableMem")
-  private val noZero :: oneZero :: twoZeros :: Nil = Enum(3)
-  private val zeroState = Seq.fill(2){RegInit(noZero)} // 0 for read, 1 for write
+  protected val noZero :: oneZero :: twoZeros :: Nil = Enum(3)
+  protected val zeroState: Seq[UInt] = Seq.fill(2){RegInit(noZero)} // 0 for read, 1 for write
   zeroState.head.suggestName("readZeroStateReg")
   zeroState.last.suggestName("writeZeroStateReg")
-  private val meetZeroWire = Wire(Vec(2, Bool())) // 0 for read, 1 for write
+  protected val meetZeroWire: Vec[Bool] = Wire(Vec(2, Bool())) // 0 for read, 1 for write
   meetZeroWire.suggestName("meetZeroWire")
-  private val writeDoneWire = Wire(Bool())
-  private val readDoneWire = Wire(Bool())
-  private val writeIdxReg = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
+  protected val writeDoneWire: Bool = Wire(Bool())
+  protected val readDoneWire: Bool = Wire(Bool())
+  protected val writeIdxReg: UInt = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
   writeIdxReg.suggestName("writeIdx")
-  private val writeIdxRegPlusOne = writeIdxReg + 1.U
-  private val readIdxAccReg = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
+  protected val writeIdxRegPlusOne: UInt = writeIdxReg + 1.U
+  protected val readIdxAccReg: UInt = RegInit(0.U(width = log2Ceil(theSRAMSize).W)) // as counter
   readIdxAccReg.suggestName("readIdxAcc")
   // lookup table
-  private val lookupTableWriteIdx = RegInit(0.U(log2Ceil(2*inActStreamNum).W))
-  private val lookupTableWriteIdxPlusOne = lookupTableWriteIdx + 1.U
-  private val readStartIdx = adrLookUpTable.read(io.ctrlPath.readIO.adr)
-  private val writeMeetZeroReg = zeroState.last === oneZero
+  protected val lookupTableWriteIdx: UInt = RegInit(0.U(log2Ceil(2*inActStreamNum).W))
+  protected val lookupTableWriteIdxPlusOne: UInt = lookupTableWriteIdx + 1.U
+  protected val readStartIdx: UInt = adrLookUpTable.read(io.ctrlPath.readIO.adr)
+  protected val writeMeetZeroReg: Bool = zeroState.last === oneZero
   when (writeMeetZeroReg) {
     // when meet zero, we need to record the start index of new stream
     adrLookUpTable.write(lookupTableWriteIdxPlusOne, writeIdxReg) // let index zero's value be zero all the time
@@ -150,7 +150,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   ) // it will increase at second write cycle, as reg next be true as default
   // SRAM read write logic
   // if meet two continuous zeros, then the group of data finishes, also write finish
-  private val writeMeetTwoZerosWire = Wire(Bool())
+  protected val writeMeetTwoZerosWire: Bool = Wire(Bool())
   writeMeetTwoZerosWire.suggestName("writeMeetTwoZeros")
   io.ctrlPath.readIO.done := readDoneWire && zeroState.head =/= oneZero
   io.ctrlPath.writeIO.done := writeDoneWire && writeIdxReg =/= 0.U
@@ -171,7 +171,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   // do finish?
   meetZeroWire.head := readOutData === 0.U
   meetZeroWire.last := writeInData === 0.U
-  private val canJump = Seq(io.dataPath.outIOs.data.fire(), io.dataPath.inIOs.data.fire())
+  protected val canJump = Seq(io.dataPath.outIOs.data.fire(), io.dataPath.inIOs.data.fire())
   for (i <- 0 until 2) {
     switch(zeroState(i)) {
       is (noZero) {
@@ -205,7 +205,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
   }
   readDoneWire := meetZeroWire.head && waitForRead && io.ctrlPath.readIO.enable// or meet one zero
   /** inAct needs write twice, former and later */
-  private val writeDoneOnce = RegInit(false.B)
+  protected val writeDoneOnce: Bool = RegInit(false.B)
   writeDoneOnce.suggestName("writeDoneOnce")
   writeDoneOnce := Mux(writeMeetTwoZerosWire, !writeDoneOnce, writeDoneOnce)
   writeDoneWire := writeDoneOnce && writeMeetTwoZerosWire
@@ -227,21 +227,21 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
 
 class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   val io: InActSRAMBankIO = IO(new InActSRAMBankIO)
-  private val adrSRAM = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug))
+  protected val adrSRAM: InActSRAMCommon = Module(new InActSRAMCommon(inActAdrSRAMSize, inActAdrWidth, debug))
   adrSRAM.suggestName("adrSRAM")
-  private val dataSRAM = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug))
+  protected val dataSRAM: InActSRAMCommon = Module(new InActSRAMCommon(inActDataSRAMSize, inActDataWidth, debug))
   dataSRAM.suggestName("dataSRAM")
-  private val adrSRAMIO = adrSRAM.io
-  private val dataSRAMIO = dataSRAM.io
-  private val bothDoneWire = Wire(Vec(2,Bool()))
-  private val doneAtSameTimeWire = Wire(Vec(2,Bool()))
-  private val inActIdle :: inActDoing :: inActWaitAdr :: inActWaitData :: Nil = Enum(4)
-  private val inActState = Seq.fill(2){RegInit(inActIdle)}
+  protected val adrSRAMIO: InACTSRAMCommonIO = adrSRAM.io
+  protected val dataSRAMIO: InACTSRAMCommonIO = dataSRAM.io
+  protected val bothDoneWire: Vec[Bool] = Wire(Vec(2,Bool()))
+  protected val doneAtSameTimeWire: Vec[Bool] = Wire(Vec(2,Bool()))
+  protected val inActIdle :: inActDoing :: inActWaitAdr :: inActWaitData :: Nil = Enum(4)
+  protected val inActState: Seq[UInt] = Seq.fill(2){RegInit(inActIdle)}
   inActState.head.suggestName("inActReadState")
   inActState.last.suggestName("inActWriteState")
-  private val currentDoingWire = Wire(Vec(2, Bool()))
-  private val adrDoneWire = Wire(Vec(2, Bool()))
-  private val dataDoneWire = Wire(Vec(2, Bool()))
+  protected val currentDoingWire: Vec[Bool] = Wire(Vec(2, Bool()))
+  protected val adrDoneWire: Vec[Bool] = Wire(Vec(2, Bool()))
+  protected val dataDoneWire: Vec[Bool] = Wire(Vec(2, Bool()))
   adrDoneWire.head := adrSRAMIO.ctrlPath.readIO.done
   dataDoneWire.head := dataSRAMIO.ctrlPath.readIO.done
   adrDoneWire.last := adrSRAMIO.ctrlPath.writeIO.done
@@ -250,7 +250,7 @@ class InActSRAMBank(debug: Boolean) extends Module with ClusterSRAMConfig {
   dataSRAMIO.ctrlPath.readIO.enable := currentDoingWire.head || (inActState.head === inActWaitData)
   adrSRAMIO.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitAdr)
   dataSRAMIO.ctrlPath.writeIO.enable := currentDoingWire.last || (inActState.last === inActWaitData)
-  private val topCtrlSeq = Seq(io.ctrlPath.readIO, io.ctrlPath.writeIO)
+  protected val topCtrlSeq = Seq(io.ctrlPath.readIO, io.ctrlPath.writeIO)
   for (i <- 0 until 2) {
     currentDoingWire(i) := inActState(i) === inActDoing
     doneAtSameTimeWire(i) := adrDoneWire(i) && dataDoneWire(i)
