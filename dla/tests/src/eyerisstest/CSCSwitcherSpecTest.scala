@@ -13,11 +13,11 @@ import org.scalatest._
 class CSCSwitcherSpecTest  extends FlatSpec with ChiselScalatestTester with Matchers
   with PESizeConfig with MCRENFConfig with GNMFCS2Config {
   private val oneStreamData = new GenOneStreamData
-  private val oneStreamInActInData = oneStreamData.inActStream.take(inActStreamNum)
+  private val oneStreamInActInData = oneStreamData.inActStreamGLBOrder.head.take(inActStreamNum)
   private val oneInActAdrStream = oneStreamInActInData.flatMap(x =>
     oneStreamData.genAdrCountData(x, inActOrWeight = true).head)
   private val oneInActDataStream = oneStreamData.inActDataStream.head
-  private val oneStreamWeightInData = oneStreamData.weightStream.take(weightStreamNum)
+  private val oneStreamWeightInData = oneStreamData.weightStreamGLBOrder.take(weightStreamNum)
   private val oneWeightAdrStream = oneStreamData.weightAdrStream.head
   private val oneWeightDataStream = oneStreamData.weightDataStream.head
   behavior of "test the function of CSCSwitcher"

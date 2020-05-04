@@ -387,13 +387,13 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
       (1 until peColNum).foldLeft(fork(forkPSumHelper(0))) {
         case (left, right) => left.fork(forkPSumHelper(idx = right))
       }.join()
-      val theOrWeights = oneStreamData.weightStream
-      val theOrInActs = oneStreamData.inActStream
+      val theOrWeights = oneStreamData.weightStreamGLBOrder
+      val theOrInActs = oneStreamData.inActStreamGLBOrder
       def getData(stream: Seq[List[Int]]): Seq[List[Int]] = {
         val dataStream: Seq[List[Int]] = stream.map(x => x.map(y => Integer.parseInt(y.toBinaryString.take(8), 2)))
         dataStream
       }
-      for (i <- 0 until pSumRouterNum) {
+      /*for (i <- 0 until pSumRouterNum) {
         var realColPSum: List[Int] = Nil
         for (pSumRow <- theOrWeights.head.indices) {
           for (pSumCol <- theOrInActs.head.head.indices) {
@@ -409,7 +409,7 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
         }
         println(s"pSum$i = ")
         println(realColPSum)
-      }
+      }*/
       theOrInActs.take(inActRouterNum*2).zipWithIndex.foreach({ case (list, i) => println(s"goldenInAct$i = $list")})
       println(s"pokeInAct = ${getData(theInActDataStreams).zip(theInActAdrStreams)}")
       theOrWeights.take(peRowNum).zipWithIndex.foreach({ case (list, i) => println(s"goldenWeight$i = $list")})
