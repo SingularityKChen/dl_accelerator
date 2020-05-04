@@ -51,7 +51,7 @@ trait PESizeConfig {
   protected val weightAdrWidth: Int = 7
   protected val cscDataWidth: Int = 8 // compressed sparse column data width
   protected val cscCountWidth: Int = 4 // compressed sparse column count width
-  protected val psDataWidth: Int = 20
+  protected val psDataWidth: Int = 21 //20
   protected val fifoSize: Int = 4
   protected val fifoEn: Boolean = true
   /** when one address vector's element equals to [[inActZeroColumnCode]], then it is a zero column */

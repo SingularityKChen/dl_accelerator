@@ -16,7 +16,7 @@ object EyerissTLBundleDriver {
   def readReqAndResp(peekIO: EyerissMemCtrlBundle, respData: Seq[List[Int]], sourceIdNum: Int, starAdr: Int)
                     (implicit theClock: Clock): Unit = {
     var respSourceId: List[Int] = Nil
-    val reqSourceIdMap: Map[Int, Int] = Map() // sourceId -> respDataIdx
+    var reqSourceIdMap: Map[Int, Int] = Map() // sourceId -> respDataIdx
     peekIO.legal.poke(true.B)
     fork.withName("manage requirement") {
       while (reqSourceIdMap.size < sourceIdNum) {
@@ -31,15 +31,15 @@ object EyerissTLBundleDriver {
           peekIO.reqFirst.poke(true.B)
           val reqSize = peekIO.reqSize.peek().litValue().toInt
           val address = peekIO.address.peek().litValue().toInt
-          val reqDataIdx = (starAdr - address)/reqSize
-          reqSourceIdMap.++(Map(currentReqSource -> reqDataIdx))
+          val reqDataIdx = (address - starAdr)/reqSize
+          reqSourceIdMap = reqSourceIdMap.++(Map(currentReqSource -> reqDataIdx))
         }
         println(s"[req@${reqSourceIdMap.size}] the require source Id is $currentReqSource, reqSourceId = $reqSourceIdMap")
         theClock.step()
         peekIO.reqFirst.poke(false.B)
         peekIO.a.ready.poke(false.B)
       }
-    }.fork.withName("manage response") {
+    }.fork.withName("manage response").withRegion(Monitor) {
       while (respSourceId.length < sourceIdNum) {
         peekIO.d.valid.poke(true.B)
         while (!peekIO.d.ready.peek().litToBoolean) {
@@ -102,18 +102,22 @@ class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matche
       theTopIO.ctrlPath.instructions.poke(decoderSequencer.loadPart2.U)
       theClock.step(cycles = (new Random).nextInt(15) + 1)
       theTopIO.ctrlPath.instructions.poke(decoderSequencer.loadPart3.U)
+      theClock.step(2)
       /** then it will begins to load GLB */
       dataDriver.readReqAndResp(theTopIO.ctrlPath.bundles.memInActBundles,
-        dataSequencer.inActStream.map(x => x.flatten), sourceIdNum = inActRouterNum,
+        dataSequencer.inActStreamGLBOrder.map(x => x.flatten.flatten.toList), sourceIdNum = inActRouterNum,
         starAdr = decoderSequencer.inActAdr.hex)
+      println("[INFO] inAct Former Finish")
       /** load later inActGLB */
       dataDriver.readReqAndResp(theTopIO.ctrlPath.bundles.memInActBundles,
-        dataSequencer.inActStream.map(x => x.flatten), sourceIdNum = inActRouterNum,
+        dataSequencer.inActStreamGLBOrder.map(x => x.flatten.flatten.toList), sourceIdNum = inActRouterNum,
         starAdr = decoderSequencer.inActAdr.hex)
+      println("[INFO] inAct later Finish")
       /** load weight */
       dataDriver.readReqAndResp(theTopIO.ctrlPath.bundles.memWeightBundles,
-        dataSequencer.weightStream.map(x => x.flatten), sourceIdNum = weightRouterNum,
+        dataSequencer.weightStreamGLBOrder.flatten.map(x => x.flatten.toList), sourceIdNum = weightRouterNum,
         starAdr = decoderSequencer.weightAdr.hex)
+      println("[INFO] one weight Finish")
     }
   }
 }
