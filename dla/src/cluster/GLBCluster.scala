@@ -182,7 +182,7 @@ class InActSRAMCommon(private val theSRAMSize: Int, private val theDataWidth: In
       is (oneZero) {
         if (i == 1) {
           // when write, then just see current data.
-          when (meetZeroWire(i)) {
+          when (meetZeroWire(i) && canJump(i) ) {
             zeroState(i) := twoZeros
           } .otherwise {
             zeroState(i) := noZero
