@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.tester._
 import chisel3.util.DecoupledIO
 import chisel3.tester.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import dla.cluster._
 
 import scala.util.Random
@@ -24,7 +24,8 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
   }
   behavior of "test the spec of Cluster Group"
   it should "work well on Cluster Group Controller" in {
-    test (new ClusterGroupController(debug = true)).withAnnotations(Seq(WriteVcdAnnotation)) { theCGCtrl =>
+    test (new ClusterGroupController(debug = true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { theCGCtrl =>
       val theTop = theCGCtrl.io
       val theDebugIO = theTop.debugIO
       val theClock = theCGCtrl.clock
@@ -198,7 +199,9 @@ class ClusterGroupSpecTest extends ClusterSpecTestBasic {
   }
 
   it should "work well on reading and writing via inner SRAM" in {
-    test (new ClusterGroup(true)).withAnnotations(Seq(WriteVcdAnnotation)) { theCG =>
+    test (new ClusterGroup(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation))
+      { theCG =>
       val theTop = theCG.io
       val theClock = theCG.clock
       def pokeData(pokeIO: DecoupledIO[UInt], pokeData: List[Int], prefix: String): Unit = {

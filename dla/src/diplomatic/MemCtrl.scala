@@ -48,9 +48,9 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   protected val inActStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
   protected val weightStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
   protected val pSumStarAdrReg: UInt = RegInit(0.U(p.addressBits.W))
-  protected val inActReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
-  protected val weightReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
-  protected val pSumReqAdrReg: UInt = RegInit(0.U(p.addressBits.W))
+  protected val inActReqAdrWire: UInt = Wire(UInt(p.addressBits.W))
+  protected val weightReqAdrWire: UInt = Wire(UInt(p.addressBits.W))
+  protected val pSumReqAdrWire: UInt = Wire(UInt(p.addressBits.W))
   protected val inActReqSizeReg: UInt = RegInit(0.U(p.inActSizeBits.W))
   inActReqSizeReg.suggestName("inActReqSizeReg")
   protected val weightReqSizeReg: UInt = RegInit(0.U(p.weightSizeBits.W))
@@ -85,19 +85,19 @@ class EyerissMemCtrlModule()(implicit val p: EyerissMemCtrlParameters) extends M
   inActReqAdrAcc := Mux(inActReqFinOnce && inActIdMapIO.finish, 0.U,
     Mux(inActIdMapIO.alloc.fire(), inActReqAdrAcc + inActReqSizeReg, inActReqAdrAcc)
   )
-  inActReqAdrReg := inActStarAdrReg + inActReqAdrAcc
+  inActReqAdrWire := inActStarAdrReg + inActReqAdrAcc
   weightReqAdrAcc := Mux(weightIdMapIO.finish, 0.U,
     Mux(weightIdMapIO.alloc.fire(), weightReqAdrAcc + weightReqSizeReg, weightReqAdrAcc)
   )
-  weightReqAdrReg := weightStarAdrReg + weightReqAdrAcc
+  weightReqAdrWire := weightStarAdrReg + weightReqAdrAcc
   pSumReqAdrAcc := Mux(pSumIdMapIO.finish, 0.U,
     Mux(pSumIdMapIO.alloc.fire(), pSumReqAdrAcc + pSumReqSizeReg, pSumReqAdrAcc)
   )
-  pSumReqAdrReg := pSumStarAdrReg + pSumReqAdrAcc
+  pSumReqAdrWire := pSumStarAdrReg + pSumReqAdrAcc
   /** connections of require address */
-  io.inActIO.address := inActReqAdrReg
-  io.weightIO.address := weightReqAdrReg
-  io.pSumIO.address := pSumReqAdrReg
+  io.inActIO.address := inActReqAdrWire
+  io.weightIO.address := weightReqAdrWire
+  io.pSumIO.address := pSumReqAdrWire
 }
 
 class EyerissIDMapGenIO(val sourceWidth: Int) extends Bundle {

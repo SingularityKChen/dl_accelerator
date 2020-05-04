@@ -3,7 +3,7 @@ package dla.tests.clustertest
 import chisel3._
 import chisel3.tester._
 import chisel3.util.DecoupledIO
-import chiseltest.internal.WriteVcdAnnotation
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import chisel3.tester.experimental.TestOptionBuilder._
 import dla.cluster._
 import dla.pe.StreamBitsIO
@@ -15,7 +15,9 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
   override val printLogDetails = false
   behavior of "test the spec of PE Cluster"
   it should "work well on PE inAct Controller" in {
-    test (new PEClusterInAct(debug = true)) { thePEAct =>
+    test (new PEClusterInAct(debug = true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation))
+      { thePEAct =>
       val theTopIO = thePEAct.io
       val theClock = thePEAct.clock
       val theTopToCtrlDataIO = theTopIO.inActToArrayData.inActIO // inActRouter number
@@ -98,7 +100,9 @@ class PEClusterSpecTest extends ClusterSpecTestBasic {
   }
 
   it should "work well on PE Cluster" in {
-    test (new PECluster(true)).withAnnotations(Seq(WriteVcdAnnotation)) { thePECluster =>
+    test (new PECluster(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation))
+    { thePECluster =>
       val theTopIO = thePECluster.io
       val theClock = thePECluster.clock
       val theCtrlIO = theTopIO.ctrlPath
