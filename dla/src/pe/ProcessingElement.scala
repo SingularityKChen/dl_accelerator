@@ -161,7 +161,10 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   protected val mightWeightIdxIncWire: Bool = Wire(Bool())
   protected val mightInActReadFinish: Bool = Wire(Bool())
   mightInActReadFinish.suggestName("mightInActReadFinish")
+  /** true while weightMatrixData = 0*/
   protected val mightWeightReadFinish: Bool = Wire(Bool())
+  /** true while weightAdr = 0, then it should turn to read new inActAdr */
+  protected val mightWeightMatrixFinish: Bool = Wire(Bool())
   protected val psDataSPadIdxWire: UInt = Wire(UInt(log2Ceil(pSumDataSPadSize).W))
   // InActSPad
   protected val inActAdrIndexWire: UInt = Wire(UInt(inActAdrIdxWidth.W))
@@ -321,6 +324,7 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
   mightWeightIdxIncWire := weightAdrDataWire === (weightDataIndexWire + 1.U) || mightWeightReadFinish // or meet finish signal
   mightInActReadFinish := inActMatrixDataWire === 0.U && !inActDataSPadFirstReadReg
   mightWeightReadFinish := weightMatrixDataReg === 0.U && !weightDataSPadFirstRead
+  mightWeightMatrixFinish := weightAdrDataWire === 0.U
   inActAdrSPadIdxIncWire := (padEqIA && mightInActZeroColumnWire) || (((padEqWA && mightWeightZeroColumnWire) ||
     (padEqWB && mightWeightIdxIncWire)) && mightInActIdxIncWire) || (mightInActReadFinish && sPad =/= 0.U)
   weightAdrSPadIdxIncWire := (padEqMpy || sPad === padWeightData1) && mightWeightZeroColumnWire // FIXME: should add a state
@@ -397,8 +401,8 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
       when (mightInActReadFinish) {
         readFinish()
       } .otherwise { // then haven't done all the MAC operations
-        when (mightWeightIdxIncWire) { // finished read current weight data Matrix column
-          when (mightInActIdxIncWire) { // finished read current inAct data Matrix column
+        when (mightWeightIdxIncWire || mightWeightMatrixFinish) { // finished read current weight data Matrix column
+          when (mightInActIdxIncWire || mightWeightMatrixFinish) { // finished read current inAct data Matrix column
             nextSPadInActAdr()
             when (inActSPadZeroColumnReg) {
               inActSPadZeroColumnReg := false.B
