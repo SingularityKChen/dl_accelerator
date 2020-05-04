@@ -54,10 +54,10 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   cGroupIO.ctrlPath.cscSwitcherCtrlPath <> decoderIO.cscSwitcherCtrlIO
   /** cGroupIO data path*/
   cGroupIO.dataPath.pSumIO.foreach(x => x.inIOs <> DontCare)
-  private def sourceInputDataMux(offChip: DecoupledIO[SimpleTLDIO], onChip: Seq[DecoupledIO[UInt]]) : Unit = {
+  private def sourceInputDataMux(offChip: DecoupledIO[SimpleTLDIO], onChip: Seq[DecoupledIO[UInt]], enable: Bool) : Unit = {
     onChip.zipWithIndex.foreach({ case (value, i) =>
       value.bits := offChip.bits.data
-      value.valid := offChip.bits.source === i.U && offChip.valid
+      value.valid := offChip.bits.source === i.U && offChip.valid && enable
     })
     offChip.ready := MuxLookup(offChip.bits.source, false.B, onChip.zipWithIndex.map({ case (value, i) =>
       i.U -> value.ready
@@ -81,11 +81,20 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
         memCtrlIO.pSumIO.sourceAlloc.valid && decoderIO.pSumIO.pSumLoadEn)
   }
   protected val inActInIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.inActIO.map(x => x.data)
-  sourceInputDataMux(offChip = io.ctrlPath.bundles.memInActBundles.d, onChip = inActInIOs)
+  sourceInputDataMux(offChip = io.ctrlPath.bundles.memInActBundles.d, onChip = inActInIOs, enable = cgCtrlPath.glbInActLoadEn)
   protected val weightInIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.weightIO.map(x => x.data)
-  sourceInputDataMux(offChip = io.ctrlPath.bundles.memWeightBundles.d, onChip = weightInIOs)
+  sourceInputDataMux(offChip = io.ctrlPath.bundles.memWeightBundles.d, onChip = weightInIOs, enable = cgCtrlPath.peWeightLoadEn)
   protected val pSumOutIOs: IndexedSeq[DecoupledIO[UInt]] = cGroupIO.dataPath.pSumIO.map(x => x.outIOs)
   pSumBundleMux(offChip = io.ctrlPath.bundles.memPSumBundles.a, onChip = pSumOutIOs)
+  protected val inActReqFirstReg: Bool = RegInit(false.B)
+  inActReqFirstReg := Mux(memCtrlIO.inActIO.sourceAlloc.fire(), false.B,
+    Mux(io.ctrlPath.bundles.memInActBundles.reqFirst, true.B, inActReqFirstReg))
+  protected val weightReqFirstReg: Bool = RegInit(false.B)
+  weightReqFirstReg := Mux(memCtrlIO.weightIO.sourceAlloc.fire(), false.B,
+    Mux(io.ctrlPath.bundles.memWeightBundles.reqFirst, true.B, weightReqFirstReg))
+  protected val pSumReqFirstReg: Bool = RegInit(false.B)
+  pSumReqFirstReg := Mux(memCtrlIO.pSumIO.sourceAlloc.fire(), false.B,
+    Mux(io.ctrlPath.bundles.memPSumBundles.reqFirst, true.B, pSumReqFirstReg))
   /** memory module address and size */
   memCtrlIO.inActIO.startAdr := decoderIO.inActIO.starAdr
   memCtrlIO.inActIO.reqSize := decoderIO.inActIO.reqSize
@@ -95,21 +104,21 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   memCtrlIO.pSumIO.reqSize := decoderIO.pSumIO.reqSize
   /** only glbLoadEn, then generate source id*/
   memCtrlIO.inActIO.sourceAlloc.ready := io.ctrlPath.bundles.memInActBundles.legal &&
-    io.ctrlPath.bundles.memInActBundles.reqFirst &&
+    (io.ctrlPath.bundles.memInActBundles.reqFirst || inActReqFirstReg) &&
     io.ctrlPath.bundles.memInActBundles.a.ready && cgCtrlPath.glbInActLoadEn
   memCtrlIO.inActIO.sourceFree.valid := io.ctrlPath.bundles.memInActBundles.respFirst &&
     io.ctrlPath.bundles.memInActBundles.d.fire()
   memCtrlIO.inActIO.sourceFree.bits := io.ctrlPath.bundles.memInActBundles.d.bits.source
   /** only peLoadEn and haven't finish read (sourceAlloc.valid), then generate source id*/
   memCtrlIO.weightIO.sourceAlloc.ready := io.ctrlPath.bundles.memWeightBundles.legal &&
-    io.ctrlPath.bundles.memWeightBundles.reqFirst &&
+    (io.ctrlPath.bundles.memWeightBundles.reqFirst || weightReqFirstReg) &&
     io.ctrlPath.bundles.memWeightBundles.a.ready && cgCtrlPath.peWeightLoadEn
   memCtrlIO.weightIO.sourceFree.valid := io.ctrlPath.bundles.memWeightBundles.respFirst &&
     io.ctrlPath.bundles.memWeightBundles.d.fire()
   memCtrlIO.weightIO.sourceFree.bits := io.ctrlPath.bundles.memWeightBundles.d.bits.source
   /** only pSumLoadEn, then generate source id*/
   memCtrlIO.pSumIO.sourceAlloc.ready := io.ctrlPath.bundles.memPSumBundles.legal &&
-    io.ctrlPath.bundles.memPSumBundles.reqFirst &&
+    (io.ctrlPath.bundles.memPSumBundles.reqFirst || pSumReqFirstReg) &&
     io.ctrlPath.bundles.memPSumBundles.a.ready && decoderIO.pSumIO.pSumLoadEn
   memCtrlIO.pSumIO.sourceFree.valid := io.ctrlPath.bundles.memPSumBundles.respFirst &&
     io.ctrlPath.bundles.memPSumBundles.d.fire()
@@ -121,7 +130,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.interrupts := decoderIO.valid
   /** only glbLoadEn then a.valid is true then can Get data */
   io.ctrlPath.bundles.memInActBundles.a.valid := io.ctrlPath.bundles.memInActBundles.legal &&
-    (!io.ctrlPath.bundles.memInActBundles.reqFirst || memCtrlIO.inActIO.sourceAlloc.valid && cgCtrlPath.glbInActLoadEn)
+    (!io.ctrlPath.bundles.memInActBundles.reqFirst || memCtrlIO.inActIO.sourceAlloc.valid) && cgCtrlPath.glbInActLoadEn
   io.ctrlPath.bundles.memInActBundles.a.bits.source := memCtrlIO.inActIO.sourceAlloc.bits
   /** Don't care memInActBundles.a.bits.data as memInActBundle.a.bits.data will be assigned in LazyImp*/
   io.ctrlPath.bundles.memInActBundles.a.bits.data := DontCare
@@ -129,7 +138,7 @@ class EyerissTop(val param: EyerissTopParam) extends Module with ClusterConfig w
   io.ctrlPath.bundles.memInActBundles.reqSize := decoderIO.inActIO.reqSize
   /** weight */
   io.ctrlPath.bundles.memWeightBundles.a.valid := io.ctrlPath.bundles.memWeightBundles.legal &&
-    (!io.ctrlPath.bundles.memWeightBundles.reqFirst || (memCtrlIO.weightIO.sourceAlloc.valid && cgCtrlPath.peWeightLoadEn))
+    (!io.ctrlPath.bundles.memWeightBundles.reqFirst || memCtrlIO.weightIO.sourceAlloc.valid) && cgCtrlPath.peWeightLoadEn
   io.ctrlPath.bundles.memWeightBundles.a.bits.source := memCtrlIO.weightIO.sourceAlloc.bits
   /** Don't care memWeightBundles.a.bits.data as memWeightBundle.a.bits.data will be assigned in LazyImp*/
   io.ctrlPath.bundles.memWeightBundles.a.bits.data := DontCare

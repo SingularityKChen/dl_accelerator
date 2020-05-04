@@ -2,7 +2,7 @@ package dla.tests.diplomatictest
 
 import chisel3._
 import chisel3.tester._
-import chiseltest.internal.WriteVcdAnnotation
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import chisel3.tester.experimental.TestOptionBuilder._
 import dla.cluster.{ClusterConfig, GNMFCS1Config, GNMFCS2Config}
 import dla.diplomatic.{EyerissMemCtrlBundle, EyerissTop, EyerissTopParam}
@@ -40,6 +40,7 @@ object EyerissTLBundleDriver {
         peekIO.a.ready.poke(false.B)
       }
     }.fork.withName("manage response").withRegion(Monitor) {
+      theClock.step((new Random).nextInt(30) + 1) // transferring time
       while (respSourceId.length < sourceIdNum) {
         peekIO.d.valid.poke(true.B)
         while (!peekIO.d.ready.peek().litToBoolean) {
@@ -89,7 +90,7 @@ class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matche
   private val dataDriver = EyerissTLBundleDriver
   behavior of "test the spec of EyerissTop"
   it should "work well on cal" in {
-    test(new EyerissTop(param = param)).withAnnotations(Seq(WriteVcdAnnotation)) { eyeriss =>
+    test(new EyerissTop(param = param)).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { eyeriss =>
       val theTopIO = eyeriss.io
       implicit val theClock: Clock = eyeriss.clock
       eyeriss.reset.poke(true.B)
@@ -114,10 +115,12 @@ class EyerissTopSpecTest extends FlatSpec with ChiselScalatestTester with Matche
         starAdr = decoderSequencer.inActAdr.hex)
       println("[INFO] inAct later Finish")
       /** load weight */
-      dataDriver.readReqAndResp(theTopIO.ctrlPath.bundles.memWeightBundles,
-        dataSequencer.weightStreamGLBOrder.flatten.map(x => x.flatten.toList), sourceIdNum = weightRouterNum,
-        starAdr = decoderSequencer.weightAdr.hex)
-      println("[INFO] one weight Finish")
+      for (i <- 0 until 10) {
+        dataDriver.readReqAndResp(theTopIO.ctrlPath.bundles.memWeightBundles,
+          dataSequencer.weightStreamGLBOrder.flatten.map(x => x.flatten), sourceIdNum = weightRouterNum,
+          starAdr = decoderSequencer.weightAdr.hex)
+        println(s"[INFO] $i-th weight Finish")
+      }
     }
   }
 }
