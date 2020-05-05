@@ -34,58 +34,22 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
+class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6, p: NNModelMapping = new NNModelMapping)
   extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
   with ClusterSRAMConfig with EyerissTopConfig {
-  object nnShape {
-    object inAct {
-      val number: Int = N2*N1*N0
-      val channel: Int = G2*G1*C2*C1*C0 //TODO: check G
-      /** although the width of inAct in RS+ data flow is (S2 + F2)*(S1 + F1)*F0,
-        * which is much greater than this width. It's caused by the overlap.*/
-      val height: Int = R + E
-      val width: Int = S2*S1 + F2*F1*F0
-      //require(height == width, s"inAct's height doesn't equal to width, $height == $width ?")
-    }
-    object weight {
-      val number: Int = M2*M1*M0
-      val channel: Int = G2*G1*C2*C1*C0
-      val height: Int = R
-      val width: Int = S2*S1
-      //require(height == width, s"weight's height doesn't equal to width, $height == $width ?")
-    }
-    object pSum {
-      require(pSumDataSPadSize > pSumOneSPadNum,
-        s"pSumSPad can not contains all the pSum, $pSumDataSPadSize > $pSumOneSPadNum?")
-      val number: Int = N2*N1*N0
-      val channel: Int = G2*G1*M2*M1*M0
-      val height: Int = E
-      val width: Int = F2*F1*F0
-      //require(height == width, s"pSum's height doesn't equal to width, $height == $width ?")
-    }
-    require(inAct.number == pSum.number)
-    require(inAct.channel == weight.channel)
-    require(weight.number == pSum.channel)
-    def printNNShapeInfo(): Unit = {
-      println(s"[INFO] the NN shape")
-      println(s"                   |\ttype\t|\tnum\t|\tchn\t|\th\t|\tw\t|")
-      println(s"                   |\tweight\t|\t${weight.number}\t|\t${weight.channel}\t|\t${weight.height}\t|\t${weight.width}\t|")
-      println(s"                   |\tinAct\t|\t${inAct.number}\t|\t${inAct.channel}\t|\t${inAct.height}\t|\t${inAct.width}\t|")
-      println(s"                   |\tpSum\t|\t${pSum.number}\t|\t${pSum.channel}\t|\t${pSum.height}\t|\t${pSum.width}\t|")
-    }
-  }
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
   protected val inActAdrMax: Int = pow(2, inActAdrWidth).toInt - 1 // zeroCode
   protected val weightAdrMax: Int = pow(2, weightAdrWidth).toInt - 1 // zeroCode
   protected val cscDataMax: Int = pow(2, cscDataWidth).toInt
+  private val needRequirement: Boolean = false
   object dataSequencer {
     /** original data, complete matrix */
     object dram {
-      val inAct: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.inAct.number, nnShape.inAct.channel) {
-        genSparse(rows = nnShape.inAct.height, cols = nnShape.inAct.width, max = cscDataMax, ratio = inActSparseRatio)
+      val inAct: Seq[Seq[List[List[Int]]]] = Seq.fill(p.nnShape.inAct.number, p.nnShape.inAct.channel) {
+        genSparse(rows = p.nnShape.inAct.height, cols = p.nnShape.inAct.width, max = cscDataMax, ratio = inActSparseRatio)
       }
-      val weight: Seq[Seq[List[List[Int]]]] = Seq.fill(nnShape.weight.number, nnShape.weight.channel) {
-        genSparse(rows = nnShape.weight.height, cols = nnShape.weight.width, max = cscDataMax, ratio = weightSparseRatio)
+      val weight: Seq[Seq[List[List[Int]]]] = Seq.fill(p.nnShape.weight.number, p.nnShape.weight.channel) {
+        genSparse(rows = p.nnShape.weight.height, cols = p.nnShape.weight.width, max = cscDataMax, ratio = weightSparseRatio)
       }
       //val pSum
     }
@@ -128,10 +92,12 @@ class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
         private val inActDataMaxLength = inActData.map(x => x.map(y => y.length).max).max
         private val weightAdrMaxLength = weightAdr.map(x => x.map(y => y.length).max).max
         private val weightDataMaxLength = weightData.map(x => x.map(y => y.length).max).max
-        require(inActAdrMaxLength <= inActAdrSPadSize, s"inActAdrSPadSize needs at least $inActAdrMaxLength")
-        require(inActDataMaxLength <= inActDataSPadSize, s"inActDataSPadSize needs at least $inActDataMaxLength")
-        require(weightAdrMaxLength <= weightAdrSPadSize, s"weightAdrSPadSize needs at least $weightAdrMaxLength")
-        require(weightDataMaxLength <= weightDataSPadSize, s"weightDataSPadSize needs at least $weightDataMaxLength")
+        if (needRequirement) {
+          require(inActAdrMaxLength <= inActAdrSPadSize, s"inActAdrSPadSize needs at least $inActAdrMaxLength")
+          require(inActDataMaxLength <= inActDataSPadSize, s"inActDataSPadSize needs at least $inActDataMaxLength")
+          require(weightAdrMaxLength <= weightAdrSPadSize, s"weightAdrSPadSize needs at least $weightAdrMaxLength")
+          require(weightDataMaxLength <= weightDataSPadSize, s"weightDataSPadSize needs at least $weightDataMaxLength")
+        }
       }
       object cscData {
         /** the first dimension is the index of NoC level's parameters,
@@ -140,12 +106,14 @@ class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
         val inActData: Seq[List[Int]] = separatedSPadCSCData.inActData.map(x => x.flatten.toList ::: List(0))
         val weightAdr: Seq[List[Int]] = separatedSPadCSCData.weightAdr.map(x => x.flatten.toList ::: List(0))
         val weightData: Seq[List[Int]] = separatedSPadCSCData.weightData.map(x => x.flatten.toList ::: List(0))
-        require(inActAdr.flatten.max <= inActAdrMax, s"${inActAdr.flatten.max} < $inActAdrMax?\n$inActAdr\n\n\n$inActData")
-        require(weightAdr.flatten.max <= weightAdrMax, s"${weightAdr.flatten.max} < $weightAdrMax?")
-        require(inActAdr.map(x => x.length).max < inActAdrSRAMSize,
-          s"inActAdrSRAMSize needs at least ${inActAdr.map(x => x.length).max}")
-        require(inActData.map(x => x.length).max < inActDataSRAMSize,
-          s"inActDataSRAMSize needs at least ${inActData.map(x => x.length).max}")
+        if (needRequirement) {
+          require(inActAdr.flatten.max <= inActAdrMax, s"${inActAdr.flatten.max} < $inActAdrMax?\n$inActAdr\n\n\n$inActData")
+          require(weightAdr.flatten.max <= weightAdrMax, s"${weightAdr.flatten.max} < $weightAdrMax?")
+          require(inActAdr.map(x => x.length).max < inActAdrSRAMSize,
+            s"inActAdrSRAMSize needs at least ${inActAdr.map(x => x.length).max}")
+          require(inActData.map(x => x.length).max < inActDataSRAMSize,
+            s"inActDataSRAMSize needs at least ${inActData.map(x => x.length).max}")
+        }
         private def checkConstrain(theInActSeq: Seq[List[Int]], theWeightSeq: Seq[List[Int]]): Boolean = {
           var error = false
           if (
@@ -204,40 +172,40 @@ class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6)
         Array.fill(inActParNum, inActStreamNum, inActMatrixHeight, inActMatrixWidth) {0}
       val weightArray: Array[Array[Array[Array[Int]]]] =
         Array.fill(weightParNum, weightStreamNum, weightMatrixHeight, weightMatrixWidth) {0}
-      for (g1 <- 0 until G1) {
-        for (n1 <- 0 until N1) {
-          for (m1 <- 0 until M1) {
-            for (f1 <- 0 until F1) {
-              for (c1 <- 0 until C1) {
-                for (s1 <- 0 until S1) {
-                  val inActNoCIdx = g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
-                  val weightNoCIdx = g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
-                  for (g2 <- 0 until G2) {
-                    for (n2 <- 0 until N2) {
-                      for (m2 <- 0 until M2) {
-                        for (f2 <- 0 until F2) {
-                          for (c2 <- 0 until C2) {
-                            for (s2 <- 0 until S2) {
-                              val inActGLBIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
-                              val weightGLBIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
-                              val weightWidth = s2*S1 + s1
-                              for (f0 <- 0 until F0) {
-                                val inActWidth = s2*S1 + f2*F1*F0 + f1*F0 + f0
-                                for (n0 <- 0 until N0) {
-                                  val inActNumber = n2*N1*N0 +n1*N0 + n0
-                                  for (e <- 0 until E) {
-                                    val inActWidthIdx = f0*N0*E + n0*E + e
-                                    for (r <- 0 until R) {
+      for (g1 <- 0 until p.G1) {
+        for (n1 <- 0 until p.N1) {
+          for (m1 <- 0 until p.M1) {
+            for (f1 <- 0 until p.F1) {
+              for (c1 <- 0 until p.C1) {
+                for (s1 <- 0 until p.S1) {
+                  val inActNoCIdx = g1*p.N1*p.C1*(p.F1+p.S1) + n1*p.C1*(p.F1+p.S1) + c1*(p.F1+p.S1) + (f1+s1)
+                  val weightNoCIdx = g1*p.M1*p.C1*p.S1 + m1*p.C1*p.S1 + c1*p.S1 + s1
+                  for (g2 <- 0 until p.G2) {
+                    for (n2 <- 0 until p.N2) {
+                      for (m2 <- 0 until p.M2) {
+                        for (f2 <- 0 until p.F2) {
+                          for (c2 <- 0 until p.C2) {
+                            for (s2 <- 0 until p.S2) {
+                              val inActGLBIdx = g2*p.N2*p.C2*(p.F2 + p.S2) + n2*p.C2*(p.F2+p.S2) + c2*(p.F2+p.S2) + f2+s2
+                              val weightGLBIdx = g2*p.M2*p.C2*p.S2 + m2*p.C2*p.S2 + c2*p.S2 + s2
+                              val weightWidth = s2*p.S1 + s1
+                              for (f0 <- 0 until p.F0) {
+                                val inActWidth = s2*p.S1 + f2*p.F1*p.F0 + f1*p.F0 + f0
+                                for (n0 <- 0 until p.N0) {
+                                  val inActNumber = n2*p.N1*p.N0 +n1*p.N0 + n0
+                                  for (e <- 0 until p.E) {
+                                    val inActWidthIdx = f0*p.N0*p.E + n0*p.E + e
+                                    for (r <- 0 until p.R) {
                                       val inActHeight = e + r
                                       val weightHeight = r
-                                      for (c0 <- 0 until C0) {
-                                        val channel = g2*G1*C2*C1*C0 + g1*C2*C1*C0 + c2*C1*C0 + c1*C0 + c0
-                                        val inActHeightIdx = r*C0 + c0
-                                        val weightWidthIdx = r*C0 + c0
+                                      for (c0 <- 0 until p.C0) {
+                                        val channel = g2*p.G1*p.C2*p.C1*p.C0 + g1*p.C2*p.C1*p.C0 + c2*p.C1*p.C0 + c1*p.C0 + c0
+                                        val inActHeightIdx = r*p.C0 + c0
+                                        val weightWidthIdx = r*p.C0 + c0
                                         inActArray(inActNoCIdx)(inActGLBIdx)(inActHeightIdx)(inActWidthIdx) =
                                           inActMem(inActNumber)(channel)(inActHeight)(inActWidth)
-                                        for (m0 <- 0 until M0) {
-                                          val weightNumber = m2*M1*M0 + m1*M0 + m0
+                                        for (m0 <- 0 until p.M0) {
+                                          val weightNumber = m2*p.M1*p.M0 + m1*p.M0 + m0
                                           val weightHeightIdx = m0
                                           weightArray(weightNoCIdx)(weightGLBIdx)(weightHeightIdx)(weightWidthIdx) =
                                             weightMem(weightNumber)(channel)(weightHeight)(weightWidth)

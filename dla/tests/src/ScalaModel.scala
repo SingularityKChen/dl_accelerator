@@ -6,36 +6,79 @@ import org.scalatest._
 import scala.math.max
 import chisel3.util.log2Ceil
 
-class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
+case class NNModelMapping (
+                          G2: Int = 1, N2: Int = 2, M2: Int = 4, F2: Int = 3, C2: Int = 3, S2: Int = 4,
+                          G1: Int = 1, N1: Int = 4, M1: Int = 2, F1: Int = 4, C1: Int = 2, S1: Int = 3,
+                          M0: Int = 4, C0: Int = 2, R: Int = 4, E: Int = 2, N0: Int = 3, F0: Int = 1
+                          ) {
+  object nnShape {
+    object inAct {
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*C2*C1*C0 //TODO: check G
+      /** although the width of inAct in RS+ data flow is (S2 + F2)*(S1 + F1)*F0,
+        * which is much greater than this width. It's caused by the overlap.*/
+      val height: Int = R + E
+      val width: Int = S2*S1 + F2*F1*F0
+      //require(height == width, s"inAct's height doesn't equal to width, $height == $width ?")
+    }
+    object weight {
+      val number: Int = M2*M1*M0
+      val channel: Int = G2*G1*C2*C1*C0
+      val height: Int = R
+      val width: Int = S2*S1
+      //require(height == width, s"weight's height doesn't equal to width, $height == $width ?")
+    }
+    object pSum {
+      val number: Int = N2*N1*N0
+      val channel: Int = G2*G1*M2*M1*M0
+      val height: Int = E
+      val width: Int = F2*F1*F0
+      //require(height == width, s"pSum's height doesn't equal to width, $height == $width ?")
+    }
+    require(inAct.number == pSum.number)
+    require(inAct.channel == weight.channel)
+    require(weight.number == pSum.channel)
+    def printNNShapeInfo(): Unit = {
+      println(s"[INFO] the NN shape")
+      println(s"                   |\ttype\t|\tnum\t|\tchn\t|\th\t|\tw\t|")
+      println(s"                   |\tweight\t|\t${weight.number}\t|\t${weight.channel}\t|\t${weight.height}\t|\t${weight.width}\t|")
+      println(s"                   |\tinAct\t|\t${inAct.number}\t|\t${inAct.channel}\t|\t${inAct.height}\t|\t${inAct.width}\t|")
+      println(s"                   |\tpSum\t|\t${pSum.number}\t|\t${pSum.channel}\t|\t${pSum.height}\t|\t${pSum.width}\t|")
+    }
+  }
+}
+
+class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMapping, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
   with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
   /** use monitor to compare the info between different test*/
   private val scoreBoard = new ScoreBoard
+  // TODO: change the
   val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
-    sequencer.nnShape.pSum.number,
-    sequencer.nnShape.pSum.channel,
-    sequencer.nnShape.pSum.height,
-    sequencer.nnShape.pSum.width
+    p.nnShape.pSum.number,
+    p.nnShape.pSum.channel,
+    p.nnShape.pSum.height,
+    p.nnShape.pSum.width
   ) {0}
   /** assume the data stored in Mem is pre-processed */
   private val inActAdrSRAMBanks = Array.fill(monitor.clusterNum, inActSRAMNum, inActAdrSRAMSize) {0}
   private val inActDataSRAMBanks = Array.fill(monitor.clusterNum, 3, inActDataSRAMSize) {0}
   private var parallelCycle = 0
-  require(G1 == 1)
+  require(p.G1 == 1)
   // mapping <> physical
-  require(S1 == peRowNum)
-  require(F1 == peColNum) // TODO: use %peColNum == 0 instead
-  require(M1*C1*N1*G1 == monitor.clusterNum)
+  require(p.S1 == peRowNum)
+  require(p.F1 == peColNum) // TODO: use %peColNum == 0 instead
+  require(p.M1*p.C1*p.N1*p.G1 == monitor.clusterNum)
   /** NoC level */
   private var inActSRAMBankWriteRecord: List[Seq[Int]] = Nil
-  for (g1 <- 0 until G1) {
-    for (n1 <- 0 until N1) {
-      for (m1 <- 0 until M1) {
-        for (f1 <- 0 until F1) {
-          for (c1 <- 0 until C1) {
-            for (s1 <- 0 until S1) {
-              val weightNoCLevelIdx = g1*M1*C1*S1 + m1*C1*S1 + c1*S1 + s1
-              val inActNoCLevelIdx = g1*N1*C1*(F1+S1) + n1*C1*(F1+S1) + c1*(F1+S1) + (f1+s1)
-              val clusterIdx = n1*M1*C1 + m1*C1 + c1
+  for (g1 <- 0 until p.G1) {
+    for (n1 <- 0 until p.N1) {
+      for (m1 <- 0 until p.M1) {
+        for (f1 <- 0 until p.F1) {
+          for (c1 <- 0 until p.C1) {
+            for (s1 <- 0 until p.S1) {
+              val weightNoCLevelIdx = g1*p.M1*p.C1*p.S1 + m1*p.C1*p.S1 + c1*p.S1 + s1
+              val inActNoCLevelIdx = g1*p.N1*p.C1*(p.F1+p.S1) + n1*p.C1*(p.F1+p.S1) + c1*(p.F1+p.S1) + (f1+s1)
+              val clusterIdx = n1*p.M1*p.C1 + m1*p.C1 + c1
               val bankIdx = (s1+f1)%3
               val inActSRAMBankWriteRecordSeq = Seq(clusterIdx, bankIdx)
               val formerOrLater = (s1+f1) < inActSRAMNum
@@ -69,21 +112,21 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Bo
                   + sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx).length)
                 val inActDataGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx).length
                   + sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx).length)
-                require(M1 == 2 || M1 == 1, "M1 needs equals to 2 or 1, or shouldn't divide M1 directly")
+                require(p.M1 == 2 || p.M1 == 1, "M1 needs equals to 2 or 1, or shouldn't divide M1 directly")
                 /** divide M1, as inAct could be shared horizontally */
-                monitor.inActWrite.adr.glb += inActAdrGLBWriteNum/M1
-                monitor.inActWrite.data.glb += inActDataGLBWriteNum/M1
+                monitor.inActWrite.adr.glb += inActAdrGLBWriteNum/p.M1
+                monitor.inActWrite.data.glb += inActDataGLBWriteNum/p.M1
                 inActSRAMBankWriteRecord = inActSRAMBankWriteRecord:::List(inActSRAMBankWriteRecordSeq)
               }
               /** GLB level */
-              for (g2 <- 0 until G2) {
-                for (n2 <- 0 until N2) {
-                  for (m2 <- 0 until M2) {
-                    for (f2 <- 0 until F2) {
-                      for (c2 <- 0 until C2) {
-                        for (s2 <- 0 until S2) {
-                          val weightGLBLevelIdx = g2*M2*C2*S2 + m2*C2*S2 + c2*S2 + s2
-                          val inActGLBLevelIdx = g2*N2*C2*(F2 + S2) + n2*C2*(F2+S2) + c2*(F2+S2) + f2+s2
+              for (g2 <- 0 until p.G2) {
+                for (n2 <- 0 until p.N2) {
+                  for (m2 <- 0 until p.M2) {
+                    for (f2 <- 0 until p.F2) {
+                      for (c2 <- 0 until p.C2) {
+                        for (s2 <- 0 until p.S2) {
+                          val weightGLBLevelIdx = g2*p.M2*p.C2*p.S2 + m2*p.C2*p.S2 + c2*p.S2 + s2
+                          val inActGLBLevelIdx = g2*p.N2*p.C2*(p.F2 + p.S2) + n2*p.C2*(p.F2+p.S2) + c2*(p.F2+p.S2) + f2+s2
                           /** SPad level */
                           val inActAdrSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
                             inActAdr(inActNoCLevelIdx)(inActGLBLevelIdx)
@@ -93,7 +136,7 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Bo
                             weightAdr(weightNoCLevelIdx)(weightGLBLevelIdx)
                           val weightDataSPad = sequencer.dataSequencer.glb.separatedSPadCSCData.
                             weightData(weightNoCLevelIdx)(weightGLBLevelIdx)
-                          val pSumSPad: Array[Array[Int]] = Array.fill(F0*N0*E, M0) {0}
+                          val pSumSPad: Array[Array[Int]] = Array.fill(p.F0*p.N0*p.E, p.M0) {0}
                           val inActGLBReadNum = max(inActAdrSPad.length, inActDataSPad.length)
                           val weightMemReadNum = sequencer.dataSequencer.glb.
                             weight(weightNoCLevelIdx)(weightGLBLevelIdx).flatten.length
@@ -178,54 +221,63 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Bo
   monitor.cycle += parallelCycle/monitor.peNum
   if (printDetails) {
     monitor.printMonitorInfo()
-    sequencer.nnShape.printNNShapeInfo()
+    p.nnShape.printNNShapeInfo()
   }
 }
 
-class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
-  with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
+class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMapping,
+                  printDetails: Boolean = true, needPSum: Boolean)
+  extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
   private val scoreBoard = new ScoreBoard
   val pSumResult: Array[Array[Array[Array[Int]]]] = Array.fill(
-    sequencer.nnShape.pSum.number,
-    sequencer.nnShape.pSum.channel,
-    sequencer.nnShape.pSum.height,
-    sequencer.nnShape.pSum.width
+    p.nnShape.pSum.number,
+    p.nnShape.pSum.channel,
+    p.nnShape.pSum.height,
+    p.nnShape.pSum.width
   ) {0}
-  /** each PSum number */
-  for (n <- 0 until sequencer.nnShape.pSum.number) {
-    /** each PSum channel*/
-    for (m <- 0 until sequencer.nnShape.pSum.channel) {
-      /** PSum height */
-      for (f <- 0 until sequencer.nnShape.pSum.width) {
-        /** PSum width*/
-        for (e <- 0 until sequencer.nnShape.pSum.height) {
-          /** inside this for loop, do mac, for the size of weight matrix */
-          /** weight channel */
-          for (c <- 0 until sequencer.nnShape.weight.channel) {
-            /** weight height */
-            for (s <- 0 until sequencer.nnShape.weight.width) {
-              /** weight width */
-              for (r <- 0 until sequencer.nnShape.weight.height) {
-                pSumResult(n)(m)(e)(f) += sequencer.dataSequencer.dram.weight(m)(c)(r)(s) *
-                  sequencer.dataSequencer.dram.inAct(n)(c)(r+e)(s+f)
-                monitor.inActRead.mem += 1
-                monitor.weightRead.mem += 1
-                monitor.macNum += 1
+  if (needPSum) {
+    /** each PSum number */
+    for (n <- 0 until p.nnShape.pSum.number) {
+      /** each PSum channel*/
+      for (m <- 0 until p.nnShape.pSum.channel) {
+        /** PSum height */
+        for (f <- 0 until p.nnShape.pSum.width) {
+          /** PSum width*/
+          for (e <- 0 until p.nnShape.pSum.height) {
+            /** inside this for loop, do mac, for the size of weight matrix */
+            /** weight channel */
+            for (c <- 0 until p.nnShape.weight.channel) {
+              /** weight height */
+              for (s <- 0 until p.nnShape.weight.width) {
+                /** weight width */
+                for (r <- 0 until p.nnShape.weight.height) {
+                  pSumResult(n)(m)(e)(f) += sequencer.dataSequencer.dram.weight(m)(c)(r)(s) *
+                    sequencer.dataSequencer.dram.inAct(n)(c)(r+e)(s+f)
+                  monitor.inActRead.mem += 1
+                  monitor.weightRead.mem += 1
+                  monitor.macNum += 1
+                }
               }
             }
+            //print(".") // finish one PSum
           }
-          //print(".") // finish one PSum
         }
+        //print("*") // finish one PSum matrix
       }
-      //print("*") // finish one PSum matrix
+      /*println("\n[INFO] finish one batch of PSum " +
+        f"${((n + 1).toFloat/p.nnShape.pSum.number.toFloat)*100}%.2f%%")*/
     }
-    /*println("\n[INFO] finish one batch of PSum " +
-      f"${((n + 1).toFloat/sequencer.nnShape.pSum.number.toFloat)*100}%.2f%%")*/
+  } else {
+    val totalNum = p.nnShape.pSum.number * p.nnShape.pSum.channel * p.nnShape.pSum.width * p.nnShape.pSum.height *
+      p.nnShape.weight.channel * p.nnShape.weight.width * p.nnShape.weight.height
+    monitor.inActRead.mem = totalNum
+    monitor.weightRead.mem = totalNum
+    monitor.macNum = totalNum
   }
   monitor.cycle = scoreBoard.totalCycles(monitor.macNum, monitor.peNum, monitor.inActRead.mem, 0, 0)
   if (printDetails) {
     monitor.printMonitorInfo()
-    sequencer.nnShape.printNNShapeInfo()
+    p.nnShape.printNNShapeInfo()
   }
 }
 
@@ -233,6 +285,7 @@ class ScalaModel extends FlatSpec {
   behavior of "compare the efficiency of Eyeriss"
   /** model the behavior of Eyeriss cluster group */
   it should "compare the info across sparse ratio between eyeriss and common device" in {
+    val param = NNModelMapping()
     object inActRatioSeq {
       val start = 4
       val end = 10
@@ -264,15 +317,15 @@ class ScalaModel extends FlatSpec {
     for (inActRatio <- inActRatioSeq.start until inActRatioSeq.end) {
       for (weightRatio <- weightRatioSeq.start until weightRatioSeq.end) {
         val sequencer = new GenFunc(inActSparseRatio = inActRatio.toDouble/10,
-          weightSparseRatio = weightRatio.toDouble/10)
+          weightSparseRatio = weightRatio.toDouble/10, p = param)
         val inActRatioIdx = inActRatio - inActRatioSeq.start
         val weightRatioIdx = weightRatio - weightRatioSeq.start
-        val eyerissModel = new EyerissModel(sequencer,
-          monitorSeq(inActRatioIdx)(weightRatioIdx).head,
-          printDetails = false)
-        val common = new CommonModel(sequencer,
-          monitorSeq(inActRatioIdx)(weightRatioIdx)(1),
-          printDetails = false)
+        val eyerissModel = new EyerissModel(sequencer = sequencer,
+          monitor = monitorSeq(inActRatioIdx)(weightRatioIdx).head,
+          p = param, printDetails = false)
+        val common = new CommonModel(sequencer = sequencer,
+          monitor = monitorSeq(inActRatioIdx)(weightRatioIdx)(1),
+          p = param, printDetails = false, needPSum = false)
         inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(0) =
           sequencer.dataSequencer.glb.separatedSPadCSCData.inActAdr.map(x => x.map(y => y.length).max).max
         inActSPadSizeNeed(inActRatioIdx)(weightRatioIdx)(1) =
@@ -295,7 +348,7 @@ class ScalaModel extends FlatSpec {
           log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
         println(s"[INFO] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
         if (inActRatio == inActRatioSeq.end - 1 && weightRatio == weightRatioSeq.end - 1)
-          sequencer.nnShape.printNNShapeInfo()
+          param.nnShape.printNNShapeInfo()
       }
     }
     println("|iRa\t|wRa\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
