@@ -15,18 +15,12 @@ you can clone the whole environment and run inside, or you can only test the mod
 ### Clone Rocket-Playground With This Project
 
 ```bash
-git clone https://github.com/SingularityKChen/rocket-playground.git -b dla
+git clone https://github.com/SingularityKChen/rocket-playground.git --recurse-submodules
 cd rocket-chip/
 mill mill.scalalib.GenIdea/idea
 ```
 
 And then you can develop and test this project in Intellij.
-
-### Clone the Project
-
-```bash
-git clone https://github.com/SingularityKChen/dl_accelerator.git --recurse-submodules
-```
 
 ### Install Mill
 
@@ -40,7 +34,7 @@ chmod +x /usr/local/bin/mill
 
 ### Generate an IntelliJ Project Config
 
-After clone it with `--recurse-submodules`, you can use `mill` in idea after this command:
+After cloning it with `--recurse-submodules`, you can use `mill` in idea after this command:
 
 ```bash
 mill mill.scalalib.GenIdea/idea
@@ -52,10 +46,6 @@ If you meet any similar error as bellow shows, you can check the `mill` version,
 
 If your mill can not find some `build.sc` files under `firrtl`, `chisel3`, etc., then you need to clone the submodules as well.
 
-### An Alternative Option: `Sbt`
-
-You can use `sbt` with `build.sbt` in history versions or other branches.
-
 ## TODO
 
 You can find it at [the project page](https://github.com/SingularityKChen/dl_accelerator/projects/1).
@@ -64,6 +54,10 @@ You can find it at [the project page](https://github.com/SingularityKChen/dl_acc
 
 + Meet continuous zero \(more than three\) columns in weight matrix;
 + The head of address vectors or data vectors is zero column;
+
+## [Modelling](./dla/tests/src/ScalaModelTest.scala)
+
+I tried to write a Scala model for Eyeriss to get the performance. Notice: I use CSC data format not only in scratch pads but also inAct SRAMs.
 
 ## [Elaboration](./dla/src)
 
