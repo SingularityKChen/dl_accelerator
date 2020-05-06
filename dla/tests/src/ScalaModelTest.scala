@@ -3,14 +3,41 @@ package dla.tests
 import dla.cluster.{ClusterSRAMConfig, GNMFCS1Config, GNMFCS2Config}
 import dla.pe.{MCRENFConfig, PESizeConfig, SPadSizeConfig}
 import org.scalatest._
+import Console.{MAGENTA, RESET}
 import scala.math.max
 import chisel3.util.log2Ceil
 
-case class NNModelMapping (
-                          G2: Int = 1, N2: Int = 2, M2: Int = 4, F2: Int = 3, C2: Int = 3, S2: Int = 4,
-                          G1: Int = 1, N1: Int = 4, M1: Int = 2, F1: Int = 4, C1: Int = 2, S1: Int = 3,
-                          M0: Int = 4, C0: Int = 2, R: Int = 4, E: Int = 2, N0: Int = 3, F0: Int = 1
-                          ) {
+case class EyerissModelParam(
+                              G2: Int = 1, N2: Int = 2, M2: Int = 4, F2: Int = 3, C2: Int = 3, S2: Int = 4,
+                              G1: Int = 1, N1: Int = 4, M1: Int = 2, F1: Int = 4, C1: Int = 2, S1: Int = 3,
+                              M0: Int = 4, C0: Int = 2, R: Int = 4, E: Int = 2, N0: Int = 3, F0: Int = 1,
+                              cgRow: Int = 8, cgCol: Int = 2, peRow: Int = 3, peCol: Int = 4, inActSRAMNum: Int = 3
+) {
+  /** true if Eyeriss can read from memory parallel,
+    * false while it only sent one memory read requirement a time*/
+  val parallelMemRead: Boolean = false
+  object physicalInfo {
+    val clusterNum: Int = cgRow * cgCol
+    private val peArraySize = peRow * peCol
+    val peNum: Int = peArraySize * clusterNum
+    // mapping <> physical
+    require(G1 == 1, "G1 has to be one, or you need to change the following requirements")
+    require(N1*C1*S1/peRow == cgRow, s"dose ${N1*C1*S1/peRow} equals to $cgRow")
+    require(M1*F1/peCol == cgCol, s"dose ${M1*F1/peCol} equals to $cgCol")
+    require(S1 % peRow == 0, s"S1 = $S1 should be multiple of peRow = $peRow") // TODO: change to S1 >= peRow // by pSum
+    require(F1 % peCol == 0, s"F1 = $F1 should be multiple of peCol = $peCol") // TODO: change to F1 >= peCol // by weight
+    def printlnPhysicalInfo(): Unit = {
+      println(s"[${MAGENTA}Info$RESET] the Eyeriss physical info")
+      println(s"             |CGRow\t|CGCol\t|peRow\t|peCol\t|")
+      println(s"             |$cgRow\t\t|$cgCol\t\t|$peRow\t\t|$peCol\t\t|")
+    }
+  }
+  object mappingInfo {
+    /**the number of different inAct in one PE array*/
+    private val inActNumInOnePEArray: Int = peRow + peCol - 1 //TODO: make it more fine grain
+    /** the read time for one SRAM to send all the PE their inAct*/
+    val inActSRAMReadTimes: Int = inActNumInOnePEArray/inActSRAMNum
+  }
   object nnShape {
     object inAct {
       val number: Int = N2*N1*N0
@@ -39,7 +66,7 @@ case class NNModelMapping (
     require(inAct.channel == weight.channel)
     require(weight.number == pSum.channel)
     def printNNShapeInfo(): Unit = {
-      println(s"[INFO] the NN shape")
+      println(s"[${MAGENTA}Info$RESET] the NN shape")
       println(s"                   |\ttype\t|\tnum\t|\tchn\t|\th\t|\tw\t|")
       println(s"                   |\tweight\t|\t${weight.number}\t|\t${weight.channel}\t|\t${weight.height}\t|\t${weight.width}\t|")
       println(s"                   |\tinAct\t|\t${inAct.number}\t|\t${inAct.channel}\t|\t${inAct.height}\t|\t${inAct.width}\t|")
@@ -48,7 +75,7 @@ case class NNModelMapping (
   }
 }
 
-class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMapping, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
+class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: EyerissModelParam, printDetails: Boolean = true) extends PESizeConfig with SPadSizeConfig
   with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
   /** use monitor to compare the info between different test*/
   private val scoreBoard = new ScoreBoard
@@ -59,64 +86,76 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMappin
     p.nnShape.pSum.height,
     p.nnShape.pSum.width
   ) {0}
-  /** assume the data stored in Mem is pre-processed */
-  private val inActAdrSRAMBanks = Array.fill(monitor.clusterNum, inActSRAMNum, inActAdrSRAMSize) {0}
-  private val inActDataSRAMBanks = Array.fill(monitor.clusterNum, 3, inActDataSRAMSize) {0}
   private var parallelCycle = 0
-  require(p.G1 == 1)
-  // mapping <> physical
-  require(p.S1 == peRowNum)
-  require(p.F1 == peColNum) // TODO: use %peColNum == 0 instead
-  require(p.M1*p.C1*p.N1*p.G1 == monitor.clusterNum)
-  /** NoC level */
-  private var inActSRAMBankWriteRecord: List[Seq[Int]] = Nil
+  /** the first dimension is NoC level index, value true means have read this from mem, false means haven't read*/
+  private val weightMemReadRecord: Array[Boolean] = Array.fill(p.G1*p.M1*p.C1*p.S1) {false}
+  /** the first dimension is NoC level index, value true means have read this from mem, false means haven't read*/
+  private val inActMemReadRecord: Array[Boolean] = Array.fill(p.G1*p.N1*p.C1*(p.F1 + p.S1)) {false}
+  /** assume the data stored in Mem is pre-processed */
+  /** the first dimension is cgRow idx, the second is cgCol idx, the third is inActSRAMIdx, inside is a list */
+  private val inActAdrSRAM: Array[Array[Array[List[Int]]]] =
+    Array.fill(p.cgRow, p.cgCol, p.inActSRAMNum) {Nil}
+  /** the first dimension is cgRow idx, the second is cgCol idx, the third is inActSRAMIdx, inside is a list */
+  private val inActDataSRAM: Array[Array[Array[List[Int]]]] =
+    Array.fill(p.cgRow, p.cgCol, p.inActSRAMNum) {Nil}
+  /** the first dimension is cgRow idx, the second is cgCol idx, the third is inActSRAMIdx,
+    * the fourth is inActSRAMReadIdx. true when has written this data into inActSRAM*/
+  private val inActSRAMWriteRecord: Array[Array[Array[Array[Boolean]]]] =
+    Array.fill(p.cgRow, p.cgCol, p.inActSRAMNum, p.mappingInfo.inActSRAMReadTimes) {false}
+  /** the first dimension is cgRow idx, the second is cgCol idx, the third is inActSRAMIdx,
+    * the fourth is inActSRAMReadIdx. true when has read this data from inActSRAM*/
+  private val inActSRAMReadRecord: Array[Array[Array[Array[Boolean]]]] =
+    Array.fill(p.cgRow, p.cgCol, p.inActSRAMNum, p.mappingInfo.inActSRAMReadTimes) {false}
+  //private var inActSRAMBankWriteRecord: List[Seq[Int]] = Nil
+  /** NoC level:
+    * the `for loops` of NoC level is the task mapping for each PE*/
   for (g1 <- 0 until p.G1) {
     for (n1 <- 0 until p.N1) {
       for (m1 <- 0 until p.M1) {
         for (f1 <- 0 until p.F1) {
           for (c1 <- 0 until p.C1) {
             for (s1 <- 0 until p.S1) {
+              /** current physical info*/
+              object cPhyInfo {
+                /**current cluster group row idx*/
+                val cr: Int = n1*p.C1*p.S1/p.peRow + c1*p.S1/p.peRow + s1/p.peRow
+                /**current cluster group column idx*/
+                val cc: Int = m1*p.F1/p.peCol + f1/p.peCol
+                /**current pe row idx*/
+                val pr: Int = s1%p.peRow
+                /**current pe column idx*/
+                val pc: Int = f1%p.peCol
+                /**current pe's corresponding inAct SRAM idx in the GLB Cluster*/
+                val inActSRAMIdx: Int = (pr + pc) % p.inActSRAMNum
+                /** current SRAM's read/write times*/
+                val inActReadTimeIdx: Int = (pr + pc) / p.inActSRAMNum
+              }
               val weightNoCLevelIdx = g1*p.M1*p.C1*p.S1 + m1*p.C1*p.S1 + c1*p.S1 + s1
               val inActNoCLevelIdx = g1*p.N1*p.C1*(p.F1+p.S1) + n1*p.C1*(p.F1+p.S1) + c1*(p.F1+p.S1) + (f1+s1)
-              val clusterIdx = n1*p.M1*p.C1 + m1*p.C1 + c1
-              val bankIdx = (s1+f1)%3
-              val inActSRAMBankWriteRecordSeq = Seq(clusterIdx, bankIdx)
-              val formerOrLater = (s1+f1) < inActSRAMNum
-              if (!inActSRAMBankWriteRecord.contains(inActSRAMBankWriteRecordSeq)) {
-                /** as it needs write into SRAM Bank for former and later, so we need
-                  * another NoCIdx*/
-                val anotherNoCIdx = if (formerOrLater) inActNoCLevelIdx + inActSRAMNum else
-                  inActNoCLevelIdx - inActSRAMNum
-                if (formerOrLater) {
-                  inActAdrSRAMBanks(clusterIdx)(bankIdx) =
-                    (sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx):::
-                      sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx)).toArray
-                  inActDataSRAMBanks(clusterIdx)(bankIdx) =
-                    (sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx):::
-                      sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx)).toArray
-                } else {
-                  inActAdrSRAMBanks(clusterIdx)(bankIdx) =
-                    (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx):::
-                      sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx)).toArray
-                  inActDataSRAMBanks(clusterIdx)(bankIdx) =
-                    (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx):::
-                      sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx)).toArray
-                }
-                // update scoreBoard
-                /** the times read directly from mem in uncompressed data format */
-                val inActMemReadNum = sequencer.dataSequencer.glb.inAct(inActNoCLevelIdx).flatten.flatten.length +
-                  sequencer.dataSequencer.glb.inAct(anotherNoCIdx).flatten.flatten.length
+              /** read inAct from main memory*/
+              if (!inActMemReadRecord(inActNoCLevelIdx)) {
+                val inActMemReadNum = sequencer.dataSequencer.glb.inAct(inActNoCLevelIdx).flatten.flatten.length
                 monitor.inActRead.mem += inActMemReadNum
-                monitor.cycle += inActMemReadNum*scoreBoard.accessCost.mem
-                val inActAdrGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActAdr(anotherNoCIdx).length
-                  + sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx).length)
-                val inActDataGLBWriteNum = (sequencer.dataSequencer.glb.cscData.inActData(anotherNoCIdx).length
-                  + sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx).length)
-                require(p.M1 == 2 || p.M1 == 1, "M1 needs equals to 2 or 1, or shouldn't divide M1 directly")
-                /** divide M1, as inAct could be shared horizontally */
-                monitor.inActWrite.adr.glb += inActAdrGLBWriteNum/p.M1
-                monitor.inActWrite.data.glb += inActDataGLBWriteNum/p.M1
-                inActSRAMBankWriteRecord = inActSRAMBankWriteRecord:::List(inActSRAMBankWriteRecordSeq)
+                if (p.parallelMemRead) {
+                  monitor.cycle += inActMemReadNum*scoreBoard.accessCost.mem/(p.G1*p.N1*p.C1*(p.F1+p.S1))
+                } else {
+                  /** if Eyeriss can only send one memory requirement at a time */
+                  monitor.cycle += inActMemReadNum*scoreBoard.accessCost.mem
+                }
+                inActMemReadRecord(inActNoCLevelIdx) = true
+              }
+              /** write inAct SRAM */
+              //println(s"current Read Times: ${cPhyInfo.inActReadTimeIdx}")
+              if (!inActSRAMWriteRecord(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx)(cPhyInfo.inActReadTimeIdx)){
+                inActAdrSRAM(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx) ++=
+                  sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx)
+                inActDataSRAM(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx) ++=
+                  sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx)
+                val inActAdrGLBWriteNum = sequencer.dataSequencer.glb.cscData.inActAdr(inActNoCLevelIdx).length
+                val inActDataGLBWriteNum = sequencer.dataSequencer.glb.cscData.inActData(inActNoCLevelIdx).length
+                monitor.inActWrite.adr.glb += inActAdrGLBWriteNum
+                monitor.inActWrite.data.glb += inActDataGLBWriteNum
+                inActSRAMWriteRecord(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx)(cPhyInfo.inActReadTimeIdx) = true
               }
               /** GLB level */
               for (g2 <- 0 until p.G2) {
@@ -140,26 +179,24 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMappin
                           val inActGLBReadNum = max(inActAdrSPad.length, inActDataSPad.length)
                           val weightMemReadNum = sequencer.dataSequencer.glb.
                             weight(weightNoCLevelIdx)(weightGLBLevelIdx).flatten.length
-                          /** only read once from Mem and send into several PEs */
-                          if (f1 == 0 && n1 == 0) {
+                          /** the same weight value only be read once from Mem*/
+                          if (!weightMemReadRecord(weightNoCLevelIdx)) {
                             monitor.weightRead.mem += weightMemReadNum
+                            if (!p.parallelMemRead) {
+                              /**if Eyeriss can not read parallel, then assume that read weight from memory
+                                * for GLB levels times will cost more than read inAct from SRAM*/
+                              monitor.cycle += weightMemReadNum*scoreBoard.accessCost.mem
+                            }
+                          }
+                          if (p.parallelMemRead) {
                             parallelCycle += max(inActGLBReadNum*scoreBoard.accessCost.glb,
                               weightMemReadNum*scoreBoard.accessCost.mem)
-                          } else {
-                            parallelCycle += inActGLBReadNum*scoreBoard.accessCost.glb
                           }
                           /** read from GLB once and send into diagonal PEs
-                            * and if m1 = 1 or more, then other cluster can receive inAct via Router */
-                          if (formerOrLater) {
-                            if (f1 == 0 && m1 == 0) {
-                              monitor.inActRead.adr.glb += inActAdrSPad.length
-                              monitor.inActRead.data.glb += inActDataSPad.length
-                            }
-                          } else {
-                            if (f1 == inActSRAMNum && m1 == 0) {
-                              monitor.inActRead.adr.glb += inActAdrSPad.length
-                              monitor.inActRead.data.glb += inActDataSPad.length
-                            }
+                            * and if this has been read, then other clusters can receive inAct via Router */
+                          if (!inActSRAMReadRecord(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx)(cPhyInfo.inActReadTimeIdx)) {
+                            monitor.inActRead.adr.glb += inActAdrSPad.length
+                            monitor.inActRead.data.glb += inActDataSPad.length
                           }
                           monitor.inActWrite.adr.sPad += inActAdrSPad.length
                           monitor.inActWrite.data.sPad += inActDataSPad.length
@@ -205,6 +242,7 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMappin
                           }
                           //print(".") // finish SPad Level
                           /** accumulate PSum vertically */
+                          // TODO
                         }
                       }
                     }
@@ -212,20 +250,22 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMappin
                 }
               }
               //print("*\n") // finish GLB Level
+              inActSRAMReadRecord(cPhyInfo.cr)(cPhyInfo.cc)(cPhyInfo.inActSRAMIdx)(cPhyInfo.inActReadTimeIdx) = true
+              weightMemReadRecord(weightNoCLevelIdx) = true
             }
           }
         }
       }
     }
   }
-  monitor.cycle += parallelCycle/monitor.peNum
+  monitor.cycle += parallelCycle/p.physicalInfo.peNum
   if (printDetails) {
-    monitor.printMonitorInfo()
+    monitor.printMonitorInfo(p.physicalInfo.peNum)
     p.nnShape.printNNShapeInfo()
   }
 }
 
-class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMapping,
+class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, p: EyerissModelParam,
                   printDetails: Boolean = true, needPSum: Boolean)
   extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config with ClusterSRAMConfig {
   private val scoreBoard = new ScoreBoard
@@ -274,18 +314,22 @@ class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, p: NNModelMapping
     monitor.weightRead.mem = totalNum
     monitor.macNum = totalNum
   }
-  monitor.cycle = scoreBoard.totalCycles(monitor.macNum, monitor.peNum, monitor.inActRead.mem, 0, 0)
+  monitor.cycle = scoreBoard.totalCycles(monitor.macNum, p.physicalInfo.peNum, monitor.inActRead.mem, 0, 0)
   if (printDetails) {
-    monitor.printMonitorInfo()
+    monitor.printMonitorInfo(p.physicalInfo.peNum)
     p.nnShape.printNNShapeInfo()
   }
 }
 
-class ScalaModel extends FlatSpec {
+class ScalaModelTest extends FlatSpec {
   behavior of "compare the efficiency of Eyeriss"
   /** model the behavior of Eyeriss cluster group */
+  /*it should "changing mapping parameters" in {
+
+  }*/
+
   it should "compare the info across sparse ratio between eyeriss and common device" in {
-    val param = NNModelMapping()
+    val param = EyerissModelParam()
     object inActRatioSeq {
       val start = 4
       val end = 10
@@ -346,9 +390,11 @@ class ScalaModel extends FlatSpec {
           log2Ceil(sequencer.dataSequencer.glb.cscData.weightAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
         weightDataWidthNeed(inActRatioIdx)(weightRatioIdx) =
           log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
-        println(s"[INFO] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
-        if (inActRatio == inActRatioSeq.end - 1 && weightRatio == weightRatioSeq.end - 1)
+        println(s"[${MAGENTA}Info$RESET] current sparse ratio: 0.$inActRatio, 0.$weightRatio")
+        if (inActRatio == inActRatioSeq.end - 1 && weightRatio == weightRatioSeq.end - 1) {
           param.nnShape.printNNShapeInfo()
+          param.physicalInfo.printlnPhysicalInfo()
+        }
       }
     }
     println("|iRa\t|wRa\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
@@ -396,9 +442,6 @@ class ScalaModel extends FlatSpec {
 }
 
 class CompareMonitor extends ClusterSRAMConfig {
-  val clusterNum: Int = 8 * 2 // 8 rows, 2 columns
-  private val peArraySize = peRowNum * peColNum
-  val peNum: Int = peArraySize * clusterNum
   var cycle: BigInt = 0 // the number of clock cycles
   var macNum: BigInt = 0 // the number of mac
   class CSCAccess {
@@ -414,12 +457,12 @@ class CompareMonitor extends ClusterSRAMConfig {
   val inActWrite = new MemHierarchyAccess
   val weightRead = new MemHierarchyAccess
   val weightWrite = new MemHierarchyAccess
-  def printMonitorInfo(): Unit = {
+  def printMonitorInfo(peNum: Int): Unit = {
     val inActGLBWriteTotal = inActWrite.adr.glb + inActWrite.data.glb
     val inActGLBReadTotal = inActRead.adr.glb + inActRead.data.glb
     val inActSPadWriteTotal = inActWrite.adr.sPad + inActWrite.data.sPad
     val inActSPadReadTotal = inActRead.adr.sPad + inActRead.data.sPad
-    println(s"[INFO] computation finishes, using $peNum PEs")
+    println(s"[${MAGENTA}Info$RESET] computation finishes, using $peNum PEs")
     println(s"------ time = $cycle cycles")
     println(s"------ mac num = $macNum")
     println(s"------ inActAccess ")

@@ -34,7 +34,7 @@ class GenOnePETestDataTest extends FlatSpec {
   println("pSumStream      = " + oneStreamTest.outPSumStream)
 }
 
-class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6, p: NNModelMapping = new NNModelMapping)
+class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6, p: EyerissModelParam = new EyerissModelParam)
   extends PESizeConfig with SPadSizeConfig with MCRENFConfig with GNMFCS1Config with GNMFCS2Config
   with ClusterSRAMConfig with EyerissTopConfig {
   protected val pSumMax: Int = pow(2, psDataWidth).toInt
