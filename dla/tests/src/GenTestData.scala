@@ -169,9 +169,11 @@ class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6,
     def dramToRSDataFlow(inActMem: Seq[Seq[List[List[Int]]]], weightMem: Seq[Seq[List[List[Int]]]]):
     (Seq[Seq[List[List[Int]]]], Seq[Seq[List[List[Int]]]]) = {
       val inActArray: Array[Array[Array[Array[Int]]]] =
-        Array.fill(inActParNum, inActStreamNum, inActMatrixHeight, inActMatrixWidth) {0}
+        Array.fill(p.mappingInfo.inActNoCNum, p.mappingInfo.inActGLBNum,
+          p.mappingInfo.inActMatrixHeight, p.mappingInfo.inActMatrixWidth) {0}
       val weightArray: Array[Array[Array[Array[Int]]]] =
-        Array.fill(weightParNum, weightStreamNum, weightMatrixHeight, weightMatrixWidth) {0}
+        Array.fill(p.mappingInfo.weightNoCNum, p.mappingInfo.weightGLBNum,
+          p.mappingInfo.weightMatrixHeight, p.mappingInfo.weightMatrixWidth) {0}
       for (g1 <- 0 until p.G1) {
         for (n1 <- 0 until p.N1) {
           for (m1 <- 0 until p.M1) {

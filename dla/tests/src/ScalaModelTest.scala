@@ -37,6 +37,19 @@ case class EyerissModelParam(
     private val inActNumInOnePEArray: Int = peRow + peCol - 1 //TODO: make it more fine grain
     /** the read time for one SRAM to send all the PE their inAct*/
     val inActSRAMReadTimes: Int = inActNumInOnePEArray/inActSRAMNum
+    require(inActNumInOnePEArray % inActSRAMNum == 0, s"inActNumInOnePEArray = $inActNumInOnePEArray should be" +
+      s"multiple of inActSRAMNum = $inActSRAMNum")
+    val pSumOneSPadNum: Int = M0*E*N0*F0
+    val inActMatrixWidth: Int = F0*N0*E // column
+    val inActMatrixHeight: Int = R*C0 // row
+    val weightMatrixWidth: Int = inActMatrixHeight // column
+    val weightMatrixHeight: Int = M0 // row
+    val inActNoCNum: Int = G1*N1*C1*(F1 + S1)
+    val weightNoCNum: Int = G1*M1*C1*S1
+    val pSumNoCNum: Int = G1*N1*M1*F1
+    val weightGLBNum: Int = G2*M2*C2*S2
+    val inActGLBNum: Int = G2*N2*C2*(F2 + S2)
+    val pSumGLBNum: Int = G2*N2*M2*F2
   }
   object nnShape {
     object inAct {
@@ -88,9 +101,9 @@ class EyerissModel(sequencer: GenFunc, monitor: CompareMonitor, p: EyerissModelP
   ) {0}
   private var parallelCycle = 0
   /** the first dimension is NoC level index, value true means have read this from mem, false means haven't read*/
-  private val weightMemReadRecord: Array[Boolean] = Array.fill(p.G1*p.M1*p.C1*p.S1) {false}
+  private val weightMemReadRecord: Array[Boolean] = Array.fill(p.mappingInfo.weightNoCNum) {false}
   /** the first dimension is NoC level index, value true means have read this from mem, false means haven't read*/
-  private val inActMemReadRecord: Array[Boolean] = Array.fill(p.G1*p.N1*p.C1*(p.F1 + p.S1)) {false}
+  private val inActMemReadRecord: Array[Boolean] = Array.fill(p.mappingInfo.inActNoCNum) {false}
   /** assume the data stored in Mem is pre-processed */
   /** the first dimension is cgRow idx, the second is cgCol idx, the third is inActSRAMIdx, inside is a list */
   private val inActAdrSRAM: Array[Array[Array[List[Int]]]] =
@@ -324,9 +337,124 @@ class CommonModel(sequencer: GenFunc, monitor: CompareMonitor, p: EyerissModelPa
 class ScalaModelTest extends FlatSpec {
   behavior of "compare the efficiency of Eyeriss"
   /** model the behavior of Eyeriss cluster group */
-  /*it should "changing mapping parameters" in {
-
-  }*/
+  it should "changing mapping parameters" in {
+    object peRow {
+      val start = 1
+      val end = 4
+      val during: Int = end - start
+    }
+    object peCol {
+      val start = 1
+      val end = 4
+      val during: Int = end - start
+    }
+    val monitorSeq = Seq.fill(peRow.during, peCol.during, 2) {new CompareMonitor}
+    /** the min size of inAct adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[inActAdrSPadSize]] and [[SPadSizeConfig]].[[inActDataSPadSize]]*/
+    val inActSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(peRow.during, peCol.during, 2) {0}
+    /** the min size of inAct adr SRAM and data SRAM to meet the requirement.
+      * [[ClusterSRAMConfig]].[[inActAdrSRAMSize]] and [[ClusterSRAMConfig]].[[inActDataSRAMSize]]*/
+    val inActSRAMSizeNeed: Array[Array[Array[Int]]] = Array.fill(peRow.during, peCol.during, 2) {0}
+    /** the min bits of inAct adr to meet the requirement. [[PESizeConfig]].[[inActAdrWidth]]*/
+    val inActAdrWidthNeed: Array[Array[Int]] = Array.fill(peRow.during, peCol.during) {0}
+    /** the min bits of inAct data to meet the requirement. [[PESizeConfig]].[[inActDataWidth]]*/
+    val inActDataWidthNeed: Array[Array[Int]] = Array.fill(peRow.during, peCol.during) {0}
+    /** the min size of weight adr SPad and data SPad to meet the requirement.
+      * [[SPadSizeConfig]].[[weightAdrSPadSize]] and [[SPadSizeConfig]].[[weightDataSPadSize]]*/
+    val weightSPadSizeNeed: Array[Array[Array[Int]]] = Array.fill(peRow.during, peCol.during, 2) {0}
+    /** the min bits of weight adr to meet the requirement. [[PESizeConfig]].[[weightAdrWidth]]*/
+    val weightAdrWidthNeed: Array[Array[Int]] = Array.fill(peRow.during, peCol.during) {0}
+    /** the min bits of weight data to meet the requirement. [[PESizeConfig]].[[weightDataWidth]]*/
+    val weightDataWidthNeed: Array[Array[Int]] = Array.fill(peRow.during, peCol.during) {0}
+    for (peRowFactor <- peRow.start until peRow.end) {
+      for (peColFactor <- peCol.start until peCol.end) {
+        val peRowIdx = peRowFactor - peRow.start
+        val peColIdx = peColFactor - peCol.start
+        val peRowNum = 3*peRowFactor
+        val peColNum = 4*peColFactor
+        var readTime = 2
+        while ((peRowNum + peColNum - 1) % readTime != 0) {
+          readTime += 1
+        }
+        val inActSRAMNum = (peRowNum + peColNum - 1) / readTime
+        val param = EyerissModelParam(peRow = peRowNum, peCol = peColNum,
+          S1 = peRowNum, F1 = peColNum, inActSRAMNum = inActSRAMNum)
+        val sequencer = new GenFunc(inActSparseRatio = 0.6, weightSparseRatio = 0.6, p = param)
+        val eyerissModel = new EyerissModel(sequencer = sequencer,
+          monitor = monitorSeq(peRowIdx)(peColIdx).head,
+          p = param, printDetails = false)
+        val common = new CommonModel(sequencer = sequencer,
+          monitor = monitorSeq(peRowIdx)(peColIdx)(1),
+          p = param, printDetails = false, needPSum = false)
+        inActSPadSizeNeed(peRowIdx)(peColIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActAdr.map(x => x.map(y => y.length).max).max
+        inActSPadSizeNeed(peRowIdx)(peColIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.inActData.map(x => x.map(y => y.length).max).max
+        inActSRAMSizeNeed(peRowIdx)(peColIdx)(0) =
+          sequencer.dataSequencer.glb.cscData.inActAdr.map(x => x.length).max
+        inActSRAMSizeNeed(peRowIdx)(peColIdx)(1) =
+          sequencer.dataSequencer.glb.cscData.inActData.map(x => x.length).max
+        inActAdrWidthNeed(peRowIdx)(peColIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        inActDataWidthNeed(peRowIdx)(peColIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.inActData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
+        weightSPadSizeNeed(peRowIdx)(peColIdx)(0) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightAdr.map(x => x.map(y => y.length).max).max
+        weightSPadSizeNeed(peRowIdx)(peColIdx)(1) =
+          sequencer.dataSequencer.glb.separatedSPadCSCData.weightData.map(x => x.map(y => y.length).max).max
+        weightAdrWidthNeed(peRowIdx)(peColIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightAdr.flatten.filter(x => x != scala.math.pow(2,7)-1).max)
+        weightDataWidthNeed(peRowIdx)(peColIdx) =
+          log2Ceil(sequencer.dataSequencer.glb.cscData.weightData.flatten.filter(x => x != scala.math.pow(2,12)-1).max)
+        println(s"[${MAGENTA}Info$RESET] current peRow = $peRowNum, peCol = $peColNum, inActSRAM = $inActSRAMNum")
+        if (peRowFactor == peRow.end - 1 && peColFactor == peCol.end - 1) {
+          param.nnShape.printNNShapeInfo()
+          param.physicalInfo.printlnPhysicalInfo()
+        }
+      }
+    }
+    println("|pRow\t|pCol\t|cycle%\t\t|mac%\t\t|iMem%\t\t|wMem%\t\t|iGLB%\t\t|iSPad%\t\t|")
+    for (peRowFactor <- peRow.start until peRow.end) {
+      for (peColFactor <- peCol.start until peCol.end) {
+        val peRowIdx = peRowFactor - peRow.start
+        val peColIdx = peColFactor - peCol.start
+        val eyerissMonitor = monitorSeq(peRowIdx)(peColIdx).head
+        val commonMonitor = monitorSeq(peRowIdx)(peColIdx).last
+        val inActGLBWriteTotal = eyerissMonitor.inActWrite.adr.glb + eyerissMonitor.inActWrite.data.glb
+        val inActGLBReadTotal = eyerissMonitor.inActRead.adr.glb + eyerissMonitor.inActRead.data.glb
+        val inActSPadWriteTotal = eyerissMonitor.inActWrite.adr.sPad + eyerissMonitor.inActWrite.data.sPad
+        val inActSPadReadTotal = eyerissMonitor.inActRead.adr.sPad + eyerissMonitor.inActRead.data.sPad
+        /**inAct GLB  R / GLB W */
+        val eyerissInActGLBRW = f"${(inActGLBReadTotal.toFloat/inActGLBWriteTotal.toFloat)*100}%.2f%%"
+        /**inAct SPad W / GLB R */
+        val eyerissInActSPadReuse = f"${(inActSPadWriteTotal.toFloat/inActGLBReadTotal.toFloat)*100}%.2f%%"
+        val cycleEfficiency = f"${(eyerissMonitor.cycle.toFloat / commonMonitor.cycle.toFloat)*100}%.4f%%"
+        val macEfficiency = f"${(eyerissMonitor.macNum.toFloat / commonMonitor.macNum.toFloat)*100}%.4f%%"
+        val inActMemReadEfficiency =
+          f"${(eyerissMonitor.inActRead.mem.toFloat / commonMonitor.inActRead.mem.toFloat)*100}%.4f%%"
+        val weightMemReadEfficiency =
+          f"${(eyerissMonitor.weightRead.mem.toFloat / commonMonitor.weightRead.mem.toFloat)*100}%.4f%%"
+        println(s"|${peRowFactor*3}\t\t|${peColFactor*4}\t\t|$cycleEfficiency\t|" +
+          s"$macEfficiency\t|$inActMemReadEfficiency\t|$weightMemReadEfficiency\t|" +
+          s"$eyerissInActGLBRW\t|$eyerissInActSPadReuse\t|")
+      }
+    }
+    println("\n|pRow\t|pCol\t|inActAdrSPad\t|inActDataSPad\t|weightAdrSPad\t|weightDataSPad\t|inActAdrSRAM\t|inActDataSRAM\t|")
+    for (peRowFactor <- peRow.start until peRow.end) {
+      for (peColFactor <- peCol.start until peCol.end) {
+        val peRowIdx = peRowFactor - peRow.start
+        val peColIdx = peColFactor - peCol.start
+        println(s"|${peRowFactor*3}\t\t|${peColFactor*4}\t\t|" +
+          s"${inActSPadSizeNeed(peRowIdx)(peColIdx)(0)}\t${inActAdrWidthNeed(peRowIdx)(peColIdx)}-bit\t|" +
+          s"${inActSPadSizeNeed(peRowIdx)(peColIdx)(1)}\t${inActDataWidthNeed(peRowIdx)(peColIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(peRowIdx)(peColIdx)(0)}\t${weightAdrWidthNeed(peRowIdx)(peColIdx)}-bit\t|" +
+          s"${weightSPadSizeNeed(peRowIdx)(peColIdx)(1)}\t${weightDataWidthNeed(peRowIdx)(peColIdx)}-bit\t|" +
+          s"${inActSRAMSizeNeed(peRowIdx)(peColIdx)(0)}\t|" +
+          s"${inActSRAMSizeNeed(peRowIdx)(peColIdx)(1)}\t|"
+        )
+      }
+    }
+  }
 
   it should "compare the info across sparse ratio between eyeriss and common device" in {
     val param = EyerissModelParam()
