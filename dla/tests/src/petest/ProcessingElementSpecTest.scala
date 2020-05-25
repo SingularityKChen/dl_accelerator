@@ -420,7 +420,7 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "basically write and read address in InAct SPad with CSC format data" in {
-    test(new SPadAdrModule( 9, 4)) { adrSPad =>
+    test(new SPadAdrModule( 9, 7)) { adrSPad =>
       val theDataPath = adrSPad.io.dataPath
       val theCtrlPath = adrSPad.io.ctrlPath
       val theDataIO = theDataPath.writeInData.data
