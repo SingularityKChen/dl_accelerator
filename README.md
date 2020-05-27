@@ -417,22 +417,22 @@ And the figure bellow is the data flow of Row Stationary, you will find more inf
 
 However, when I tried to map the Row Stationary Plus data flow into a graph like Row Stationary's, 
 I found that we are supposed to accumulate each partial sum columns rather than rows, because in RS+, 
-we have done each row in SPad Level, i.e., the for loop of `E` and `R`.
+we have done each row in SPad Level, i.e., the `E` and `R` for-loops of. Each column of PEs \(maybe include its vertical group cluster's corresponding columns of PEs\) have finish the current row \(includes `E` PSums\), then be accumulated together.
 
-So we can get the graphs bellow.
+So I'd better call it as `Column Stationary`. We can get the graphs bellow.
 
-At SPad level, we will calculate all rows of weights and partial sums, so we don't have to care about this dimension at other levels.
+At SPad level, we will calculate all rows of weights and partial sums, so we don't have to care about this dimension at other levels. The corresponding hardware architecture is Processing Element.
 
-![EyerissV2 SPad Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232716EyerissV2SPadLevel.png)
+![EyerissV2 SPad Level](./diagrams/row-stationary-01.jpg)
 
 At Noc level, all kinds of data will be mapped in to PE array at same time, 
-and regard the PEs which will produce the same column of partial sums as one group.
+and regard the PEs which will produce the same column of partial sums as one group. The corresponding hardware architecture is the mesh network and pe array in the PE cluster.
 
-![EyerissV2 NoC Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312232830EyerissV2NoCLevel.png)
+![EyerissV2 NoC Level](./diagrams/row-stationary-02.jpg)
 
-At Global Buffer level, each group we created at Noc level will read in those data.
+At Global Buffer level, each group we created at Noc level will read in those data. The corresponding hardware component is the GLB cluster.
 
-![EyerissV2 Global Buffer Level](https://raw.githubusercontent.com/SingularityKChen/PicUpload/master/img/20200312233211EyerissV2GlobalBufferLevel.png)
+![EyerissV2 Global Buffer Level](./diagrams/row-stationary-03.jpg)
 
 ### Compressed Sparse Column Data Format
 
