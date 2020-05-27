@@ -7,6 +7,52 @@ import Console.{MAGENTA, RESET}
 import scala.math.max
 import chisel3.util.log2Ceil
 
+case class TaskMappingParam(inActWidth: Int, inActHeight: Int, inActNum: Int, inActCh: Int,
+                            weightWidth: Int, weightHeight: Int, weightNum: Int, weightCh: Int,
+                            cgRow: Int = 8, cgCol: Int = 2, peRow: Int = 3, peCol: Int = 4,
+                            inActAdrSRAMSize: Int, inActDataSRAMSize: Int, inActSRAMNum: Int = 3,
+                            pSumSRAMSize: Int,
+                            inActAdrSPadSize: Int, inActDataSPadSize: Int,
+                            weightAdrSPadSize: Int, weightDataSPadSize: Int,
+                            pSumSPadSize: Int
+                           ) {
+  require(inActHeight > weightHeight, "the height of inAct should bigger than that of weight")
+  /** assume the SRAM size and SPad size is the worst case*/
+  val g2: Int = 1
+  val g1: Int = 1
+  private def getGLBLevel(): Int = {
+    var n2 = 1
+    var m2 = 1
+    var f2 = 1
+    var c2 = 1
+    var s2 = 1
+  }
+  private def getNoCLevel(): Int = {
+    var n1 = 1
+    var m1 = 1
+    var f1 = 1
+    var c1 = 1
+    var s1 = 1
+  }
+  private def getSPadLevel(): Int = {
+    var f0 = 1
+    var n0 = 1
+    val e = inActHeight - weightHeight //2
+    val r = weightHeight //4
+    var c0 = 1
+    var m0 = 1
+    val inActMatrixHeight: Int = r*c0 // row
+    val inActMatrixWidth: Int = f0*n0*e // column
+    val weightMatrixWidth: Int = inActMatrixHeight // column
+    val weightMatrixHeight: Int = m0 // row
+    val pSumOneSPadNum: Int = m0*e*n0*f0
+    val inActDataFit = inActMatrixHeight*inActMatrixWidth <= inActDataSPadSize
+    val weightDataFit = weightMatrixHeight*weightMatrixWidth <= weightDataSPadSize
+    val pSumFit = pSumOneSPadNum <= pSumSPadSize
+  }
+
+}
+
 case class EyerissModelParam(
                               G2: Int = 1, N2: Int = 2, M2: Int = 4, F2: Int = 3, C2: Int = 3, S2: Int = 4,
                               G1: Int = 1, N1: Int = 4, M1: Int = 2, F1: Int = 4, C1: Int = 2, S1: Int = 3,
@@ -53,8 +99,10 @@ case class EyerissModelParam(
   }
   object nnShape {
     object inAct {
-      val number: Int = N2*N1*N0
-      val channel: Int = G2*G1*C2*C1*C0 //TODO: check G
+      /** G means the group number of the input activation. Different groups of input activation shard the same
+        * weight, hence increasing the data reuse ratio of weight*/
+      val number: Int = G2*G1*N2*N1*N0
+      val channel: Int = C2*C1*C0
       /** although the width of inAct in RS+ data flow is (S2 + F2)*(S1 + F1)*F0,
         * which is much greater than this width. It's caused by the overlap.*/
       val height: Int = R + E
@@ -63,14 +111,14 @@ case class EyerissModelParam(
     }
     object weight {
       val number: Int = M2*M1*M0
-      val channel: Int = G2*G1*C2*C1*C0
+      val channel: Int = C2*C1*C0
       val height: Int = R
       val width: Int = S2*S1
       //require(height == width, s"weight's height doesn't equal to width, $height == $width ?")
     }
     object pSum {
-      val number: Int = N2*N1*N0
-      val channel: Int = G2*G1*M2*M1*M0
+      val number: Int = G2*G1*N2*N1*N0
+      val channel: Int = M2*M1*M0
       val height: Int = E
       val width: Int = F2*F1*F0
       //require(height == width, s"pSum's height doesn't equal to width, $height == $width ?")
