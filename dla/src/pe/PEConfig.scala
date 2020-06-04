@@ -47,7 +47,7 @@ trait SPadSizeConfig {
 trait PESizeConfig {
   protected val inActDataWidth: Int = 12 // 8-bit data and 4-bit count
   /** [[inActAdrWidth]] equals to 4 for test and equals to 7 for modelling */
-  protected val inActAdrWidth: Int = 7//4
+  protected val inActAdrWidth: Int = 4//7//4
   protected val weightDataWidth: Int = 12 // 24 if SIMD
   protected val weightAdrWidth: Int = 7
   protected val cscDataWidth: Int = 8 // compressed sparse column data width

@@ -20,7 +20,7 @@ case class TaskMappingParam(inActWidth: Int, inActHeight: Int, inActNum: Int, in
   /** assume the SRAM size and SPad size is the worst case*/
   val g2: Int = 1
   val g1: Int = 1
-  private def getGLBLevel(): Int = {
+  /*private def getGLBLevel(): Int = {
     var n2 = 1
     var m2 = 1
     var f2 = 1
@@ -50,7 +50,7 @@ case class TaskMappingParam(inActWidth: Int, inActHeight: Int, inActNum: Int, in
     val weightDataFit = weightMatrixHeight*weightMatrixWidth <= weightDataSPadSize
     val pSumFit = pSumOneSPadNum <= pSumSPadSize
   }
-
+*/
 }
 
 case class EyerissModelParam(
