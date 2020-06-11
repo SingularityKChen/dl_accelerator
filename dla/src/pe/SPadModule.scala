@@ -3,7 +3,6 @@ package dla.pe
 import chisel3._
 import chisel3.util._
 
-
 class nonTpActSPadDataModule(padSize: Int, dataWidth: Int)
   extends Module with SPadSizeConfig with PESizeConfig with MCRENFConfigRS {
   val io: SPadNonTpModuleIO = IO(new SPadNonTpModuleIO (dataWidth = dataWidth, padSize = padSize))
@@ -76,10 +75,15 @@ class nonTpActSPadDataModule(padSize: Int, dataWidth: Int)
     (padReadIndexReg === inActAdrLastReadInIdxWire)
 
   // when Mpy & weightColFinish & !inActColFinish & nextIdxData > UB
+  // logic first or part: make sure when dealing the last inAct in a certain sliding window, before the last weight MAC result WB,
+  // set the Reg as true so that the WB stage could turn to ID stage for right data with sliding rather than taking next padReadIndexReg+1
+  // logic second or part: make sure when last inAct in the window occur weightZeroCol, it cannot proceed to padEqMpy,
+  // so that need to take it into account also
+  // weightIdxIncWire: when weightFinish or this weightColFinish
   readSlidingInc := ((padEqMpy && weightIdxIncWire && (!inActColIncWire)) || (padEqWA && mightWeightZeroColumn)) &&
-    ((((dataSPad(padReadIndexReg + 1.U)(cscCountWidth - 1, 0) > inActDataUB) && (padReadIndexReg + 1.U < inActAdrReadInIdxWire)) ||
-      (padReadIndexReg + 1.U === inActAdrReadInIdxWire)) &&   // when the sliding window finish
-      (currentSlidingWire =/= F.U - 1.U))   // when the UB is not at the maximum
+    ((((dataSPad(padReadIndexReg + 1.U)(cscCountWidth - 1, 0) > inActDataUB) && (padReadIndexReg + 1.U < inActAdrReadInIdxWire)) || // when the sliding window finish, which is next readInd is larger than the UB
+      (padReadIndexReg + 1.U === inActAdrReadInIdxWire)) &&   // when the sliding window finish, which is needed to slide but there is no other element in this inAct col
+      (currentSlidingWire =/= F.U - 1.U))   // when the UB is not at the maximum, precondition
 
   io.ctrlPath.slidingInc := readSlidingInc
   inActAdrLastReadInIdxWire := lastInActAdrDataReg
@@ -95,7 +99,7 @@ class nonTpActSPadDataModule(padSize: Int, dataWidth: Int)
   }
   // read logic 1
   when(readIndexInc) {
-    when(readSlidingInc) {
+    when(readSlidingInc) { // re-direct the readInIdx
       padReadIndexReg := futureLBStartReg
     } .otherwise {
       when(currentCountAtFutureLB && lastCountNotAtFutureLB) {
@@ -118,11 +122,13 @@ class nonTpActSPadDataModule(padSize: Int, dataWidth: Int)
 
 class WeightSPadAdrModule(PadSize: Int, DataWidth: Int) extends SPadAdrModule(PadSize, DataWidth) {
   when (io.ctrlPath.readInIdxEn) {
-    padReadIndexReg := io.ctrlPath.readInIdx
+    padReadIndexReg := io.ctrlPath.readInIdx               // f: why here?
+    // seems like the readInIdx is connected to the readOutData in PE
+    // and the weight needs to jump with the InAct
   }
 }
 
-class SPadAdrModule(PadSize: Int, val DataWidth: Int)
+class SPadAdrModule(PadSize: Int, val DataWidth: Int)  // the padSize make sure larger than input num + 1, for the nextDataWire
   extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
   protected val adrSPad: Vec[UInt] = RegInit(VecInit(Seq.fill(PadSize)(0.U(DataWidth.W))))
   adrSPad.suggestName("addressSPad")
@@ -134,18 +140,18 @@ class SPadAdrModule(PadSize: Int, val DataWidth: Int)
   regReadLogic1()
   // read logic 2
   dataWire := adrSPad(padReadIndexReg)
-  io.dataPath.readOutData := dataWire
+  io.dataPath.readOutData := dataWire   // connect readoutdata to MatrixdataReg/wire for multiply
   readIndexInc := io.ctrlPath.indexInc
 }
 
 class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
   extends SPadCommonModule(PadSize, DataWidth) with SPadSizeConfig {
-  if (sramOrReg) { // true for weight SPad
+  if (sramOrReg) { // true for weight SPad sram
     val dataSPad: SyncReadMem[UInt] = SyncReadMem(PadSize,UInt(DataWidth.W))
     dataSPad.suggestName("dataSPadSRAM")
     // write logic 2
     when (writeFire) {
-      dataSPad.write(padWriteIndexReg, decoupledDataIO.bits)
+      dataSPad.write(padWriteIndexReg, decoupledDataIO.bits)  // f: Sync RAM write
     }
     // read logic 1
     when (io.ctrlPath.readInIdxEn) {
@@ -167,11 +173,11 @@ class SPadDataModule(PadSize: Int, DataWidth: Int, val sramOrReg: Boolean)
     dataWire := dataSPad(padReadIndexReg)
   }
   readIndexInc := io.ctrlPath.indexInc
-  io.dataPath.readOutData := dataWire
+  io.dataPath.readOutData := dataWire        //f: no matter what kind, it will connect to the readOutData
 }
 
 class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
-  val io: SPadCommonModuleIO = IO(new SPadCommonModuleIO(dataWidth = dataWidth, padSize = padSize))
+  lazy val io: SPadCommonModuleIO = IO(new SPadCommonModuleIO(dataWidth = dataWidth, padSize = padSize))
   protected val decoupledDataIO: DecoupledIO[UInt] = io.dataPath.writeInData.data
   protected val dataWire: UInt = Wire(UInt(dataWidth.W))
   protected val padWriteIndexReg: UInt = RegInit(0.U(log2Ceil(padSize).W))
@@ -181,7 +187,7 @@ class SPadCommonModule(padSize: Int, dataWidth: Int) extends Module {
   protected val readIndexInc: Bool = Wire(Bool()) // true, then read index increase
   protected val writeFire: Bool = Wire(Bool())
   writeFire := decoupledDataIO.fire() && io.ctrlPath.writeEn
-  writeWrapWire := decoupledDataIO.bits === 0.U && writeFire
+  writeWrapWire := decoupledDataIO.bits === 0.U && writeFire  // f: reach our end set 0
   readWrapWire := dataWire === 0.U && readIndexInc
   // write logic 1
   decoupledDataIO.ready := true.B // as a memory, its always ready to be wrote in
@@ -206,10 +212,10 @@ class PSumSPad(debug: Boolean) extends Module with SPadSizeConfig with PESizeCon
   pSumDataSPadReg.suggestName("pSumDataSPadReg")
   protected val readOutDataWire = Wire(UInt(psDataWidth.W))
   readOutDataWire := pSumDataSPadReg(io.ctrlPath.readIdx)
-  io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read
+  io.dataPath.ipsIO.ready := !io.dataPath.opsIO.ready // when not read, (fred) if receive opsIO.ready true, the ipsIO.ready be false and halt input
   io.dataPath.opsIO.valid := !io.dataPath.ipsIO.valid // when not write
-  io.dataPath.opsIO.bits := readOutDataWire
-  when (io.dataPath.ipsIO.fire()) {
-    pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits
+  io.dataPath.opsIO.bits := readOutDataWire  // for read
+  when (io.dataPath.ipsIO.fire()) { //my output ready true, my input valid is also true
+    pSumDataSPadReg(io.ctrlPath.writeIdx) := io.dataPath.ipsIO.bits // for write
   }
 }
