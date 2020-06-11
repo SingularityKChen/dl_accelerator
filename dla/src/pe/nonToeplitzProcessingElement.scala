@@ -105,13 +105,6 @@ class nonToeplitzProcessingElementPad(debug: Boolean) extends Module with MCRENF
     weightDataSPadReadEnReg := true.B
   }
 
-  protected def nexeSPadSpecialForNTP(): Unit = {
-    inActAdrSPadReadEnReg := false.B
-    inActDataSPadReadEnReg := false.B
-    weightAdrSPadReadEnReg := false.B
-    weightDataSPadReadEnReg := false.B
-  }
-
   protected def readOff(): Unit = {
     inActAdrSPadReadEnReg := false.B
     inActDataSPadReadEnReg := false.B
