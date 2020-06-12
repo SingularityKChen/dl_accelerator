@@ -438,6 +438,12 @@ class ProcessingElementPad(debug: Boolean) extends Module with MCRENFConfig with
     io.debugIO.weightAdrInIdx := weightAdrSPadReadIdxWire
     io.debugIO.sPadState := sPad
     io.debugIO.pSumReadIdx := pSumPadReadIdxReg
+    io.debugIO.pSumPadReadIdx := pSumPadReadIdxReg // f: for debug
+    io.debugIO.inActDataSliding := DontCare
+    io.debugIO.inActDataSlidingFire := DontCare
+    io.debugIO.futureLBStart := DontCare
+    io.debugIO.inActDataIndex := DontCare
+    io.debugIO.inActAdrData := DontCare
   }else {
     io.debugIO <> DontCare
   }
