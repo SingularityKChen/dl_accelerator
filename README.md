@@ -423,16 +423,16 @@ So I'd better call it as `Column Stationary`. We can get the graphs bellow.
 
 At SPad level, we will calculate all rows of weights and partial sums, so we don't have to care about this dimension at other levels. The corresponding hardware architecture is Processing Element.
 
-![EyerissV2 SPad Level](./diagrams/row-stationary-01.jpg)
+![EyerissV2 SPad Level]()
 
 At Noc level, all kinds of data will be mapped in to PE array at same time, 
 and regard the PEs which will produce the same column of partial sums as one group. The corresponding hardware architecture is the mesh network and pe array in the PE cluster.
 
-![EyerissV2 NoC Level](./diagrams/row-stationary-02.jpg)
+![EyerissV2 NoC Level]()
 
 At Global Buffer level, each group we created at Noc level will read in those data. The corresponding hardware component is the GLB cluster.
 
-![EyerissV2 Global Buffer Level](./diagrams/row-stationary-03.jpg)
+![EyerissV2 Global Buffer Level]()
 
 ### Compressed Sparse Column Data Format
 
