@@ -3,6 +3,35 @@ package dla.pe
 import scala.math.pow
 import chisel3.util.log2Ceil
 
+trait MCRENFConfigRS { // contains some scala values, we assume U = 1
+  /** this contains the parameters needed in SPad level
+    * [[M0]]: weights reuse M0 times
+    * [[C0]]: different input feature maps and their weights reuse
+    * [[S]]:
+    * [[E0]]: same row of weights in a PE
+    * [[N0]]: the number of partial sum
+    * [[F]]: one row of partial sum
+    * [[pSumOneSPadNum]]: the size of one matrix of PSum
+    * [[inActMatrixWidth]] and [[inActMatrixHeight]]: the size of input activation Matrix, no Toeplitz
+    * [[weightMatrixWidth]] and [[weightMatrixHeight]]: the size of weight Matrix
+    * */
+  protected val M0: Int = 4
+  protected val C0: Int = 2
+  protected val S: Int = 4
+  protected val E0: Int = 1
+  protected val N0: Int = 3
+  protected val F: Int = 2
+  protected val U: Int = 1
+  protected val pSumOneSPadNum: Int = M0*E0*N0*F
+  protected val weightMatrixWidth: Int = S*C0 // column
+  protected val weightMatrixHeight: Int = M0 // row
+  // the matrix below is for matrix-mul the golden model, Toeplitz
+  protected val inActMatrixWidth: Int = F*N0*E0 // column
+  protected val inActMatrixHeight: Int = S*C0 // row
+  protected val slidingInActMatrixWidth: Int = E0*N0
+  protected val slidingInActMatrixHeight: Int = C0*(S+U)
+}
+
 trait MCRENFConfig { // contains some scala values
   /** this contains the parameters needed in SPad level
     * [[M0]]: weights reuse M0 times

@@ -1,7 +1,7 @@
 package dla.pe
 
-import chisel3._
-import chisel3.util._
+import chisel3.{UInt, _}
+import chisel3.util.{log2Ceil, _}
 
 class ProcessingElementIO extends Bundle {
   val dataStream = new DataStreamIO
@@ -21,7 +21,7 @@ class PEControlDebugIO extends Bundle {
   val doMACEnDebug: Bool = Output(Bool())
 }
 
-class PESPadDebugIO extends Bundle with PESizeConfig with SPadSizeConfig {
+class PESPadDebugIO extends Bundle with PESizeConfig with SPadSizeConfig with MCRENFConfigRS {
   val inActMatrixData: UInt = Output(UInt(cscDataWidth.W))
   val inActMatrixRow: UInt = Output(UInt(cscCountWidth.W))
   val inActMatrixColumn: UInt = Output(UInt(inActAdrWidth.W))
@@ -37,6 +37,13 @@ class PESPadDebugIO extends Bundle with PESizeConfig with SPadSizeConfig {
   val weightAdrInIdx: UInt = Output(UInt(cscCountWidth.W))
   val sPadState: UInt = Output(UInt(3.W))
   val pSumReadIdx: UInt = Output(UInt(log2Ceil(pSumDataSPadSize).W))
+  //f: for debug, original IdxReg
+  val pSumPadReadIdx: UInt = Output(UInt(log2Ceil(pSumDataSPadSize).W))
+  val inActDataSliding: UInt = Output(UInt(log2Ceil(2).W))
+  val inActDataSlidingFire: Bool = Output(Bool())
+  val futureLBStart: UInt = Output(UInt(log2Ceil(C0 * (S + F)).W))
+  val inActDataIndex: UInt = Output(UInt(inActDataIdxWidth.W))
+  val inActAdrData:UInt = Output(UInt(inActAdrWidth.W))
 }
 
 class SPadCommonModuleIO(private val dataWidth: Int, private val padSize: Int) extends Bundle {
@@ -44,33 +51,57 @@ class SPadCommonModuleIO(private val dataWidth: Int, private val padSize: Int) e
   val ctrlPath = new SPadCommonCtrlIO(padSize)
 }
 
-class SPadCommonDataIO(private val dataWidth: Int, private val padSize: Int) extends Bundle {
-  val columnNum: UInt = Output(UInt(log2Ceil(padSize).W)) // the column number, address only
+class SPadNonTpModuleIO(private val dataWidth: Int, private val padSize: Int) extends Bundle {
+  val dataPath = new SPadNonTpDataIO(dataWidth, padSize)
+  val ctrlPath = new SPadNonTpCtrlIO(padSize)
+}
+
+class SPadCommonDataIO(private val dataWidth: Int, private val padSize: Int) extends Bundle with MCRENFConfigRS {
+  val columnNum: UInt = Output(UInt(log2Ceil(padSize).W)) // padReadIndexReg, idx which is currently reading, address only
   val readOutData: UInt = Output(UInt(dataWidth.W)) // the data read from SPad
   val writeInData: StreamBitsIO = Flipped(new StreamBitsIO(dataWidth))
+}
+
+class SPadNonTpDataIO(private val dataWidth: Int, private val padSize: Int) extends SPadCommonDataIO(dataWidth, padSize) with MCRENFConfigRS with PESizeConfig {
+  val currentSliding: UInt = Input(UInt(log2Ceil(F).W))
+  val slidingBoxUB: UInt = Output(UInt(log2Ceil(C0 * (S + F) ).W))
+  val slidingBoxLB: UInt = Output(UInt(log2Ceil(C0 * (S + F) ).W))
+  val futureLBStart: UInt = Output(UInt(log2Ceil(C0 * (S + F) ).W))
 }
 
 class SPadCommonCtrlIO(private val padSize: Int) extends Bundle {
   val writeEn: Bool = Input(Bool())
   val writeIdx: UInt = Output(UInt(log2Ceil(padSize).W))
   val writeFin: Bool = Output(Bool())
-  val readEn: Bool = Input(Bool())
+  val readEn: Bool = Input(Bool())       // todo seems could be removed
   val readInIdx: UInt = Input(UInt(log2Ceil(padSize).W))
   val indexInc: Bool = Input(Bool()) // true to increase the index of address
   val readInIdxEn: Bool = Input(Bool())
 }
 
+class SPadNonTpCtrlIO(private val padSize: Int) extends SPadCommonCtrlIO(padSize) {
+  val slidingInc: Bool = Output(Bool()) // true to slide the window for inAct
+  val inActColInc: Bool = Input(Bool())
+  val weightIdxInc: Bool = Input(Bool())
+  val padEqMpyBool: Bool = Input(Bool())
+  val mightWeightZeroColumn: Bool = Input(Bool())
+  val padEqWABool: Bool = Input(Bool())
+  val padEqIDBool: Bool = Input(Bool())
+  val inActReadIdxBeyondUB: Bool = Output(Bool())
+  val inActLastNonZeroEle: Bool = Output(Bool())
+}
+
 class DataStreamIO extends Bundle with PESizeConfig {
-  val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W)))
-  val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))
+  val ipsIO: DecoupledIO[UInt] = Flipped(Decoupled(UInt(psDataWidth.W))) /** input PSum*/
+  val opsIO: DecoupledIO[UInt] = Decoupled(UInt(psDataWidth.W))  /** output PSum*/
   // TODO: combine ips and ops
-  //val pSumDataIOs = new PSumSPadDataIO
+  //val pSumDataIOs = new PSumSPadDataIO            // above for psum, below for inputs ports of the CSC inAct & weight data
   val inActIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = inActAdrWidth, dataWidth = inActDataWidth))
   val weightIOs: CSCStreamIO = Flipped(new CSCStreamIO(adrWidth = weightAdrWidth, dataWidth = weightDataWidth))
 }
 
 class CSCStreamIO(private val adrWidth: Int, private val dataWidth: Int) extends Bundle {
-  val adrIOs = new StreamBitsIO(adrWidth) // output bits and valid
+  val adrIOs = new StreamBitsIO(adrWidth) // output bits and valid for queue
   val dataIOs = new StreamBitsIO(dataWidth) // output bits and valid
 }
 
@@ -93,7 +124,7 @@ class PEPadWriteFinIO extends Bundle {
 }
 
 class StreamBitsIO(private val dataWidth: Int) extends Bundle {
-  val data: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W))
+  val data: DecoupledIO[UInt] = Decoupled(UInt(dataWidth.W))       //fred: queue output port
 }
 
 class ProcessingElementControlIO extends Bundle {
@@ -104,7 +135,7 @@ class ProcessingElementControlIO extends Bundle {
 
 class PECtrlToPadIO extends Bundle {
   val doMACEn: Bool = Output(Bool()) // true, then begin MAC computations
-  val fromTopIO: PETopToHigherIO = Flipped(new PETopToHigherIO)
+  val fromTopIO: PETopToHigherIO = Flipped(new PETopToHigherIO) // fred: it should be spadToTopIO
 }
 
 class PEControlToTopIO extends PETopToHigherIO {
