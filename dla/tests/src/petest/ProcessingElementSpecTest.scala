@@ -42,7 +42,7 @@ class PEnonToeplitzTest extends FlatSpec with ChiselScalatestTester with Matcher
     *  0   16  24
     *  8   18  0
     *  10  0   26
-    *  0	  20  0
+    *  0	 20  0
     *  12  0   0
     * */
   /** the inInAct Toeplitz matrix used for software golden model is
