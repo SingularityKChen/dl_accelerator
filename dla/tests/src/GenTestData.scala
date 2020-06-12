@@ -327,6 +327,11 @@ class GenFunc(inActSparseRatio: Double = 0.845, weightSparseRatio: Double = 0.6,
         }
       }
     }
+    /** if the last column contains more than one elements,
+      * then we need to add one more address */
+    if (dataList.length -1 > adrList.last) {
+      adrList = adrList:::List(dataList.length)
+    }
     // add zero signal to their end
     adrList = adrList:::List(0)
     countList = countList:::List(0)
