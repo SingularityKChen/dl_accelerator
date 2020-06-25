@@ -28,7 +28,7 @@ You can install `mill` manual or [other methods](http://www.lihaoyi.com/mill/)
 
 ```bash
 sudo su
-curl -L https://github.com/lihaoyi/mill/releases/download/0.6.1/0.6.1 > /usr/local/bin/mill
+curl -L https://github.com/lihaoyi/mill/releases/download/0.7.3/0.7.3 > /usr/local/bin/mill
 chmod +x /usr/local/bin/mill
 ```
 
