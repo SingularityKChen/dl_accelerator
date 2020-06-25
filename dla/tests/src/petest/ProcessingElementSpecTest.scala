@@ -2,6 +2,8 @@ package dla.tests.petest
 
 import chisel3._
 import chisel3.tester._
+import chisel3.tester.experimental.TestOptionBuilder._
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import dla.pe._
 import org.scalatest._
 import dla.tests.GenOnePETestData
@@ -12,7 +14,8 @@ import scala.util.Random
 class PEnonToeplitzTest extends FlatSpec with ChiselScalatestTester with Matchers
   with SPadSizeConfig with MCRENFConfigRS with PESizeConfig {
   private val pSumSPadSize = M0*E0*F*N0
-  private val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0)  /** it means starting from the col1, the index of its first col, but the number of elements seem to be determined by # of elements of count vec */
+  private val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0)
+  /** it means starting from the col1, the index of its first col, but the number of elements seem to be determined by # of elements of count vec */
   private val inWeightData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 0) // zero column between 15 & 18, 24 & 27
   private val inWeightCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2, 0)
   private val inInActAdr = Seq(6, 10, 13, 0)
@@ -106,7 +109,8 @@ class PEnonToeplitzTest extends FlatSpec with ChiselScalatestTester with Matcher
   behavior of "test the spec of Processing Element"
 
   it should "work for nonToeplitz PE Top module" in {
-    test(new nonToeplitzProcessingElement(true)) { thePE =>
+    test(new nonToeplitzProcessingElement(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)){ thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
       //      outPSu
@@ -218,7 +222,8 @@ class PEnonToeplitzTest extends FlatSpec with ChiselScalatestTester with Matcher
 class PEToeplitzTest extends FlatSpec with ChiselScalatestTester with Matchers // This one uses Toeplitz matrix as the comparison
   with SPadSizeConfig with MCRENFConfigRS with PESizeConfig {
   private val pSumSPadSize = M0*E0*F*N0
-  private val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0)  /** it means starting from the col1, the index of its first col, but the number of elements seem to be determined by # of elements of count vec */
+  private val inWeightAdr = Seq(2, 5, weightZeroColumnCode, 6, 7, weightZeroColumnCode, 9, 12, 0)
+  /** it means starting from the col1, the index of its first col, but the number of elements seem to be determined by # of elements of count vec */
   private val inWeightData = Seq(1, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 0) // zero column between 15 & 18, 24 & 27
   private val inWeightCount = Seq(1, 2, 0, 1, 3, 2, 3, 1, 3, 0, 1, 2, 0)
   private val inInActAdr = Seq(5, 10, 13, 17, 20, 22, 0)
@@ -377,7 +382,8 @@ class PEToeplitzTest extends FlatSpec with ChiselScalatestTester with Matchers /
   behavior of "test the spec of Processing Element"
 
   it should "work well on PE Top module" in {
-    test(new ProcessingElement(true)) { thePE =>
+    test(new ProcessingElement(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
       outPSum.zip(addendRand).foreach({case (x, addend) =>
@@ -664,7 +670,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   behavior of "test the spec of Processing Element"
 
   it should "work well on PE Top module" in {
-    test(new ProcessingElement(true)) { thePE =>
+    test(new ProcessingElement(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { thePE =>
       val theTopIO = thePE.io
       val theClock = thePE.clock
       if (randOrNot) {
@@ -785,7 +792,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "work well on PE SPad with CSC compressed data" in {
-    test(new ProcessingElementPad(true)) { thePESPad =>
+    test(new ProcessingElementPad(true))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { thePESPad =>
       val theTopIO = thePESPad.io
       val theClock = thePESPad.clock
       println("----------------- test begin -----------------")
@@ -860,7 +868,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "work well on reading and writing data in csc format" in {
-    test(new SimplyCombineAdrDataSPad) { inActSPad =>
+    test(new SimplyCombineAdrDataSPad)
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { inActSPad =>
       val theTopIO = inActSPad.io
       val theClock = inActSPad.clock
       println("---------- begin to test the read ----------")
@@ -884,7 +893,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "work well on reading and writing data in csc format with continued zero columns" in {
-    test(new SimplyCombineAdrDataSPad) { inActSPad =>
+    test(new SimplyCombineAdrDataSPad)
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { inActSPad =>
       val theTopIO = inActSPad.io
       val theClock = inActSPad.clock
       println("---------- begin to test the read ----------")
@@ -909,7 +919,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "basically write and read address in InAct SPad with CSC format data" in {
-    test(new SPadAdrModule( 9, 7)) { adrSPad =>
+    test(new SPadAdrModule( 9, 7))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { adrSPad =>
       val theDataPath = adrSPad.io.dataPath
       val theCtrlPath = adrSPad.io.ctrlPath
       val theDataIO = theDataPath.writeInData.data
@@ -945,7 +956,8 @@ class ProcessingElementSpecTest extends FlatSpec with ChiselScalatestTester with
   }
 
   it should "basically write and read data in InAct SPad" in {
-    test(new SPadDataModule( PadSize = weightDataSPadSize, DataWidth = weightDataWidth, false)) { dataSPad =>
+    test(new SPadDataModule( PadSize = weightDataSPadSize, DataWidth = weightDataWidth, false))
+      .withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) { dataSPad =>
       val theDataPath = dataSPad.io.dataPath
       val theCtrlPath = dataSPad.io.ctrlPath
       val theDataIO = theDataPath.writeInData.data
